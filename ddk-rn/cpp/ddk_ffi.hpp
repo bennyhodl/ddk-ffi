@@ -35,6 +35,7 @@ class NativeDdkFfi : public jsi::HostObject {
     jsi::Value cpp_uniffi_ddk_ffi_fn_func_create_refund_transaction(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count);
     jsi::Value cpp_uniffi_ddk_ffi_fn_func_create_spliced_dlc_transactions(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count);
     jsi::Value cpp_uniffi_ddk_ffi_fn_func_create_xpriv_from_parent_path(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count);
+    jsi::Value cpp_uniffi_ddk_ffi_fn_func_extract_ecdsa_signature_from_oracle_signatures(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count);
     jsi::Value cpp_uniffi_ddk_ffi_fn_func_get_change_output_and_fees(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count);
     jsi::Value cpp_uniffi_ddk_ffi_fn_func_get_pubkey_from_extkey(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count);
     jsi::Value cpp_uniffi_ddk_ffi_fn_func_get_raw_funding_transaction_input_signature(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count);
@@ -62,6 +63,7 @@ class NativeDdkFfi : public jsi::HostObject {
     jsi::Value cpp_uniffi_ddk_ffi_checksum_func_create_refund_transaction(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count);
     jsi::Value cpp_uniffi_ddk_ffi_checksum_func_create_spliced_dlc_transactions(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count);
     jsi::Value cpp_uniffi_ddk_ffi_checksum_func_create_xpriv_from_parent_path(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count);
+    jsi::Value cpp_uniffi_ddk_ffi_checksum_func_extract_ecdsa_signature_from_oracle_signatures(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count);
     jsi::Value cpp_uniffi_ddk_ffi_checksum_func_get_change_output_and_fees(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count);
     jsi::Value cpp_uniffi_ddk_ffi_checksum_func_get_pubkey_from_extkey(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count);
     jsi::Value cpp_uniffi_ddk_ffi_checksum_func_get_raw_funding_transaction_input_signature(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count);

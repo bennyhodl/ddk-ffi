@@ -133,6 +133,11 @@ interface NativeModuleInterface {
     path: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus
   ): Uint8Array;
+  ubrn_uniffi_ddk_ffi_fn_func_extract_ecdsa_signature_from_oracle_signatures(
+    oracleSignatures: Uint8Array,
+    adaptorSignature: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus
+  ): Uint8Array;
   ubrn_uniffi_ddk_ffi_fn_func_get_change_output_and_fees(
     params: Uint8Array,
     feeRate: bigint,
@@ -235,6 +240,7 @@ interface NativeModuleInterface {
   ubrn_uniffi_ddk_ffi_checksum_func_create_refund_transaction(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_create_spliced_dlc_transactions(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_create_xpriv_from_parent_path(): number;
+  ubrn_uniffi_ddk_ffi_checksum_func_extract_ecdsa_signature_from_oracle_signatures(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_get_change_output_and_fees(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_get_pubkey_from_extkey(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_get_raw_funding_transaction_input_signature(): number;

@@ -3,7 +3,7 @@
 authors = ["benny b <ben@bitcoinbay.foundation>"]
 edition = "2021"
 name = "ddk_ts"
-version = "0.3.31"
+version = "0.3.32"
 
 [lib]
 crate-type = ["cdylib", "rlib"]

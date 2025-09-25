@@ -243,6 +243,11 @@ extern "C" {
         RustBuffer path, 
         RustCallStatus *uniffi_out_err
     );
+    RustBuffer uniffi_ddk_ffi_fn_func_extract_ecdsa_signature_from_oracle_signatures(
+        RustBuffer oracle_signatures, 
+        RustBuffer adaptor_signature, 
+        RustCallStatus *uniffi_out_err
+    );
     RustBuffer uniffi_ddk_ffi_fn_func_get_change_output_and_fees(
         RustBuffer params, 
         uint64_t fee_rate, 
@@ -569,6 +574,8 @@ extern "C" {
     uint16_t uniffi_ddk_ffi_checksum_func_create_spliced_dlc_transactions(
     );
     uint16_t uniffi_ddk_ffi_checksum_func_create_xpriv_from_parent_path(
+    );
+    uint16_t uniffi_ddk_ffi_checksum_func_extract_ecdsa_signature_from_oracle_signatures(
     );
     uint16_t uniffi_ddk_ffi_checksum_func_get_change_output_and_fees(
     );
@@ -2252,6 +2259,14 @@ NativeDdkFfi::NativeDdkFfi(
             return this->cpp_uniffi_ddk_ffi_fn_func_create_xpriv_from_parent_path(rt, thisVal, args, count);
         }
     );
+    props["ubrn_uniffi_ddk_ffi_fn_func_extract_ecdsa_signature_from_oracle_signatures"] = jsi::Function::createFromHostFunction(
+        rt,
+        jsi::PropNameID::forAscii(rt, "ubrn_uniffi_ddk_ffi_fn_func_extract_ecdsa_signature_from_oracle_signatures"),
+        2,
+        [this](jsi::Runtime &rt, const jsi::Value &thisVal, const jsi::Value *args, size_t count) -> jsi::Value {
+            return this->cpp_uniffi_ddk_ffi_fn_func_extract_ecdsa_signature_from_oracle_signatures(rt, thisVal, args, count);
+        }
+    );
     props["ubrn_uniffi_ddk_ffi_fn_func_get_change_output_and_fees"] = jsi::Function::createFromHostFunction(
         rt,
         jsi::PropNameID::forAscii(rt, "ubrn_uniffi_ddk_ffi_fn_func_get_change_output_and_fees"),
@@ -2466,6 +2481,14 @@ NativeDdkFfi::NativeDdkFfi(
         0,
         [this](jsi::Runtime &rt, const jsi::Value &thisVal, const jsi::Value *args, size_t count) -> jsi::Value {
             return this->cpp_uniffi_ddk_ffi_checksum_func_create_xpriv_from_parent_path(rt, thisVal, args, count);
+        }
+    );
+    props["ubrn_uniffi_ddk_ffi_checksum_func_extract_ecdsa_signature_from_oracle_signatures"] = jsi::Function::createFromHostFunction(
+        rt,
+        jsi::PropNameID::forAscii(rt, "ubrn_uniffi_ddk_ffi_checksum_func_extract_ecdsa_signature_from_oracle_signatures"),
+        0,
+        [this](jsi::Runtime &rt, const jsi::Value &thisVal, const jsi::Value *args, size_t count) -> jsi::Value {
+            return this->cpp_uniffi_ddk_ffi_checksum_func_extract_ecdsa_signature_from_oracle_signatures(rt, thisVal, args, count);
         }
     );
     props["ubrn_uniffi_ddk_ffi_checksum_func_get_change_output_and_fees"] = jsi::Function::createFromHostFunction(
@@ -2775,6 +2798,16 @@ jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_func_create_xpriv_from_parent_pat
         
         return uniffi::ddk_ffi::Bridging<RustBuffer>::toJs(rt, callInvoker, value);
 }
+jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_func_extract_ecdsa_signature_from_oracle_signatures(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
+        RustCallStatus status = uniffi::ddk_ffi::Bridging<RustCallStatus>::rustSuccess(rt);
+        auto value = uniffi_ddk_ffi_fn_func_extract_ecdsa_signature_from_oracle_signatures(uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[1]), 
+            &status
+        );
+        uniffi::ddk_ffi::Bridging<RustCallStatus>::copyIntoJs(rt, callInvoker, status, args[count - 1]);
+
+        
+        return uniffi::ddk_ffi::Bridging<RustBuffer>::toJs(rt, callInvoker, value);
+}
 jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_func_get_change_output_and_fees(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         RustCallStatus status = uniffi::ddk_ffi::Bridging<RustCallStatus>::rustSuccess(rt);
         auto value = uniffi_ddk_ffi_fn_func_get_change_output_and_fees(uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[0]), uniffi_jsi::Bridging<uint64_t>::fromJs(rt, callInvoker, args[1]), 
@@ -2997,6 +3030,13 @@ jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_checksum_func_create_spliced_dlc_tra
 }
 jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_checksum_func_create_xpriv_from_parent_path(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         auto value = uniffi_ddk_ffi_checksum_func_create_xpriv_from_parent_path(
+        );
+
+        
+        return uniffi_jsi::Bridging<uint16_t>::toJs(rt, callInvoker, value);
+}
+jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_checksum_func_extract_ecdsa_signature_from_oracle_signatures(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
+        auto value = uniffi_ddk_ffi_checksum_func_extract_ecdsa_signature_from_oracle_signatures(
         );
 
         

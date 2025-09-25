@@ -491,6 +491,32 @@ export function createXprivFromParentPath(
     )
   );
 }
+export function extractEcdsaSignatureFromOracleSignatures(
+  oracleSignatures: Array<Array</*u8*/ number>>,
+  adaptorSignature: Array</*u8*/ number>
+): Array</*u8*/ number> /*throws*/ {
+  return FfiConverterArrayUInt8.lift(
+    uniffiCaller.rustCallWithError(
+      /*liftError:*/ FfiConverterTypeDLCError.lift.bind(
+        FfiConverterTypeDLCError
+      ),
+      /*caller:*/ (callStatus) => {
+        return (() => {
+          console.debug(
+            `-- uniffi_ddk_ffi_fn_func_extract_ecdsa_signature_from_oracle_signatures`
+          );
+          return nativeModule()
+            .ubrn_uniffi_ddk_ffi_fn_func_extract_ecdsa_signature_from_oracle_signatures;
+        })()(
+          FfiConverterArrayArrayUInt8.lower(oracleSignatures),
+          FfiConverterArrayUInt8.lower(adaptorSignature),
+          callStatus
+        );
+      },
+      /*liftString:*/ FfiConverterString.lift
+    )
+  );
+}
 export function getChangeOutputAndFees(
   params: PartyParams,
   feeRate: /*u64*/ bigint
@@ -2236,6 +2262,14 @@ function uniffiEnsureInitialized() {
   ) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       'uniffi_ddk_ffi_checksum_func_create_xpriv_from_parent_path'
+    );
+  }
+  if (
+    nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_extract_ecdsa_signature_from_oracle_signatures() !==
+    8006
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      'uniffi_ddk_ffi_checksum_func_extract_ecdsa_signature_from_oracle_signatures'
     );
   }
   if (
