@@ -517,6 +517,63 @@ export function extractEcdsaSignatureFromOracleSignatures(
     )
   );
 }
+export function getCetAdaptorSignatureInputs(
+  cet: Transaction,
+  oracleInfo: Array<OracleInfo>,
+  fundingScriptPubkey: Array</*u8*/ number>,
+  fundOutputValue: /*u64*/ bigint,
+  msgs: Array<Array<Array</*u8*/ number>>>
+): CetAdaptorSignatureDebugInfo /*throws*/ {
+  return FfiConverterTypeCetAdaptorSignatureDebugInfo.lift(
+    uniffiCaller.rustCallWithError(
+      /*liftError:*/ FfiConverterTypeDLCError.lift.bind(
+        FfiConverterTypeDLCError
+      ),
+      /*caller:*/ (callStatus) => {
+        return (() => {
+          console.debug(
+            `-- uniffi_ddk_ffi_fn_func_get_cet_adaptor_signature_inputs`
+          );
+          return nativeModule()
+            .ubrn_uniffi_ddk_ffi_fn_func_get_cet_adaptor_signature_inputs;
+        })()(
+          FfiConverterTypeTransaction.lower(cet),
+          FfiConverterArrayTypeOracleInfo.lower(oracleInfo),
+          FfiConverterArrayUInt8.lower(fundingScriptPubkey),
+          FfiConverterUInt64.lower(fundOutputValue),
+          FfiConverterArrayArrayArrayUInt8.lower(msgs),
+          callStatus
+        );
+      },
+      /*liftString:*/ FfiConverterString.lift
+    )
+  );
+}
+export function getCetSighash(
+  cet: Transaction,
+  fundingScriptPubkey: Array</*u8*/ number>,
+  fundOutputValue: /*u64*/ bigint
+): Array</*u8*/ number> /*throws*/ {
+  return FfiConverterArrayUInt8.lift(
+    uniffiCaller.rustCallWithError(
+      /*liftError:*/ FfiConverterTypeDLCError.lift.bind(
+        FfiConverterTypeDLCError
+      ),
+      /*caller:*/ (callStatus) => {
+        return (() => {
+          console.debug(`-- uniffi_ddk_ffi_fn_func_get_cet_sighash`);
+          return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_get_cet_sighash;
+        })()(
+          FfiConverterTypeTransaction.lower(cet),
+          FfiConverterArrayUInt8.lower(fundingScriptPubkey),
+          FfiConverterUInt64.lower(fundOutputValue),
+          callStatus
+        );
+      },
+      /*liftString:*/ FfiConverterString.lift
+    )
+  );
+}
 export function getChangeOutputAndFees(
   params: PartyParams,
   feeRate: /*u64*/ bigint
@@ -904,6 +961,86 @@ const FfiConverterTypeAdaptorSignature = (() => {
       return (
         FfiConverterArrayUInt8.allocationSize(value.signature) +
         FfiConverterArrayUInt8.allocationSize(value.proof)
+      );
+    }
+  }
+  return new FFIConverter();
+})();
+
+export type CetAdaptorSignatureDebugInfo = {
+  sighash: Array</*u8*/ number>;
+  adaptorPoint: Array</*u8*/ number>;
+  inputIndex: /*u32*/ number;
+  scriptPubkey: Array</*u8*/ number>;
+  value: /*u64*/ bigint;
+  cetTxid: string;
+  cetRaw: Array</*u8*/ number>;
+};
+
+/**
+ * Generated factory for {@link CetAdaptorSignatureDebugInfo} record objects.
+ */
+export const CetAdaptorSignatureDebugInfo = (() => {
+  const defaults = () => ({});
+  const create = (() => {
+    return uniffiCreateRecord<
+      CetAdaptorSignatureDebugInfo,
+      ReturnType<typeof defaults>
+    >(defaults);
+  })();
+  return Object.freeze({
+    /**
+     * Create a frozen instance of {@link CetAdaptorSignatureDebugInfo}, with defaults specified
+     * in Rust, in the {@link ddk_ffi} crate.
+     */
+    create,
+
+    /**
+     * Create a frozen instance of {@link CetAdaptorSignatureDebugInfo}, with defaults specified
+     * in Rust, in the {@link ddk_ffi} crate.
+     */
+    new: create,
+
+    /**
+     * Defaults specified in the {@link ddk_ffi} crate.
+     */
+    defaults: () =>
+      Object.freeze(defaults()) as Partial<CetAdaptorSignatureDebugInfo>,
+  });
+})();
+
+const FfiConverterTypeCetAdaptorSignatureDebugInfo = (() => {
+  type TypeName = CetAdaptorSignatureDebugInfo;
+  class FFIConverter extends AbstractFfiConverterByteArray<TypeName> {
+    read(from: RustBuffer): TypeName {
+      return {
+        sighash: FfiConverterArrayUInt8.read(from),
+        adaptorPoint: FfiConverterArrayUInt8.read(from),
+        inputIndex: FfiConverterUInt32.read(from),
+        scriptPubkey: FfiConverterArrayUInt8.read(from),
+        value: FfiConverterUInt64.read(from),
+        cetTxid: FfiConverterString.read(from),
+        cetRaw: FfiConverterArrayUInt8.read(from),
+      };
+    }
+    write(value: TypeName, into: RustBuffer): void {
+      FfiConverterArrayUInt8.write(value.sighash, into);
+      FfiConverterArrayUInt8.write(value.adaptorPoint, into);
+      FfiConverterUInt32.write(value.inputIndex, into);
+      FfiConverterArrayUInt8.write(value.scriptPubkey, into);
+      FfiConverterUInt64.write(value.value, into);
+      FfiConverterString.write(value.cetTxid, into);
+      FfiConverterArrayUInt8.write(value.cetRaw, into);
+    }
+    allocationSize(value: TypeName): number {
+      return (
+        FfiConverterArrayUInt8.allocationSize(value.sighash) +
+        FfiConverterArrayUInt8.allocationSize(value.adaptorPoint) +
+        FfiConverterUInt32.allocationSize(value.inputIndex) +
+        FfiConverterArrayUInt8.allocationSize(value.scriptPubkey) +
+        FfiConverterUInt64.allocationSize(value.value) +
+        FfiConverterString.allocationSize(value.cetTxid) +
+        FfiConverterArrayUInt8.allocationSize(value.cetRaw)
       );
     }
   }
@@ -2273,6 +2410,21 @@ function uniffiEnsureInitialized() {
     );
   }
   if (
+    nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_get_cet_adaptor_signature_inputs() !==
+    14595
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      'uniffi_ddk_ffi_checksum_func_get_cet_adaptor_signature_inputs'
+    );
+  }
+  if (
+    nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_get_cet_sighash() !== 10643
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      'uniffi_ddk_ffi_checksum_func_get_cet_sighash'
+    );
+  }
+  if (
     nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_get_change_output_and_fees() !==
     44150
   ) {
@@ -2375,6 +2527,7 @@ export default Object.freeze({
   initialize: uniffiEnsureInitialized,
   converters: {
     FfiConverterTypeAdaptorSignature,
+    FfiConverterTypeCetAdaptorSignatureDebugInfo,
     FfiConverterTypeChangeOutputAndFees,
     FfiConverterTypeDLCError,
     FfiConverterTypeDlcInputInfo,

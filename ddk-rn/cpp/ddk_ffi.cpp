@@ -248,6 +248,20 @@ extern "C" {
         RustBuffer adaptor_signature, 
         RustCallStatus *uniffi_out_err
     );
+    RustBuffer uniffi_ddk_ffi_fn_func_get_cet_adaptor_signature_inputs(
+        RustBuffer cet, 
+        RustBuffer oracle_info, 
+        RustBuffer funding_script_pubkey, 
+        uint64_t fund_output_value, 
+        RustBuffer msgs, 
+        RustCallStatus *uniffi_out_err
+    );
+    RustBuffer uniffi_ddk_ffi_fn_func_get_cet_sighash(
+        RustBuffer cet, 
+        RustBuffer funding_script_pubkey, 
+        uint64_t fund_output_value, 
+        RustCallStatus *uniffi_out_err
+    );
     RustBuffer uniffi_ddk_ffi_fn_func_get_change_output_and_fees(
         RustBuffer params, 
         uint64_t fee_rate, 
@@ -576,6 +590,10 @@ extern "C" {
     uint16_t uniffi_ddk_ffi_checksum_func_create_xpriv_from_parent_path(
     );
     uint16_t uniffi_ddk_ffi_checksum_func_extract_ecdsa_signature_from_oracle_signatures(
+    );
+    uint16_t uniffi_ddk_ffi_checksum_func_get_cet_adaptor_signature_inputs(
+    );
+    uint16_t uniffi_ddk_ffi_checksum_func_get_cet_sighash(
     );
     uint16_t uniffi_ddk_ffi_checksum_func_get_change_output_and_fees(
     );
@@ -2267,6 +2285,22 @@ NativeDdkFfi::NativeDdkFfi(
             return this->cpp_uniffi_ddk_ffi_fn_func_extract_ecdsa_signature_from_oracle_signatures(rt, thisVal, args, count);
         }
     );
+    props["ubrn_uniffi_ddk_ffi_fn_func_get_cet_adaptor_signature_inputs"] = jsi::Function::createFromHostFunction(
+        rt,
+        jsi::PropNameID::forAscii(rt, "ubrn_uniffi_ddk_ffi_fn_func_get_cet_adaptor_signature_inputs"),
+        5,
+        [this](jsi::Runtime &rt, const jsi::Value &thisVal, const jsi::Value *args, size_t count) -> jsi::Value {
+            return this->cpp_uniffi_ddk_ffi_fn_func_get_cet_adaptor_signature_inputs(rt, thisVal, args, count);
+        }
+    );
+    props["ubrn_uniffi_ddk_ffi_fn_func_get_cet_sighash"] = jsi::Function::createFromHostFunction(
+        rt,
+        jsi::PropNameID::forAscii(rt, "ubrn_uniffi_ddk_ffi_fn_func_get_cet_sighash"),
+        3,
+        [this](jsi::Runtime &rt, const jsi::Value &thisVal, const jsi::Value *args, size_t count) -> jsi::Value {
+            return this->cpp_uniffi_ddk_ffi_fn_func_get_cet_sighash(rt, thisVal, args, count);
+        }
+    );
     props["ubrn_uniffi_ddk_ffi_fn_func_get_change_output_and_fees"] = jsi::Function::createFromHostFunction(
         rt,
         jsi::PropNameID::forAscii(rt, "ubrn_uniffi_ddk_ffi_fn_func_get_change_output_and_fees"),
@@ -2489,6 +2523,22 @@ NativeDdkFfi::NativeDdkFfi(
         0,
         [this](jsi::Runtime &rt, const jsi::Value &thisVal, const jsi::Value *args, size_t count) -> jsi::Value {
             return this->cpp_uniffi_ddk_ffi_checksum_func_extract_ecdsa_signature_from_oracle_signatures(rt, thisVal, args, count);
+        }
+    );
+    props["ubrn_uniffi_ddk_ffi_checksum_func_get_cet_adaptor_signature_inputs"] = jsi::Function::createFromHostFunction(
+        rt,
+        jsi::PropNameID::forAscii(rt, "ubrn_uniffi_ddk_ffi_checksum_func_get_cet_adaptor_signature_inputs"),
+        0,
+        [this](jsi::Runtime &rt, const jsi::Value &thisVal, const jsi::Value *args, size_t count) -> jsi::Value {
+            return this->cpp_uniffi_ddk_ffi_checksum_func_get_cet_adaptor_signature_inputs(rt, thisVal, args, count);
+        }
+    );
+    props["ubrn_uniffi_ddk_ffi_checksum_func_get_cet_sighash"] = jsi::Function::createFromHostFunction(
+        rt,
+        jsi::PropNameID::forAscii(rt, "ubrn_uniffi_ddk_ffi_checksum_func_get_cet_sighash"),
+        0,
+        [this](jsi::Runtime &rt, const jsi::Value &thisVal, const jsi::Value *args, size_t count) -> jsi::Value {
+            return this->cpp_uniffi_ddk_ffi_checksum_func_get_cet_sighash(rt, thisVal, args, count);
         }
     );
     props["ubrn_uniffi_ddk_ffi_checksum_func_get_change_output_and_fees"] = jsi::Function::createFromHostFunction(
@@ -2808,6 +2858,26 @@ jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_func_extract_ecdsa_signature_from
         
         return uniffi::ddk_ffi::Bridging<RustBuffer>::toJs(rt, callInvoker, value);
 }
+jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_func_get_cet_adaptor_signature_inputs(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
+        RustCallStatus status = uniffi::ddk_ffi::Bridging<RustCallStatus>::rustSuccess(rt);
+        auto value = uniffi_ddk_ffi_fn_func_get_cet_adaptor_signature_inputs(uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[1]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[2]), uniffi_jsi::Bridging<uint64_t>::fromJs(rt, callInvoker, args[3]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[4]), 
+            &status
+        );
+        uniffi::ddk_ffi::Bridging<RustCallStatus>::copyIntoJs(rt, callInvoker, status, args[count - 1]);
+
+        
+        return uniffi::ddk_ffi::Bridging<RustBuffer>::toJs(rt, callInvoker, value);
+}
+jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_func_get_cet_sighash(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
+        RustCallStatus status = uniffi::ddk_ffi::Bridging<RustCallStatus>::rustSuccess(rt);
+        auto value = uniffi_ddk_ffi_fn_func_get_cet_sighash(uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[1]), uniffi_jsi::Bridging<uint64_t>::fromJs(rt, callInvoker, args[2]), 
+            &status
+        );
+        uniffi::ddk_ffi::Bridging<RustCallStatus>::copyIntoJs(rt, callInvoker, status, args[count - 1]);
+
+        
+        return uniffi::ddk_ffi::Bridging<RustBuffer>::toJs(rt, callInvoker, value);
+}
 jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_func_get_change_output_and_fees(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         RustCallStatus status = uniffi::ddk_ffi::Bridging<RustCallStatus>::rustSuccess(rt);
         auto value = uniffi_ddk_ffi_fn_func_get_change_output_and_fees(uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[0]), uniffi_jsi::Bridging<uint64_t>::fromJs(rt, callInvoker, args[1]), 
@@ -3037,6 +3107,20 @@ jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_checksum_func_create_xpriv_from_pare
 }
 jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_checksum_func_extract_ecdsa_signature_from_oracle_signatures(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         auto value = uniffi_ddk_ffi_checksum_func_extract_ecdsa_signature_from_oracle_signatures(
+        );
+
+        
+        return uniffi_jsi::Bridging<uint16_t>::toJs(rt, callInvoker, value);
+}
+jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_checksum_func_get_cet_adaptor_signature_inputs(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
+        auto value = uniffi_ddk_ffi_checksum_func_get_cet_adaptor_signature_inputs(
+        );
+
+        
+        return uniffi_jsi::Bridging<uint16_t>::toJs(rt, callInvoker, value);
+}
+jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_checksum_func_get_cet_sighash(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
+        auto value = uniffi_ddk_ffi_checksum_func_get_cet_sighash(
         );
 
         
