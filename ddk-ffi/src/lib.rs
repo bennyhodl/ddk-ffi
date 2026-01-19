@@ -193,6 +193,31 @@ pub struct OracleInfo {
     pub nonces: Vec<Vec<u8>>,
 }
 
+/// Debug info for CET adaptor signature inputs.
+///
+/// Contains all the values that go into creating an adaptor signature,
+/// useful for comparing with external signers during debugging.
+///
+/// This struct is intentionally always available (not feature-gated)
+/// to support production debugging scenarios.
+#[derive(Clone)]
+pub struct CetAdaptorSignatureDebugInfo {
+    /// The sighash (32 bytes) - this is the message that gets signed
+    pub sighash: Vec<u8>,
+    /// The adaptor point (33 bytes compressed public key)
+    pub adaptor_point: Vec<u8>,
+    /// Input index (always 0 for CETs)
+    pub input_index: u32,
+    /// The funding script pubkey used for sighash
+    pub script_pubkey: Vec<u8>,
+    /// The fund output value used for sighash
+    pub value: u64,
+    /// The CET txid
+    pub cet_txid: String,
+    /// Raw CET bytes for verification
+    pub cet_raw: Vec<u8>,
+}
+
 // Conversion helpers
 pub fn btc_tx_to_transaction(tx: &BtcTransaction) -> Transaction {
     use bitcoin::consensus::Encodable;
@@ -1154,6 +1179,116 @@ pub fn extract_ecdsa_signature_from_oracle_signatures(
     Ok(ecdsa_sig.serialize_der().to_vec())
 }
 
+/// Get all the inputs that go into creating a CET adaptor signature.
+///
+/// This debug function is intentionally always available (not feature-gated)
+/// to enable debugging signature mismatches in production environments where
+/// rebuilding with debug features may not be feasible.
+///
+/// Use this to compare values with external signers (e.g., Fordefi) when
+/// debugging adaptor signature verification failures.
+///
+/// Returns:
+/// - `sighash`: The 32-byte BIP143 sighash message that gets signed
+/// - `adaptor_point`: The 33-byte compressed adaptor public key
+/// - `input_index`: Always 0 for CETs
+/// - `script_pubkey`: The funding script used for sighash calculation
+/// - `value`: The fund output value used for sighash calculation
+/// - `cet_txid`: The CET transaction ID
+/// - `cet_raw`: Raw serialized CET bytes
+pub fn get_cet_adaptor_signature_inputs(
+    cet: Transaction,
+    oracle_info: Vec<OracleInfo>,
+    funding_script_pubkey: Vec<u8>,
+    fund_output_value: u64,
+    msgs: Vec<Vec<Vec<u8>>>,
+) -> Result<CetAdaptorSignatureDebugInfo, DLCError> {
+    let btc_tx = transaction_to_btc_tx(&cet)?;
+    let funding_script = Script::from_bytes(&funding_script_pubkey);
+
+    // Convert oracle info
+    let oracle_infos: Vec<DlcOracleInfo> = oracle_info
+        .iter()
+        .map(|info| {
+            let public_key = XOnlyPublicKey::from_slice(&info.public_key)
+                .map_err(|_| DLCError::InvalidPublicKey)?;
+            let nonces = info
+                .nonces
+                .iter()
+                .map(|nonce| XOnlyPublicKey::from_slice(nonce))
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|_| DLCError::InvalidArgument("Invalid nonce pubkey".to_string()))?;
+            Ok(DlcOracleInfo { public_key, nonces })
+        })
+        .collect::<Result<Vec<_>, DLCError>>()?;
+
+    // Convert messages
+    let cet_msgs: Vec<Vec<Message>> = msgs
+        .into_iter()
+        .map(|outcome_msgs| {
+            outcome_msgs
+                .iter()
+                .map(|m| {
+                    Message::from_digest_slice(m)
+                        .map_err(|_| DLCError::InvalidArgument("Invalid message".to_string()))
+                })
+                .collect::<Result<Vec<_>, _>>()
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let secp = get_secp_context();
+
+    // Get the adaptor point
+    let adaptor_point = ddk_dlc::get_adaptor_point_from_oracle_info(secp, &oracle_infos, &cet_msgs)
+        .map_err(|e| DLCError::Secp256k1Error(e.to_string()))?;
+
+    // Get the sighash - this is the actual message being signed
+    let sig_hash = ddk_dlc::util::get_sig_hash_msg(
+        &btc_tx,
+        0, // input_index is always 0 for CETs
+        funding_script,
+        Amount::from_sat(fund_output_value),
+    )
+    .map_err(DLCError::from)?;
+
+    Ok(CetAdaptorSignatureDebugInfo {
+        sighash: sig_hash.as_ref().to_vec(),
+        adaptor_point: adaptor_point.serialize().to_vec(),
+        input_index: 0,
+        script_pubkey: funding_script_pubkey,
+        value: fund_output_value,
+        cet_txid: btc_tx.compute_txid().to_string(),
+        cet_raw: cet.raw_bytes,
+    })
+}
+
+/// Get the sighash for a CET - the actual 32-byte message that gets signed.
+///
+/// This debug function is intentionally always available (not feature-gated)
+/// to enable debugging sighash mismatches in production environments where
+/// rebuilding with debug features may not be feasible.
+///
+/// Use this to compare sighash values with external signers (e.g., Fordefi)
+/// when debugging signature verification failures.
+pub fn get_cet_sighash(
+    cet: Transaction,
+    funding_script_pubkey: Vec<u8>,
+    fund_output_value: u64,
+) -> Result<Vec<u8>, DLCError> {
+    let btc_tx = transaction_to_btc_tx(&cet)?;
+    let funding_script = Script::from_bytes(&funding_script_pubkey);
+
+    let sig_hash = ddk_dlc::util::get_sig_hash_msg(
+        &btc_tx,
+        0, // input_index is always 0 for CETs
+        funding_script,
+        Amount::from_sat(fund_output_value),
+    )
+    .map_err(DLCError::from)?;
+
+    Ok(sig_hash.as_ref().to_vec())
+}
+
 pub fn convert_mnemonic_to_seed(
     mnemonic: String,
     passphrase: Option<String>,
@@ -2065,5 +2200,243 @@ mod tests {
         // Verify the signature is valid DER format
         let ecdsa_sig = EcdsaSignature::from_der(&ecdsa_sig_bytes);
         assert!(ecdsa_sig.is_ok(), "Should be valid DER signature");
+    }
+
+    #[test]
+    fn test_get_cet_sighash() {
+        // Setup: Create DLC transactions to get a valid CET
+        let (offer_party_params, _offer_fund_sk) =
+            get_party_params(1_000_000_000, 100_000_000, None);
+        let (accept_party_params, _accept_fund_sk) =
+            get_party_params(1_000_000_000, 100_000_000, Some(2));
+
+        let dlc_txs = create_dlc_transactions(
+            payouts_test(),
+            offer_party_params.clone(),
+            accept_party_params.clone(),
+            100,
+            4,
+            10,
+            10,
+            0,
+        )
+        .unwrap();
+
+        let cet = dlc_txs.cets[0].clone();
+        let funding_script_pubkey = ddk_dlc::make_funding_redeemscript(
+            &PublicKey::from_slice(&offer_party_params.fund_pubkey).unwrap(),
+            &PublicKey::from_slice(&accept_party_params.fund_pubkey).unwrap(),
+        );
+        let fund_output_value = dlc_txs.fund.outputs[0].value;
+
+        // Act: Get the sighash
+        let result = get_cet_sighash(
+            cet.clone(),
+            funding_script_pubkey.clone().into_bytes(),
+            fund_output_value,
+        );
+
+        // Assert
+        assert!(result.is_ok(), "get_cet_sighash should succeed");
+        let sighash = result.unwrap();
+        assert_eq!(sighash.len(), 32, "Sighash should be 32 bytes");
+
+        // Verify against direct ddk-dlc call
+        let btc_tx = transaction_to_btc_tx(&cet).unwrap();
+        let direct_sighash = ddk_dlc::util::get_sig_hash_msg(
+            &btc_tx,
+            0,
+            Script::from_bytes(&funding_script_pubkey.clone().into_bytes()),
+            Amount::from_sat(fund_output_value),
+        )
+        .unwrap();
+
+        assert_eq!(
+            sighash,
+            direct_sighash.as_ref().to_vec(),
+            "Sighash should match direct ddk-dlc calculation"
+        );
+    }
+
+    #[test]
+    fn test_get_cet_adaptor_signature_inputs() {
+        // Setup: Create DLC transactions and oracle info
+        let secp = Secp256k1::new();
+        let mut rng = secp256k1_zkp::rand::thread_rng();
+        let (offer_party_params, _offer_fund_sk) =
+            get_party_params(1_000_000_000, 100_000_000, None);
+        let (accept_party_params, _accept_fund_sk) =
+            get_party_params(1_000_000_000, 100_000_000, Some(2));
+
+        let dlc_txs = create_dlc_transactions(
+            payouts_test(),
+            offer_party_params.clone(),
+            accept_party_params.clone(),
+            100,
+            4,
+            10,
+            10,
+            0,
+        )
+        .unwrap();
+
+        let cet = dlc_txs.cets[0].clone();
+        let funding_script_pubkey = ddk_dlc::make_funding_redeemscript(
+            &PublicKey::from_slice(&offer_party_params.fund_pubkey).unwrap(),
+            &PublicKey::from_slice(&accept_party_params.fund_pubkey).unwrap(),
+        );
+        let fund_output_value = dlc_txs.fund.outputs[0].value;
+
+        // Create oracle info (single oracle, single nonce for enumeration)
+        let oracle_kp = Keypair::new(&secp, &mut rng);
+        let oracle_pubkey = oracle_kp.x_only_public_key().0;
+        let mut sk_nonce = [0u8; 32];
+        rng.fill_bytes(&mut sk_nonce);
+        let oracle_r_kp = Keypair::from_seckey_slice(&secp, &sk_nonce).unwrap();
+        let nonce = XOnlyPublicKey::from_keypair(&oracle_r_kp).0;
+
+        let oracle_info = vec![OracleInfo {
+            public_key: oracle_pubkey.serialize().to_vec(),
+            nonces: vec![nonce.serialize().to_vec()],
+        }];
+
+        // Create message (first outcome)
+        let message = &[0u8];
+        let hash = sha256::Hash::hash(message).to_byte_array();
+        let msgs = vec![vec![hash.to_vec()]]; // Single oracle, single message
+
+        // Act: Get debug info
+        let result = get_cet_adaptor_signature_inputs(
+            cet.clone(),
+            oracle_info.clone(),
+            funding_script_pubkey.clone().into_bytes(),
+            fund_output_value,
+            msgs.clone(),
+        );
+
+        // Assert
+        assert!(
+            result.is_ok(),
+            "get_cet_adaptor_signature_inputs should succeed"
+        );
+        let debug_info = result.unwrap();
+
+        // Verify sighash
+        assert_eq!(debug_info.sighash.len(), 32, "Sighash should be 32 bytes");
+        let expected_sighash = get_cet_sighash(
+            cet.clone(),
+            funding_script_pubkey.clone().into_bytes(),
+            fund_output_value,
+        )
+        .unwrap();
+        assert_eq!(
+            debug_info.sighash, expected_sighash,
+            "Sighash should match get_cet_sighash result"
+        );
+
+        // Verify adaptor point
+        assert_eq!(
+            debug_info.adaptor_point.len(),
+            33,
+            "Adaptor point should be 33 bytes (compressed pubkey)"
+        );
+
+        // Verify input index is always 0 for CETs
+        assert_eq!(
+            debug_info.input_index, 0,
+            "Input index should always be 0 for CETs"
+        );
+
+        // Verify script_pubkey matches what we passed in
+        assert_eq!(
+            debug_info.script_pubkey,
+            funding_script_pubkey.clone().into_bytes(),
+            "Script pubkey should match input"
+        );
+
+        // Verify value matches
+        assert_eq!(
+            debug_info.value, fund_output_value,
+            "Value should match input"
+        );
+
+        // Verify cet_txid is valid
+        let btc_tx = transaction_to_btc_tx(&cet).unwrap();
+        assert_eq!(
+            debug_info.cet_txid,
+            btc_tx.compute_txid().to_string(),
+            "CET txid should match"
+        );
+
+        // Verify cet_raw matches input
+        assert_eq!(
+            debug_info.cet_raw, cet.raw_bytes,
+            "CET raw bytes should match input"
+        );
+    }
+
+    #[test]
+    fn test_get_cet_sighash_invalid_transaction() {
+        // Create an invalid transaction (empty raw_bytes)
+        let invalid_tx = Transaction {
+            version: 2,
+            lock_time: 0,
+            inputs: vec![],
+            outputs: vec![],
+            raw_bytes: vec![0x00], // Invalid serialization
+        };
+
+        let result = get_cet_sighash(invalid_tx, vec![0x00, 0x14], 100_000);
+
+        assert!(
+            result.is_err(),
+            "Should fail with invalid transaction bytes"
+        );
+    }
+
+    #[test]
+    fn test_get_cet_adaptor_signature_inputs_invalid_oracle_pubkey() {
+        // Setup valid CET
+        let (offer_party_params, _) = get_party_params(1_000_000_000, 100_000_000, None);
+        let (accept_party_params, _) = get_party_params(1_000_000_000, 100_000_000, Some(2));
+
+        let dlc_txs = create_dlc_transactions(
+            payouts_test(),
+            offer_party_params.clone(),
+            accept_party_params.clone(),
+            100,
+            4,
+            10,
+            10,
+            0,
+        )
+        .unwrap();
+
+        let cet = dlc_txs.cets[0].clone();
+        let funding_script_pubkey = ddk_dlc::make_funding_redeemscript(
+            &PublicKey::from_slice(&offer_party_params.fund_pubkey).unwrap(),
+            &PublicKey::from_slice(&accept_party_params.fund_pubkey).unwrap(),
+        );
+
+        // Invalid oracle info (wrong pubkey length)
+        let invalid_oracle_info = vec![OracleInfo {
+            public_key: vec![0x00; 20], // Invalid: should be 32 bytes for x-only
+            nonces: vec![vec![0x00; 32]],
+        }];
+
+        let msgs = vec![vec![vec![0u8; 32]]];
+
+        let result = get_cet_adaptor_signature_inputs(
+            cet,
+            invalid_oracle_info,
+            funding_script_pubkey.into_bytes(),
+            100_000,
+            msgs,
+        );
+
+        assert!(
+            result.is_err(),
+            "Should fail with invalid oracle public key"
+        );
     }
 }

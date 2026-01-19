@@ -610,6 +610,73 @@ pub fn get_xpub_from_xpriv(xpriv: Buffer, network: String) -> Result<Buffer> {
   Ok(vec_to_buffer(result))
 }
 
+/// Get all the inputs that go into creating a CET adaptor signature.
+/// Use this to compare values with Fordefi to debug signature mismatches.
+///
+/// Returns:
+/// - sighash: The 32-byte message that gets signed (BIP143 sighash)
+/// - adaptor_point: The 33-byte compressed public key (adaptor point)
+/// - input_index: Always 0 for CETs
+/// - script_pubkey: The funding script used for sighash calculation
+/// - value: The fund output value used for sighash calculation
+/// - cet_txid: The CET transaction ID
+/// - cet_raw: Raw CET bytes
+#[napi]
+pub fn get_cet_adaptor_signature_inputs(
+  cet: Transaction,
+  oracle_info: Vec<OracleInfo>,
+  funding_script_pubkey: Buffer,
+  fund_output_value: BigInt,
+  msgs: Vec<Vec<Buffer>>,
+) -> Result<CetAdaptorSignatureDebugInfo> {
+  let ffi_oracle_info: Vec<ddk_ffi::OracleInfo> = oracle_info
+    .into_iter()
+    .map(|info| info.into())
+    .collect();
+
+  let ffi_msgs: Vec<Vec<Vec<u8>>> = msgs
+    .into_iter()
+    .map(|outcome_msgs| outcome_msgs.iter().map(buffer_to_vec).collect())
+    .collect();
+
+  let result = ddk_ffi::get_cet_adaptor_signature_inputs(
+    cet.try_into()?,
+    ffi_oracle_info,
+    buffer_to_vec(&funding_script_pubkey),
+    bigint_to_u64(&fund_output_value)?,
+    ffi_msgs,
+  )
+  .map_err(|e| Error::from_reason(format!("{:?}", e)))?;
+
+  Ok(CetAdaptorSignatureDebugInfo {
+    sighash: vec_to_buffer(result.sighash),
+    adaptor_point: vec_to_buffer(result.adaptor_point),
+    input_index: result.input_index,
+    script_pubkey: vec_to_buffer(result.script_pubkey),
+    value: u64_to_bigint(result.value),
+    cet_txid: result.cet_txid,
+    cet_raw: vec_to_buffer(result.cet_raw),
+  })
+}
+
+/// Get the sighash for a CET - the actual 32-byte message that gets signed.
+/// This is useful for comparing with Fordefi's sighash calculation.
+#[napi]
+pub fn get_cet_sighash(
+  cet: Transaction,
+  funding_script_pubkey: Buffer,
+  fund_output_value: BigInt,
+) -> Result<Buffer> {
+  let result = ddk_ffi::get_cet_sighash(
+    cet.try_into()?,
+    buffer_to_vec(&funding_script_pubkey),
+    bigint_to_u64(&fund_output_value)?,
+  )
+  .map_err(|e| Error::from_reason(format!("{:?}", e)))?;
+
+  Ok(vec_to_buffer(result))
+}
+
 // #[cfg(test)]
 // mod tests {
 //   use super::*;

@@ -10,6 +10,11 @@ pub fn bigint_to_u64(bi: &BigInt) -> Result<u64> {
   Ok(value)
 }
 
+// Helper function to convert u64 to BigInt
+pub fn u64_to_bigint(value: u64) -> BigInt {
+  BigInt::from(value)
+}
+
 // Helper function to convert Vec<u8> to Buffer
 pub fn vec_to_buffer(vec: Vec<u8>) -> Buffer {
   Buffer::from(vec)
