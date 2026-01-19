@@ -2252,10 +2252,15 @@ mod tests {
         };
 
         let remote_params = PartyParams {
-            fund_pubkey: hex::decode("03a1bd2a7e8ebfa9b51c645c2cf9fd94897bd4083ae3da5118044f5acc631517d2").unwrap(),
-            change_script_pubkey: hex::decode("0014ecd675858f6d993286aa95efbff400553ff0ceb8").unwrap(),
+            fund_pubkey: hex::decode(
+                "03a1bd2a7e8ebfa9b51c645c2cf9fd94897bd4083ae3da5118044f5acc631517d2",
+            )
+            .unwrap(),
+            change_script_pubkey: hex::decode("0014ecd675858f6d993286aa95efbff400553ff0ceb8")
+                .unwrap(),
             change_serial_id: 3237572,
-            payout_script_pubkey: hex::decode("001434f4c603066449d3b50b60ba7ddd878cf969ed71").unwrap(),
+            payout_script_pubkey: hex::decode("001434f4c603066449d3b50b60ba7ddd878cf969ed71")
+                .unwrap(),
             payout_serial_id: 8044989,
             inputs: vec![],
             input_amount: 0,
@@ -2296,13 +2301,23 @@ mod tests {
                 println!("Testing with minimal data (no DLC inputs)...");
 
                 let minimal_local_params = PartyParams {
-                    fund_pubkey: hex::decode("033bdbcb6651977925f12aa2008393f73d7587347e061c8f2aca2744e734d6509d").unwrap(),
-                    change_script_pubkey: hex::decode("00142f92d4f2ec12f11a0e1c6bb86d8cc4c284c2f3e6").unwrap(),
+                    fund_pubkey: hex::decode(
+                        "033bdbcb6651977925f12aa2008393f73d7587347e061c8f2aca2744e734d6509d",
+                    )
+                    .unwrap(),
+                    change_script_pubkey: hex::decode(
+                        "00142f92d4f2ec12f11a0e1c6bb86d8cc4c284c2f3e6",
+                    )
+                    .unwrap(),
                     change_serial_id: 1299805,
-                    payout_script_pubkey: hex::decode("0014381fbc6470cda3cd0e5c194680f3242a6b896466").unwrap(),
+                    payout_script_pubkey: hex::decode(
+                        "0014381fbc6470cda3cd0e5c194680f3242a6b896466",
+                    )
+                    .unwrap(),
                     payout_serial_id: 14910176,
                     inputs: vec![TxInputInfo {
-                        txid: "a70ea5d3c49194370616cd3036b514b3339fd072afc64da2a2cb1f606fd49b3f".to_string(),
+                        txid: "a70ea5d3c49194370616cd3036b514b3339fd072afc64da2a2cb1f606fd49b3f"
+                            .to_string(),
                         vout: 1,
                         script_sig: vec![],
                         max_witness_length: 108,
