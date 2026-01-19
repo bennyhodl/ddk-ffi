@@ -193,6 +193,26 @@ pub struct OracleInfo {
     pub nonces: Vec<Vec<u8>>,
 }
 
+/// Debug info for CET adaptor signature inputs
+/// All the values that go into creating an adaptor signature
+#[derive(Clone)]
+pub struct CetAdaptorSignatureDebugInfo {
+    /// The sighash (32 bytes) - this is the message that gets signed
+    pub sighash: Vec<u8>,
+    /// The adaptor point (33 bytes compressed public key)
+    pub adaptor_point: Vec<u8>,
+    /// Input index (always 0 for CETs)
+    pub input_index: u32,
+    /// The funding script pubkey used for sighash
+    pub script_pubkey: Vec<u8>,
+    /// The fund output value used for sighash
+    pub value: u64,
+    /// The CET txid
+    pub cet_txid: String,
+    /// Raw CET bytes for verification
+    pub cet_raw: Vec<u8>,
+}
+
 // Conversion helpers
 pub fn btc_tx_to_transaction(tx: &BtcTransaction) -> Transaction {
     use bitcoin::consensus::Encodable;
@@ -1154,6 +1174,95 @@ pub fn extract_ecdsa_signature_from_oracle_signatures(
     Ok(ecdsa_sig.serialize_der().to_vec())
 }
 
+/// Get all the inputs that go into creating a CET adaptor signature.
+/// Use this to compare values with Fordefi to debug signature mismatches.
+pub fn get_cet_adaptor_signature_inputs(
+    cet: Transaction,
+    oracle_info: Vec<OracleInfo>,
+    funding_script_pubkey: Vec<u8>,
+    fund_output_value: u64,
+    msgs: Vec<Vec<Vec<u8>>>,
+) -> Result<CetAdaptorSignatureDebugInfo, DLCError> {
+    let btc_tx = transaction_to_btc_tx(&cet)?;
+    let funding_script = Script::from_bytes(&funding_script_pubkey);
+
+    // Convert oracle info
+    let oracle_infos: Vec<DlcOracleInfo> = oracle_info
+        .iter()
+        .map(|info| {
+            let public_key = XOnlyPublicKey::from_slice(&info.public_key)
+                .map_err(|_| DLCError::InvalidPublicKey)?;
+            let nonces = info
+                .nonces
+                .iter()
+                .map(|nonce| XOnlyPublicKey::from_slice(nonce))
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|_| DLCError::InvalidArgument("Invalid nonce pubkey".to_string()))?;
+            Ok(DlcOracleInfo { public_key, nonces })
+        })
+        .collect::<Result<Vec<_>, DLCError>>()?;
+
+    // Convert messages
+    let cet_msgs: Vec<Vec<Message>> = msgs
+        .into_iter()
+        .map(|outcome_msgs| {
+            outcome_msgs
+                .iter()
+                .map(|m| {
+                    Message::from_digest_slice(m)
+                        .map_err(|_| DLCError::InvalidArgument("Invalid message".to_string()))
+                })
+                .collect::<Result<Vec<_>, _>>()
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let secp = get_secp_context();
+
+    // Get the adaptor point
+    let adaptor_point = ddk_dlc::get_adaptor_point_from_oracle_info(secp, &oracle_infos, &cet_msgs)
+        .map_err(|e| DLCError::Secp256k1Error(e.to_string()))?;
+
+    // Get the sighash - this is the actual message being signed
+    let sig_hash = ddk_dlc::util::get_sig_hash_msg(
+        &btc_tx,
+        0, // input_index is always 0 for CETs
+        funding_script,
+        Amount::from_sat(fund_output_value),
+    )
+    .map_err(DLCError::from)?;
+
+    Ok(CetAdaptorSignatureDebugInfo {
+        sighash: sig_hash.as_ref().to_vec(),
+        adaptor_point: adaptor_point.serialize().to_vec(),
+        input_index: 0,
+        script_pubkey: funding_script_pubkey,
+        value: fund_output_value,
+        cet_txid: btc_tx.compute_txid().to_string(),
+        cet_raw: cet.raw_bytes,
+    })
+}
+
+/// Get the sighash for a CET - the actual 32-byte message that gets signed.
+/// This is useful for comparing with Fordefi's sighash calculation.
+pub fn get_cet_sighash(
+    cet: Transaction,
+    funding_script_pubkey: Vec<u8>,
+    fund_output_value: u64,
+) -> Result<Vec<u8>, DLCError> {
+    let btc_tx = transaction_to_btc_tx(&cet)?;
+    let funding_script = Script::from_bytes(&funding_script_pubkey);
+
+    let sig_hash = ddk_dlc::util::get_sig_hash_msg(
+        &btc_tx,
+        0, // input_index is always 0 for CETs
+        funding_script,
+        Amount::from_sat(fund_output_value),
+    )
+    .map_err(DLCError::from)?;
+
+    Ok(sig_hash.as_ref().to_vec())
+}
+
 pub fn convert_mnemonic_to_seed(
     mnemonic: String,
     passphrase: Option<String>,
@@ -2065,5 +2174,172 @@ mod tests {
         // Verify the signature is valid DER format
         let ecdsa_sig = EcdsaSignature::from_der(&ecdsa_sig_bytes);
         assert!(ecdsa_sig.is_ok(), "Should be valid DER signature");
+    }
+
+    #[test]
+    fn test_create_spliced_dlc_transactions_with_failing_data() {
+        // Exact data from the failing integration test
+        let outcomes = vec![
+            Payout {
+                offer: 200998630,
+                accept: 0,
+            },
+            Payout {
+                offer: 0,
+                accept: 200998630,
+            },
+        ];
+
+        let local_params = PartyParams {
+            fund_pubkey: hex::decode("033bdbcb6651977925f12aa2008393f73d7587347e061c8f2aca2744e734d6509d").unwrap(),
+            change_script_pubkey: hex::decode("00142f92d4f2ec12f11a0e1c6bb86d8cc4c284c2f3e6").unwrap(),
+            change_serial_id: 1299805,
+            payout_script_pubkey: hex::decode("0014381fbc6470cda3cd0e5c194680f3242a6b896466").unwrap(),
+            payout_serial_id: 14910176,
+            inputs: vec![TxInputInfo {
+                txid: "a70ea5d3c49194370616cd3036b514b3339fd072afc64da2a2cb1f606fd49b3f".to_string(),
+                vout: 1,
+                script_sig: vec![],
+                max_witness_length: 108,
+                serial_id: 23958,
+            }],
+            input_amount: 200000000,
+            collateral: 200998630,
+            dlc_inputs: vec![DlcInputInfo {
+                fund_tx: Transaction {
+                    version: 2,
+                    lock_time: 1617170574,
+                    inputs: vec![
+                        TxInput {
+                            txid: "1329ee675813b09732ac94234d44035189537e7f839b793ba93b6ec582".to_string(),
+                            vout: 0,
+                            script_sig: vec![],
+                            sequence: 4294967295,
+                            witness: vec![],
+                        },
+                        TxInput {
+                            txid: "3aaf44df860f2f1fbc439c8a947fcfc434aea788b2f9affb406070509be505".to_string(),
+                            vout: 0,
+                            script_sig: vec![],
+                            sequence: 4294967295,
+                            witness: vec![],
+                        },
+                    ],
+                    outputs: vec![
+                        TxOutput {
+                            value: 1001700,
+                            script_pubkey: hex::decode("160014b8a3a42f43eb9e211cc86247c349c3d8d8620603").unwrap(),
+                        },
+                        TxOutput {
+                            value: 1000000,
+                            script_pubkey: hex::decode("220020e4bdf4adc13419eca173b43b28bd863b0ba69793fda0bf03d04544cb037ea95a").unwrap(),
+                        },
+                        TxOutput {
+                            value: 200000000,
+                            script_pubkey: hex::decode("160014982f1bc078c49d32352913579443d8c78690030a").unwrap(),
+                        },
+                    ],
+                    raw_bytes: hex::decode("0200000000010282c56e3ba93b799b832e7f573e58953103444d43294ac3297b0135867eee92130000000000ffffffffe5059b50706040fbaff9b288a7ae34c4cf7f948a399c431bf2f10f86df44af3a0000000000ffffffff03f2b1eb0b00000000160014b8a3a42f43eb9e211cc86247c349c3d8d8620603e4480f0000000000220020e4bdf4adc13419eca173b43b28bd863b0ba69793fda0bf03d04544cb037ea95a527fdc0b00000000160014982f1bc078c49d32352913579443d8c78690030a02483045022100f758c4b22544df4e4372c5e01379954564df69f627f1f1402bf9514530db57d8022076e6aa10ff9e6af0f832ab6cf287830c97ae72d2400330cadf3d397798e10daf01210365f417bc5df7414b6f06622f6ac60cc918e8313c8aa7dce4d0050b6076707db602473044022069980c969da7b21c66ddd3794bed7b9dcd4fefae0dab12b3504d2ba010558e670220287fa84f313a72c37b10b47123cc6f57dc8038c7035dfdd9b6b7380a9676691d012103ce59c1343fee68943acd457c569fcfb0c30eaa9996c0eb8011cd5c828dd9100200000000").unwrap(),
+                },
+                fund_vout: 1,
+                local_fund_pubkey: hex::decode("024d97f1fcc303da595f91fcfcb4affa4bc4676d5e451912282202c283c2ebd306").unwrap(),
+                remote_fund_pubkey: hex::decode("0302ed01c9a6d7618271d1e752aa19655e0ebebbef968f41185e6d69ce0845b640").unwrap(),
+                fund_amount: 1001700,
+                max_witness_len: 220,
+                input_serial_id: 1,
+                contract_id: hex::decode("0000000000000000000000000000000000000000000000000000000000000000").unwrap(),
+            }],
+        };
+
+        let remote_params = PartyParams {
+            fund_pubkey: hex::decode("03a1bd2a7e8ebfa9b51c645c2cf9fd94897bd4083ae3da5118044f5acc631517d2").unwrap(),
+            change_script_pubkey: hex::decode("0014ecd675858f6d993286aa95efbff400553ff0ceb8").unwrap(),
+            change_serial_id: 3237572,
+            payout_script_pubkey: hex::decode("001434f4c603066449d3b50b60ba7ddd878cf969ed71").unwrap(),
+            payout_serial_id: 8044989,
+            inputs: vec![],
+            input_amount: 0,
+            collateral: 0,
+            dlc_inputs: vec![],
+        };
+
+        let refund_locktime = 1617170575;
+        let fee_rate = 10;
+        let fund_lock_time = 1617170574;
+        let cet_lock_time = 1617170574;
+        let fund_output_serial_id = 36665;
+
+        println!("Testing create_spliced_dlc_transactions with exact failing data...");
+
+        let result = create_spliced_dlc_transactions(
+            outcomes,
+            local_params,
+            remote_params.clone(),
+            refund_locktime,
+            fee_rate,
+            fund_lock_time,
+            cet_lock_time,
+            fund_output_serial_id,
+        );
+
+        match result {
+            Ok(dlc_txs) => {
+                println!("Success! Created spliced DLC transactions");
+                println!("Fund tx version: {}", dlc_txs.fund.version);
+                println!("Number of CETs: {}", dlc_txs.cets.len());
+                println!("Refund tx lock time: {}", dlc_txs.refund.lock_time);
+            }
+            Err(e) => {
+                println!("Error: {:?}", e);
+
+                // Try to isolate the issue by testing with minimal data
+                println!("Testing with minimal data (no DLC inputs)...");
+
+                let minimal_local_params = PartyParams {
+                    fund_pubkey: hex::decode("033bdbcb6651977925f12aa2008393f73d7587347e061c8f2aca2744e734d6509d").unwrap(),
+                    change_script_pubkey: hex::decode("00142f92d4f2ec12f11a0e1c6bb86d8cc4c284c2f3e6").unwrap(),
+                    change_serial_id: 1299805,
+                    payout_script_pubkey: hex::decode("0014381fbc6470cda3cd0e5c194680f3242a6b896466").unwrap(),
+                    payout_serial_id: 14910176,
+                    inputs: vec![TxInputInfo {
+                        txid: "a70ea5d3c49194370616cd3036b514b3339fd072afc64da2a2cb1f606fd49b3f".to_string(),
+                        vout: 1,
+                        script_sig: vec![],
+                        max_witness_length: 108,
+                        serial_id: 23958,
+                    }],
+                    input_amount: 200000000,
+                    collateral: 200998630,
+                    dlc_inputs: vec![], // Remove DLC inputs
+                };
+
+                let minimal_outcomes = vec![
+                    Payout {
+                        offer: 200998630,
+                        accept: 0,
+                    },
+                    Payout {
+                        offer: 0,
+                        accept: 200998630,
+                    },
+                ];
+
+                let minimal_result = create_spliced_dlc_transactions(
+                    minimal_outcomes,
+                    minimal_local_params,
+                    remote_params,
+                    refund_locktime,
+                    fee_rate,
+                    fund_lock_time,
+                    cet_lock_time,
+                    fund_output_serial_id,
+                );
+
+                match minimal_result {
+                    Ok(_) => println!("Minimal test succeeded - DLC inputs are the issue"),
+                    Err(minimal_e) => println!("Minimal test also failed: {:?}", minimal_e),
+                }
+            }
+        }
     }
 }

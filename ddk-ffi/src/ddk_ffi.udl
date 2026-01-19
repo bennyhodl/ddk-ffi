@@ -211,6 +211,25 @@ namespace ddk_ffi {
         sequence<sequence<u8>> oracle_signatures,
         sequence<u8> adaptor_signature
     );
+
+    // Debug function to get all inputs for adaptor signature creation
+    // Use this to compare values with Fordefi
+    [Throws=DLCError]
+    CetAdaptorSignatureDebugInfo get_cet_adaptor_signature_inputs(
+        Transaction cet,
+        sequence<OracleInfo> oracle_info,
+        sequence<u8> funding_script_pubkey,
+        u64 fund_output_value,
+        sequence<sequence<sequence<u8>>> msgs
+    );
+
+    // Get sighash for a CET - the actual message that gets signed
+    [Throws=DLCError]
+    sequence<u8> get_cet_sighash(
+        Transaction cet,
+        sequence<u8> funding_script_pubkey,
+        u64 fund_output_value
+    );
 };
 
 // Transaction representation
@@ -301,6 +320,25 @@ dictionary ChangeOutputAndFees {
 dictionary OracleInfo {
     sequence<u8> public_key;
     sequence<sequence<u8>> nonces;
+};
+
+// Debug info for CET adaptor signature inputs
+// All the values that go into creating an adaptor signature
+dictionary CetAdaptorSignatureDebugInfo {
+    // The sighash (32 bytes) - this is the message that gets signed
+    sequence<u8> sighash;
+    // The adaptor point (33 bytes compressed public key)
+    sequence<u8> adaptor_point;
+    // Input index (always 0 for CETs)
+    u32 input_index;
+    // The funding script pubkey used for sighash
+    sequence<u8> script_pubkey;
+    // The fund output value used for sighash
+    u64 value;
+    // The CET txid
+    string cet_txid;
+    // Raw CET bytes for verification
+    sequence<u8> cet_raw;
 };
 
 // Error types for DLC operations

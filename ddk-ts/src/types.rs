@@ -102,3 +102,23 @@ pub struct OracleInfo {
   pub public_key: Buffer,
   pub nonces: Vec<Buffer>,
 }
+
+// Debug info for CET adaptor signature inputs
+// All the values that go into creating an adaptor signature
+#[napi(object)]
+pub struct CetAdaptorSignatureDebugInfo {
+  /// The sighash (32 bytes) - this is the message that gets signed
+  pub sighash: Buffer,
+  /// The adaptor point (33 bytes compressed public key)
+  pub adaptor_point: Buffer,
+  /// Input index (always 0 for CETs)
+  pub input_index: u32,
+  /// The funding script pubkey used for sighash
+  pub script_pubkey: Buffer,
+  /// The fund output value used for sighash
+  pub value: BigInt,
+  /// The CET txid
+  pub cet_txid: String,
+  /// Raw CET bytes for verification
+  pub cet_raw: Buffer,
+}
