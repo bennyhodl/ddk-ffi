@@ -957,6 +957,64 @@ pub fn create_cet_adaptor_sigs_from_oracle_info(
     Ok(adaptor_sigs)
 }
 
+/// Create adaptor signatures from pre-computed adaptor points.
+/// This matches Fordefi's interface where adaptor points are provided directly.
+pub fn create_cet_adaptor_sigs_from_points(
+    cets: Vec<Transaction>,
+    adaptor_points: Vec<Vec<u8>>,
+    funding_secret_key: Vec<u8>,
+    funding_script_pubkey: Vec<u8>,
+    fund_output_value: u64,
+) -> Result<Vec<AdaptorSignature>, DLCError> {
+    if cets.len() != adaptor_points.len() {
+        return Err(DLCError::InvalidArgument(format!(
+            "CETs length ({}) does not match adaptor points length ({})",
+            cets.len(),
+            adaptor_points.len()
+        )));
+    }
+
+    let cets = cets
+        .iter()
+        .map(transaction_to_btc_tx)
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let adaptor_points = adaptor_points
+        .iter()
+        .map(|p| {
+            PublicKey::from_slice(p)
+                .map_err(|_| DLCError::InvalidArgument("Invalid adaptor point".to_string()))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let funding_sk = SecretKey::from_slice(&funding_secret_key)
+        .map_err(|_| DLCError::InvalidArgument("Invalid funding secret key".to_string()))?;
+    let funding_script = Script::from_bytes(&funding_script_pubkey);
+
+    let inputs: Vec<(&bitcoin::Transaction, &PublicKey)> =
+        cets.iter().zip(adaptor_points.iter()).collect();
+
+    let secp = get_secp_context();
+    let adaptor_sigs = ddk_dlc::create_cet_adaptor_sigs_from_points(
+        secp,
+        &inputs,
+        &funding_sk,
+        funding_script,
+        Amount::from_sat(fund_output_value),
+    )
+    .map_err(|e| DLCError::Secp256k1Error(e.to_string()))?;
+
+    let adaptor_sigs = adaptor_sigs
+        .iter()
+        .map(|sig| AdaptorSignature {
+            signature: sig.as_ref().to_vec(),
+            proof: Vec::new(),
+        })
+        .collect::<Vec<_>>();
+
+    Ok(adaptor_sigs)
+}
+
 pub fn verify_cet_adaptor_sig_from_oracle_info(
     adaptor_sig: AdaptorSignature,
     cet: Transaction,
