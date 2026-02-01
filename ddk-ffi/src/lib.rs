@@ -958,7 +958,6 @@ pub fn create_cet_adaptor_sigs_from_oracle_info(
 }
 
 /// Create adaptor signatures from pre-computed adaptor points.
-/// This matches Fordefi's interface where adaptor points are provided directly.
 pub fn create_cet_adaptor_sigs_from_points(
     cets: Vec<Transaction>,
     adaptor_points: Vec<Vec<u8>>,
