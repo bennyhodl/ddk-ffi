@@ -468,6 +468,36 @@ pub fn create_cet_adaptor_sigs_from_oracle_info(
 }
 
 #[napi]
+pub fn create_cet_adaptor_sigs_from_points(
+  cets: Vec<Transaction>,
+  adaptor_points: Vec<Buffer>,
+  funding_secret_key: Buffer,
+  funding_script_pubkey: Buffer,
+  fund_output_value: BigInt,
+) -> Result<Vec<AdaptorSignature>> {
+  let ffi_adaptor_points: Vec<Vec<u8>> = adaptor_points.iter().map(buffer_to_vec).collect();
+
+  let sigs = ddk_ffi::create_cet_adaptor_sigs_from_points(
+    cets
+      .into_iter()
+      .map(|cet| cet.try_into())
+      .collect::<Result<Vec<_>, _>>()?,
+    ffi_adaptor_points,
+    buffer_to_vec(&funding_secret_key),
+    buffer_to_vec(&funding_script_pubkey),
+    bigint_to_u64(&fund_output_value)?,
+  )
+  .map_err(|e| Error::from_reason(format!("{:?}", e)))?;
+
+  let result = sigs
+    .into_iter()
+    .map(|sig| sig.into())
+    .collect::<Vec<AdaptorSignature>>();
+
+  Ok(result)
+}
+
+#[napi]
 pub fn create_cet_adaptor_signature_from_oracle_info(
   cet: Transaction,
   oracle_info: OracleInfo,

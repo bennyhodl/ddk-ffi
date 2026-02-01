@@ -150,6 +150,15 @@ namespace ddk_ffi {
         sequence<sequence<sequence<sequence<u8>>>> msgs
     );
 
+    [Throws=DLCError]
+    sequence<AdaptorSignature> create_cet_adaptor_sigs_from_points(
+        sequence<Transaction> cets,
+        sequence<sequence<u8>> adaptor_points,
+        sequence<u8> funding_secret_key,
+        sequence<u8> funding_script_pubkey,
+        u64 fund_output_value
+    );
+
     boolean verify_cet_adaptor_sigs_from_oracle_info(
         sequence<AdaptorSignature> adaptor_sigs,
         sequence<Transaction> cets,
