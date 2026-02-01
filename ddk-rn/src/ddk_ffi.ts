@@ -242,6 +242,38 @@ export function createCetAdaptorSigsFromOracleInfo(
     )
   );
 }
+export function createCetAdaptorSigsFromPoints(
+  cets: Array<Transaction>,
+  adaptorPoints: Array<Array</*u8*/ number>>,
+  fundingSecretKey: Array</*u8*/ number>,
+  fundingScriptPubkey: Array</*u8*/ number>,
+  fundOutputValue: /*u64*/ bigint
+): Array<AdaptorSignature> /*throws*/ {
+  return FfiConverterArrayTypeAdaptorSignature.lift(
+    uniffiCaller.rustCallWithError(
+      /*liftError:*/ FfiConverterTypeDLCError.lift.bind(
+        FfiConverterTypeDLCError
+      ),
+      /*caller:*/ (callStatus) => {
+        return (() => {
+          console.debug(
+            `-- uniffi_ddk_ffi_fn_func_create_cet_adaptor_sigs_from_points`
+          );
+          return nativeModule()
+            .ubrn_uniffi_ddk_ffi_fn_func_create_cet_adaptor_sigs_from_points;
+        })()(
+          FfiConverterArrayTypeTransaction.lower(cets),
+          FfiConverterArrayArrayUInt8.lower(adaptorPoints),
+          FfiConverterArrayUInt8.lower(fundingSecretKey),
+          FfiConverterArrayUInt8.lower(fundingScriptPubkey),
+          FfiConverterUInt64.lower(fundOutputValue),
+          callStatus
+        );
+      },
+      /*liftString:*/ FfiConverterString.lift
+    )
+  );
+}
 export function createCets(
   fundTxId: string,
   fundVout: /*u32*/ number,
@@ -2336,6 +2368,14 @@ function uniffiEnsureInitialized() {
   ) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       'uniffi_ddk_ffi_checksum_func_create_cet_adaptor_sigs_from_oracle_info'
+    );
+  }
+  if (
+    nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_create_cet_adaptor_sigs_from_points() !==
+    33705
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      'uniffi_ddk_ffi_checksum_func_create_cet_adaptor_sigs_from_points'
     );
   }
   if (

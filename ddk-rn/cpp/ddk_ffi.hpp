@@ -27,6 +27,7 @@ class NativeDdkFfi : public jsi::HostObject {
     jsi::Value cpp_uniffi_ddk_ffi_fn_func_create_cet_adaptor_points_from_oracle_info(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count);
     jsi::Value cpp_uniffi_ddk_ffi_fn_func_create_cet_adaptor_signature_from_oracle_info(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count);
     jsi::Value cpp_uniffi_ddk_ffi_fn_func_create_cet_adaptor_sigs_from_oracle_info(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count);
+    jsi::Value cpp_uniffi_ddk_ffi_fn_func_create_cet_adaptor_sigs_from_points(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count);
     jsi::Value cpp_uniffi_ddk_ffi_fn_func_create_cets(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count);
     jsi::Value cpp_uniffi_ddk_ffi_fn_func_create_dlc_transactions(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count);
     jsi::Value cpp_uniffi_ddk_ffi_fn_func_create_extkey_from_parent_path(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count);
@@ -57,6 +58,7 @@ class NativeDdkFfi : public jsi::HostObject {
     jsi::Value cpp_uniffi_ddk_ffi_checksum_func_create_cet_adaptor_points_from_oracle_info(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count);
     jsi::Value cpp_uniffi_ddk_ffi_checksum_func_create_cet_adaptor_signature_from_oracle_info(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count);
     jsi::Value cpp_uniffi_ddk_ffi_checksum_func_create_cet_adaptor_sigs_from_oracle_info(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count);
+    jsi::Value cpp_uniffi_ddk_ffi_checksum_func_create_cet_adaptor_sigs_from_points(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count);
     jsi::Value cpp_uniffi_ddk_ffi_checksum_func_create_cets(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count);
     jsi::Value cpp_uniffi_ddk_ffi_checksum_func_create_dlc_transactions(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count);
     jsi::Value cpp_uniffi_ddk_ffi_checksum_func_create_extkey_from_parent_path(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count);
