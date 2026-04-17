@@ -1,11 +1,11 @@
 {
   "name": "@bennyblader/ddk-ts",
-  "version": "0.3.36",
+  "version": "0.3.37",
   "description": "dlcdevkit typescript bindings",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "type": "module",
-  "repository": "https://github.com/bennyblader/ddk-ffi",
+  "repository": "https://github.com/bennyhodl/ddk-ffi",
   "license": "MIT",
   "keywords": [
     "napi-rs",
