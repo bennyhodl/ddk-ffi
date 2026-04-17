@@ -1,0 +1,211 @@
+name: Publish
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  APP_NAME: ddk-ts
+  MACOSX_DEPLOYMENT_TARGET: '10.13'
+
+jobs:
+  verify-version:
+    name: Verify tag matches package versions
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.extract.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract version from tag and verify package versions
+        id: extract
+        shell: bash
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          echo "Tag version: $TAG_VERSION"
+
+          TS_VERSION=$(node -p "require('./ddk-ts/package.json').version")
+          RN_VERSION=$(node -p "require('./ddk-rn/package.json').version")
+          echo "ddk-ts: $TS_VERSION"
+          echo "ddk-rn: $RN_VERSION"
+
+          if [ "$TAG_VERSION" != "$TS_VERSION" ]; then
+            echo "::error::Tag $TAG_VERSION does not match ddk-ts package.json version $TS_VERSION"
+            exit 1
+          fi
+          if [ "$TAG_VERSION" != "$RN_VERSION" ]; then
+            echo "::error::Tag $TAG_VERSION does not match ddk-rn package.json version $RN_VERSION"
+            exit 1
+          fi
+
+          echo "version=$TAG_VERSION" >> "$GITHUB_OUTPUT"
+
+  build-ddk-ts:
+    name: Build ddk-ts (${{ matrix.short }})
+    needs: [verify-version]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - host: macos-latest
+            target: aarch64-apple-darwin
+            short: darwin-arm64
+            build: pnpm build:darwin-arm64
+          - host: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            short: linux-x64-gnu
+            build: pnpm build:linux-x64
+    runs-on: ${{ matrix.host }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      - name: Install dependencies
+        run: cd ddk-ts && pnpm install --no-frozen-lockfile
+      - name: Build
+        run: cd ddk-ts && ${{ matrix.build }}
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ddk-ts-bindings-${{ matrix.target }}
+          path: ddk-ts/dist/${{ env.APP_NAME }}.*.node
+          if-no-files-found: error
+
+  test-ddk-ts:
+    name: Test ddk-ts
+    needs: [verify-version]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-gnu
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      - name: Install dependencies
+        run: cd ddk-ts && pnpm install --no-frozen-lockfile
+      - name: Build
+        run: cd ddk-ts && pnpm build:linux-x64
+      - name: Test
+        run: cd ddk-ts && pnpm test
+      - name: Verify parity
+        run: cd ddk-ts && pnpm verify:parity
+      - name: Verify types
+        run: cd ddk-ts && pnpm verify:types
+
+  test-ddk-rn:
+    name: Test ddk-rn
+    needs: [verify-version]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18.17'
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      - name: Install uniffi-bindgen-react-native
+        run: npm install -g uniffi-bindgen-react-native@0.29.3-1
+      - uses: extractions/setup-just@v1
+      - name: Generate JSI bindings
+        run: just uniffi-jsi
+      - name: Generate TurboModule bindings
+        run: just uniffi-turbo
+      - name: Install dependencies
+        run: cd ddk-rn && pnpm install
+      - name: Build
+        run: cd ddk-rn && pnpm prepare
+      - name: Test
+        run: cd ddk-rn && pnpm test
+
+  publish-ddk-ts:
+    name: Publish @bennyblader/ddk-ts
+    needs: [test-ddk-ts, build-ddk-ts]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-gnu
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      - name: Install dependencies
+        run: cd ddk-ts && pnpm install --no-frozen-lockfile
+      - name: Build main package (dist/index.js + dist/index.d.ts)
+        run: cd ddk-ts && pnpm build:linux-x64
+      - name: Download platform binaries
+        uses: actions/download-artifact@v4
+        with:
+          path: ddk-ts/artifacts
+          pattern: ddk-ts-bindings-*
+      - name: Create sub-package directories
+        run: cd ddk-ts && npx napi create-npm-dirs
+      - name: Move binaries into sub-package directories
+        run: cd ddk-ts && npx napi artifacts
+      # Main package must not ship .node binaries; each sibling package carries its own.
+      - name: Strip binaries from main package dist/
+        run: rm -f ddk-ts/dist/*.node
+      - name: Publish (siblings via prepublishOnly, then main)
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          cd ddk-ts
+          npm config set provenance true
+          npm publish --access public
+
+  publish-ddk-rn:
+    name: Publish @bennyblader/ddk-rn
+    needs: [test-ddk-rn]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18.17'
+          registry-url: 'https://registry.npmjs.org'
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      - name: Install uniffi-bindgen-react-native
+        run: npm install -g uniffi-bindgen-react-native@0.29.3-1
+      - uses: extractions/setup-just@v1
+      - name: Generate JSI bindings
+        run: just uniffi-jsi
+      - name: Generate TurboModule bindings
+        run: just uniffi-turbo
+      - name: Copy Rust source into package
+        run: cd ddk-rn && node scripts/prepare-rust-src.js
+      - name: Install ddk-rn dependencies
+        run: cd ddk-rn && pnpm install
+      - name: Build
+        run: cd ddk-rn && pnpm prepare
+      - name: Publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          cd ddk-rn
+          npm config set provenance true
+          npm publish --access public
