@@ -56,8 +56,7 @@ This project uses `just` as the primary build orchestrator. All build commands s
 1. **Modify Rust Code**: Edit `ddk-ffi/src/lib.rs` with new functions/structs
 2. **Update Interface**: Add corresponding definitions to `ddk-ffi/src/ddk_ffi.udl`
 3. **Generate Bindings**: Run `just uniffi` to regenerate all language bindings
-4. **Manual Fix**: Fix the include path in `ddk-rn/cpp/bennyblader-ddk-rn.cpp` from `#include "/ddk_ffi.hpp"` to `#include "ddk_ffi.hpp"`
-5. **Test Changes**: Use example app or run tests
+4. **Test Changes**: Use example app or run tests
 
 ## Key Files & Locations
 
@@ -84,20 +83,25 @@ This project uses `just` as the primary build orchestrator. All build commands s
 
 ## Known Issues
 
-### Manual Post-Build Fix Required
+### UniFFI / ubrn version lockstep
 
-After running `just uniffi`, manually fix the include path:
+The `uniffi` crate (`ddk-ffi/Cargo.toml`), the `uniffi-bindgen-react-native` dependency
+(`ddk-rn/package.json`), and the **globally installed** `uniffi-bindgen-react-native`
+binary must all be the same release. The `just uniffi-*` recipes call the bare
+`uniffi-bindgen-react-native` on `$PATH`, which resolves to the global pnpm install —
+not `ddk-rn/node_modules`. A version skew shows up as TypeScript errors like
+"Expected 2 arguments, but got 1" on every generated `.lower()` call.
 
-```cpp
-// In ddk-rn/cpp/bennyblader-ddk-rn.cpp, change:
-#include "/ddk_ffi.hpp"
-// To:
-#include "ddk_ffi.hpp"
-```
+ubrn pins an exact `uniffi_core` version (e.g. ubrn `0.31.0-3` requires `uniffi_core =0.31.0`),
+so pin the Rust crate to that exact patch. Update the global binary with
+`pnpm add -g uniffi-bindgen-react-native@<version>`.
+
+> Note: as of uniffi 0.31, the old manual fix for `#include "/ddk_ffi.hpp"` is no longer
+> needed — the generator emits the correct `#include "ddk_ffi.hpp"`.
 
 ### Dependencies
 
-- Requires `uniffi-bindgen-react-native` globally installed
+- Requires `uniffi-bindgen-react-native` globally installed (version must match `ddk-rn/package.json`)
 - Uses pnpm as package manager (not npm/yarn)
 - React Native new architecture enabled by default
 

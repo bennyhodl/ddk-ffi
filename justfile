@@ -16,7 +16,7 @@ uniffi:
 # Generate the JSI bindings
 uniffi-jsi:
   cd {{justfile_directory()}}/ddk-ffi && uniffi-bindgen-react-native generate jsi bindings \
-    --crate ddk_ffi --config ../ddk-rn/ubrn.config.toml \
+    --crate ddk_ffi \
     --ts-dir {{justfile_directory()}}/ddk-rn/src \
     --cpp-dir {{justfile_directory()}}/ddk-rn/cpp \
     {{justfile_directory()}}/ddk-ffi/src/ddk_ffi.udl
