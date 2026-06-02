@@ -1,5 +1,9 @@
 # DDK-TS Changelog
 
+## [Unreleased]
+- **Breaking:** renamed 10 NAPI functions to match ddk-ffi's record-method names so the two bindings stay in parity: `isDustOutput`→`isDust`, `getChangeOutputAndFees`→`changeOutputAndFees`, `verifyCetAdaptorSigFromOracleInfo`→`verifyFromOracleInfo`, `addSignatureToTransaction`→`addSignature`, `verifyFundTxSignature`→`verifyFundSignature`, `getRawFundingTransactionInputSignature`→`rawFundingInputSignature`, `signFundTransactionInput`→`signFundInput`, `createCetAdaptorSignatureFromOracleInfo`→`cetAdaptorSignatureFromOracleInfo`, `getCetAdaptorSignatureInputs`→`cetAdaptorSignatureInputs`, `getCetSighash`→`cetSighash`
+- Parity scripts now read ddk-ffi's proc-macro exports from `lib.rs` (the `.udl` was removed)
+
 ## [0.1.11] - 2025-01-15
 - Updated package configuration
 

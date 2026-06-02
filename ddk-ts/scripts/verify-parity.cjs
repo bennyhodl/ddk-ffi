@@ -3,153 +3,74 @@
 const fs = require('fs')
 const path = require('path')
 
-// Parse UDL to get all functions
-function parseUDLFunctions(udlPath) {
-  const content = fs.readFileSync(udlPath, 'utf8')
-  // Match function declarations in UDL
-  const functionRegex = /^\s*(?:\[Throws=\w+\])?\s*(?:sequence<)?[\w<>]+>?\s+(\w+)\s*\(/gm
-  const functions = []
+// Parse ddk-ffi lib.rs for the exported UniFFI operations.
+// Source of truth is the Rust proc-macros (there is no longer a .udl):
+//   - free functions:  #[uniffi::export] pub fn <name>(
+//   - record methods:  pub fn <name>(  inside a #[uniffi::export] impl block
+function parseUniffiFunctions(libPath) {
+  const content = fs.readFileSync(libPath, 'utf8')
 
-  let match
-  while ((match = functionRegex.exec(content)) !== null) {
-    // Skip the namespace declaration
-    if (match[1] !== 'ddk_ffi') {
-      functions.push(match[1])
-    }
-  }
+  // Free functions: #[uniffi::export] immediately followed by a top-level `pub fn`.
+  const free = [...content.matchAll(/#\[uniffi::export\]\s*\npub fn (\w+)\(/g)].map((m) => m[1])
 
-  return functions
+  // Methods: `pub fn` indented inside an impl block. Every impl block in this
+  // crate that defines methods is annotated #[uniffi::export], so any 4-space
+  // indented `pub fn` is an exported method.
+  const methods = [...content.matchAll(/\n {4}pub fn (\w+)\(/g)].map((m) => m[1])
+
+  return [...free, ...methods]
 }
 
-// Parse Rust lib.rs to get all NAPI functions
+// Parse ddk-ts lib.rs for the #[napi] functions
 function parseNAPIFunctions(libPath) {
   const content = fs.readFileSync(libPath, 'utf8')
-  // Match #[napi] decorated functions
-  const functionRegex = /#\[napi\]\s*pub\s+fn\s+(\w+)/g
-  const functions = []
-
-  let match
-  while ((match = functionRegex.exec(content)) !== null) {
-    functions.push(match[1])
-  }
-
-  return functions
+  return [...content.matchAll(/#\[napi\]\s*pub fn (\w+)/g)].map((m) => m[1])
 }
 
-// Convert snake_case to camelCase
-function toCamelCase(str) {
-  return str.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase())
-}
-
-// Convert camelCase to snake_case
-function toSnakeCase(str) {
-  return str.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`).replace(/^_/, '')
-}
-
-// Main verification
 function verifyParity() {
-  const udlPath = path.join(__dirname, '../../ddk-ffi/src/ddk_ffi.udl')
-  const libPath = path.join(__dirname, '../src/lib.rs')
-  const testPath = path.join(__dirname, '../__test__/index.spec.ts')
+  const ffiLibPath = path.join(__dirname, '../../ddk-ffi/src/lib.rs')
+  const tsLibPath = path.join(__dirname, '../src/lib.rs')
 
   console.log('🔍 Verifying NAPI-RS and UniFFI parity...\n')
 
-  // Parse UDL functions
-  const udlFunctions = parseUDLFunctions(udlPath)
-  console.log(`📋 Found ${udlFunctions.length} functions in UDL:`)
-  udlFunctions.forEach((fn) => console.log(`   - ${fn}`))
-  console.log()
+  const uniffiFunctions = parseUniffiFunctions(ffiLibPath)
+  console.log(`📋 Found ${uniffiFunctions.length} exported operations in ddk-ffi (functions + methods)`)
 
-  // Parse NAPI functions
-  const napiFunctions = parseNAPIFunctions(libPath)
-  console.log(`🦀 Found ${napiFunctions.length} functions in NAPI lib.rs:`)
-  napiFunctions.forEach((fn) => console.log(`   - ${fn}`))
-  console.log()
+  const napiFunctions = parseNAPIFunctions(tsLibPath)
+  console.log(`🦀 Found ${napiFunctions.length} #[napi] functions in ddk-ts\n`)
 
-  // Check for missing functions
-  const missingInNAPI = []
-  const extraInNAPI = []
+  const napiSet = new Set(napiFunctions)
+  const uniffiSet = new Set(uniffiFunctions)
 
-  // Convert NAPI functions to snake_case for comparison
-  const napiFunctionsSnake = napiFunctions.map(toSnakeCase)
+  const missingInNAPI = uniffiFunctions.filter((fn) => !napiSet.has(fn))
+  const extraInNAPI = napiFunctions.filter((fn) => !uniffiSet.has(fn))
 
-  // Check each UDL function
-  for (const udlFunc of udlFunctions) {
-    if (!napiFunctionsSnake.includes(udlFunc)) {
-      missingInNAPI.push(udlFunc)
-    }
-  }
-
-  // Check for extra functions in NAPI
-  for (const napiFunc of napiFunctionsSnake) {
-    if (!udlFunctions.includes(napiFunc)) {
-      extraInNAPI.push(napiFunc)
-    }
-  }
-
-  // Parse test file to check test coverage
-  const testContent = fs.readFileSync(testPath, 'utf8')
-  const testedFunctions = new Set()
-
-  // Look for function calls in tests (camelCase)
-  const callRegex = /ddk\.(\w+)\(/g
-  let match
-  while ((match = callRegex.exec(testContent)) !== null) {
-    testedFunctions.add(toSnakeCase(match[1]))
-  }
-
-  // Check test coverage
-  const untestedFunctions = []
-  for (const udlFunc of udlFunctions) {
-    if (!testedFunctions.has(udlFunc)) {
-      untestedFunctions.push(udlFunc)
-    }
-  }
-
-  // Report results
   console.log('📊 Parity Check Results:\n')
 
   if (missingInNAPI.length > 0) {
-    console.error('❌ Functions missing in NAPI implementation:')
-    missingInNAPI.forEach((fn) => console.error(`   - ${fn} (should be ${toCamelCase(fn)} in NAPI)`))
+    console.error('❌ Operations exported by ddk-ffi but missing in ddk-ts NAPI:')
+    missingInNAPI.forEach((fn) => console.error(`   - ${fn}`))
     console.log()
   }
 
   if (extraInNAPI.length > 0) {
-    console.warn('⚠️  Extra functions in NAPI (not in UDL):')
-    extraInNAPI.forEach((fn) => console.warn(`   - ${fn}`))
+    console.error('❌ NAPI functions in ddk-ts with no matching ddk-ffi export:')
+    extraInNAPI.forEach((fn) => console.error(`   - ${fn}`))
     console.log()
   }
 
-  if (untestedFunctions.length > 0) {
-    console.warn('⚠️  Functions without test coverage:')
-    untestedFunctions.forEach((fn) => console.warn(`   - ${fn} (${toCamelCase(fn)} in tests)`))
-    console.log()
-  }
-
-  // Final verdict
   if (missingInNAPI.length === 0 && extraInNAPI.length === 0) {
-    console.log('✅ Perfect parity! All UDL functions are implemented in NAPI.')
+    console.log('✅ Perfect parity! ddk-ts NAPI matches ddk-ffi exports 1:1.')
   } else {
     console.log('⚠️  Parity issues found. Please review the discrepancies above.')
     process.exit(1)
   }
 
-  if (untestedFunctions.length === 0) {
-    console.log('✅ All functions have test coverage!')
-  } else {
-    console.log('⚠️  Some functions lack test coverage.')
-  }
-
   console.log('\n📈 Summary:')
-  console.log(`   UDL Functions: ${udlFunctions.length}`)
-  console.log(`   NAPI Functions: ${napiFunctions.length}`)
-  console.log(
-    `   Test Coverage: ${(((udlFunctions.length - untestedFunctions.length) / udlFunctions.length) * 100).toFixed(1)}%`,
-  )
+  console.log(`   ddk-ffi exports: ${uniffiFunctions.length}`)
+  console.log(`   ddk-ts NAPI:     ${napiFunctions.length}`)
 }
 
-// Run verification
 try {
   verifyParity()
 } catch (error) {

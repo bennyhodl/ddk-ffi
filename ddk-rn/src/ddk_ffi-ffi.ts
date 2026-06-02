@@ -164,13 +164,6 @@ interface NativeModuleInterface {
     uniffi_out_err: UniffiRustCallStatus
   ): void;
   ubrn_ffi_ddk_ffi_rust_future_free_void(handle: bigint): void;
-  ubrn_uniffi_ddk_ffi_fn_func_add_signature_to_transaction(
-    tx: Uint8Array,
-    signature: Uint8Array,
-    pubkey: Uint8Array,
-    inputIndex: number,
-    uniffi_out_err: UniffiRustCallStatus
-  ): Uint8Array;
   ubrn_uniffi_ddk_ffi_fn_func_convert_mnemonic_to_seed(
     mnemonic: Uint8Array,
     passphrase: Uint8Array,
@@ -188,15 +181,6 @@ interface NativeModuleInterface {
   ): Uint8Array;
   ubrn_uniffi_ddk_ffi_fn_func_create_cet_adaptor_points_from_oracle_info(
     oracleInfo: Uint8Array,
-    msgs: Uint8Array,
-    uniffi_out_err: UniffiRustCallStatus
-  ): Uint8Array;
-  ubrn_uniffi_ddk_ffi_fn_func_create_cet_adaptor_signature_from_oracle_info(
-    cet: Uint8Array,
-    oracleInfo: Uint8Array,
-    fundingSk: Uint8Array,
-    fundingScriptPubkey: Uint8Array,
-    totalCollateral: bigint,
     msgs: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus
   ): Uint8Array;
@@ -287,36 +271,9 @@ interface NativeModuleInterface {
     adaptorSignature: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus
   ): Uint8Array;
-  ubrn_uniffi_ddk_ffi_fn_func_get_cet_adaptor_signature_inputs(
-    cet: Uint8Array,
-    oracleInfo: Uint8Array,
-    fundingScriptPubkey: Uint8Array,
-    fundOutputValue: bigint,
-    msgs: Uint8Array,
-    uniffi_out_err: UniffiRustCallStatus
-  ): Uint8Array;
-  ubrn_uniffi_ddk_ffi_fn_func_get_cet_sighash(
-    cet: Uint8Array,
-    fundingScriptPubkey: Uint8Array,
-    fundOutputValue: bigint,
-    uniffi_out_err: UniffiRustCallStatus
-  ): Uint8Array;
-  ubrn_uniffi_ddk_ffi_fn_func_get_change_output_and_fees(
-    params: Uint8Array,
-    feeRate: bigint,
-    uniffi_out_err: UniffiRustCallStatus
-  ): Uint8Array;
   ubrn_uniffi_ddk_ffi_fn_func_get_pubkey_from_extkey(
     extkey: Uint8Array,
     network: Uint8Array,
-    uniffi_out_err: UniffiRustCallStatus
-  ): Uint8Array;
-  ubrn_uniffi_ddk_ffi_fn_func_get_raw_funding_transaction_input_signature(
-    fundingTransaction: Uint8Array,
-    privkey: Uint8Array,
-    prevTxId: Uint8Array,
-    prevTxVout: number,
-    value: bigint,
     uniffi_out_err: UniffiRustCallStatus
   ): Uint8Array;
   ubrn_uniffi_ddk_ffi_fn_func_get_total_input_vsize(
@@ -328,12 +285,74 @@ interface NativeModuleInterface {
     network: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus
   ): Uint8Array;
-  ubrn_uniffi_ddk_ffi_fn_func_is_dust_output(
-    output: Uint8Array,
+  ubrn_uniffi_ddk_ffi_fn_func_verify_cet_adaptor_sigs_from_oracle_info(
+    adaptorSigs: Uint8Array,
+    cets: Uint8Array,
+    oracleInfos: Uint8Array,
+    pubkey: Uint8Array,
+    fundingScriptPubkey: Uint8Array,
+    totalCollateral: bigint,
+    msgs: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus
   ): number;
-  ubrn_uniffi_ddk_ffi_fn_func_sign_cet(
+  ubrn_uniffi_ddk_ffi_fn_func_version(
+    uniffi_out_err: UniffiRustCallStatus
+  ): Uint8Array;
+  ubrn_uniffi_ddk_ffi_fn_method_adaptorsignature_verify_from_oracle_info(
+    uniffiSelf: Uint8Array,
     cet: Uint8Array,
+    oracleInfos: Uint8Array,
+    pubkey: Uint8Array,
+    fundingScriptPubkey: Uint8Array,
+    totalCollateral: bigint,
+    msgs: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus
+  ): number;
+  ubrn_uniffi_ddk_ffi_fn_method_partyparams_change_output_and_fees(
+    uniffiSelf: Uint8Array,
+    feeRate: bigint,
+    uniffi_out_err: UniffiRustCallStatus
+  ): Uint8Array;
+  ubrn_uniffi_ddk_ffi_fn_method_transaction_add_signature(
+    uniffiSelf: Uint8Array,
+    signature: Uint8Array,
+    pubkey: Uint8Array,
+    inputIndex: number,
+    uniffi_out_err: UniffiRustCallStatus
+  ): Uint8Array;
+  ubrn_uniffi_ddk_ffi_fn_method_transaction_cet_adaptor_signature_from_oracle_info(
+    uniffiSelf: Uint8Array,
+    oracleInfo: Uint8Array,
+    fundingSk: Uint8Array,
+    fundingScriptPubkey: Uint8Array,
+    totalCollateral: bigint,
+    msgs: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus
+  ): Uint8Array;
+  ubrn_uniffi_ddk_ffi_fn_method_transaction_cet_adaptor_signature_inputs(
+    uniffiSelf: Uint8Array,
+    oracleInfo: Uint8Array,
+    fundingScriptPubkey: Uint8Array,
+    fundOutputValue: bigint,
+    msgs: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus
+  ): Uint8Array;
+  ubrn_uniffi_ddk_ffi_fn_method_transaction_cet_sighash(
+    uniffiSelf: Uint8Array,
+    fundingScriptPubkey: Uint8Array,
+    fundOutputValue: bigint,
+    uniffi_out_err: UniffiRustCallStatus
+  ): Uint8Array;
+  ubrn_uniffi_ddk_ffi_fn_method_transaction_raw_funding_input_signature(
+    uniffiSelf: Uint8Array,
+    privkey: Uint8Array,
+    prevTxId: Uint8Array,
+    prevTxVout: number,
+    value: bigint,
+    uniffi_out_err: UniffiRustCallStatus
+  ): Uint8Array;
+  ubrn_uniffi_ddk_ffi_fn_method_transaction_sign_cet(
+    uniffiSelf: Uint8Array,
     adaptorSignature: Uint8Array,
     oracleSignatures: Uint8Array,
     fundingSecretKey: Uint8Array,
@@ -342,43 +361,23 @@ interface NativeModuleInterface {
     fundOutputValue: bigint,
     uniffi_out_err: UniffiRustCallStatus
   ): Uint8Array;
-  ubrn_uniffi_ddk_ffi_fn_func_sign_fund_transaction_input(
-    fundTransaction: Uint8Array,
+  ubrn_uniffi_ddk_ffi_fn_method_transaction_sign_fund_input(
+    uniffiSelf: Uint8Array,
     privkey: Uint8Array,
     prevTxId: Uint8Array,
     prevTxVout: number,
     value: bigint,
     uniffi_out_err: UniffiRustCallStatus
   ): Uint8Array;
-  ubrn_uniffi_ddk_ffi_fn_func_sign_multi_sig_input(
-    tx: Uint8Array,
+  ubrn_uniffi_ddk_ffi_fn_method_transaction_sign_multi_sig_input(
+    uniffiSelf: Uint8Array,
     dlcInput: Uint8Array,
     localPrivkey: Uint8Array,
     remoteSignature: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus
   ): Uint8Array;
-  ubrn_uniffi_ddk_ffi_fn_func_verify_cet_adaptor_sig_from_oracle_info(
-    adaptorSig: Uint8Array,
-    cet: Uint8Array,
-    oracleInfo: Uint8Array,
-    pubkey: Uint8Array,
-    fundingScriptPubkey: Uint8Array,
-    totalCollateral: bigint,
-    msgs: Uint8Array,
-    uniffi_out_err: UniffiRustCallStatus
-  ): number;
-  ubrn_uniffi_ddk_ffi_fn_func_verify_cet_adaptor_sigs_from_oracle_info(
-    adaptorSigs: Uint8Array,
-    cets: Uint8Array,
-    oracleInfo: Uint8Array,
-    pubkey: Uint8Array,
-    fundingScriptPubkey: Uint8Array,
-    totalCollateral: bigint,
-    msgs: Uint8Array,
-    uniffi_out_err: UniffiRustCallStatus
-  ): number;
-  ubrn_uniffi_ddk_ffi_fn_func_verify_fund_tx_signature(
-    fundTx: Uint8Array,
+  ubrn_uniffi_ddk_ffi_fn_method_transaction_verify_fund_signature(
+    uniffiSelf: Uint8Array,
     signature: Uint8Array,
     pubkey: Uint8Array,
     txid: Uint8Array,
@@ -386,15 +385,14 @@ interface NativeModuleInterface {
     inputAmount: bigint,
     uniffi_out_err: UniffiRustCallStatus
   ): number;
-  ubrn_uniffi_ddk_ffi_fn_func_version(
+  ubrn_uniffi_ddk_ffi_fn_method_txoutput_is_dust(
+    uniffiSelf: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus
-  ): Uint8Array;
+  ): number;
   ubrn_ffi_ddk_ffi_uniffi_contract_version(): number;
-  ubrn_uniffi_ddk_ffi_checksum_func_add_signature_to_transaction(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_convert_mnemonic_to_seed(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_create_cet(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_create_cet_adaptor_points_from_oracle_info(): number;
-  ubrn_uniffi_ddk_ffi_checksum_func_create_cet_adaptor_signature_from_oracle_info(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_create_cet_adaptor_sigs_from_oracle_info(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_create_cet_adaptor_sigs_from_points(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_create_cets(): number;
@@ -406,20 +404,10 @@ interface NativeModuleInterface {
   ubrn_uniffi_ddk_ffi_checksum_func_create_spliced_dlc_transactions(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_create_xpriv_from_parent_path(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_extract_ecdsa_signature_from_oracle_signatures(): number;
-  ubrn_uniffi_ddk_ffi_checksum_func_get_cet_adaptor_signature_inputs(): number;
-  ubrn_uniffi_ddk_ffi_checksum_func_get_cet_sighash(): number;
-  ubrn_uniffi_ddk_ffi_checksum_func_get_change_output_and_fees(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_get_pubkey_from_extkey(): number;
-  ubrn_uniffi_ddk_ffi_checksum_func_get_raw_funding_transaction_input_signature(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_get_total_input_vsize(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_get_xpub_from_xpriv(): number;
-  ubrn_uniffi_ddk_ffi_checksum_func_is_dust_output(): number;
-  ubrn_uniffi_ddk_ffi_checksum_func_sign_cet(): number;
-  ubrn_uniffi_ddk_ffi_checksum_func_sign_fund_transaction_input(): number;
-  ubrn_uniffi_ddk_ffi_checksum_func_sign_multi_sig_input(): number;
-  ubrn_uniffi_ddk_ffi_checksum_func_verify_cet_adaptor_sig_from_oracle_info(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_verify_cet_adaptor_sigs_from_oracle_info(): number;
-  ubrn_uniffi_ddk_ffi_checksum_func_verify_fund_tx_signature(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_version(): number;
   // Codegen call sites use these via `nativeModule().rustbuffer_alloc(...)`
   // and `nativeModule().rustbuffer_free(...)`. The JSI host object exposes

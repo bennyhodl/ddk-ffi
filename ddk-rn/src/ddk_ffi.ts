@@ -13,6 +13,7 @@ import {
   type UniffiByteArray,
   AbstractFfiConverterByteArray,
   FfiConverterArray,
+  FfiConverterArrayBuffer,
   FfiConverterBool,
   FfiConverterInt32,
   FfiConverterOptional,
@@ -20,6 +21,7 @@ import {
   FfiConverterUInt64,
   FfiConverterUInt8,
   RustBuffer,
+  UniffiEnum,
   UniffiError,
   UniffiInternalError,
   UniffiRustCaller,
@@ -39,53 +41,13 @@ const uniffiIsDebug =
 
 // Public interface members begin here.
 
-export function addSignatureToTransaction(
-  tx: Transaction,
-  signature: Array<number>,
-  pubkey: Array<number>,
-  inputIndex: number
-): Transaction /*throws*/ {
-  return ((__rb: Uint8Array) => {
-    try {
-      return FfiConverterTypeTransaction.lift(__rb);
-    } finally {
-      nativeModule().rustbuffer_free(__rb);
-    }
-  })(
-    uniffiCaller.rustCallWithError(
-      /*liftError:*/ FfiConverterTypeDLCError.lift.bind(
-        FfiConverterTypeDLCError
-      ),
-      /*caller:*/ (callStatus) => {
-        return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_add_signature_to_transaction(
-          FfiConverterTypeTransaction.lower(
-            tx,
-            nativeModule().rustbuffer_alloc
-          ),
-          FfiConverterSequenceUInt8.lower(
-            signature,
-            nativeModule().rustbuffer_alloc
-          ),
-          FfiConverterSequenceUInt8.lower(
-            pubkey,
-            nativeModule().rustbuffer_alloc
-          ),
-          FfiConverterUInt32.lower(inputIndex, nativeModule().rustbuffer_alloc),
-          callStatus
-        );
-      },
-      /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString)
-    )
-  );
-}
-
 export function convertMnemonicToSeed(
   mnemonic: string,
   passphrase: string | undefined
-): Array<number> /*throws*/ {
+): ArrayBuffer /*throws*/ {
   return ((__rb: Uint8Array) => {
     try {
-      return FfiConverterSequenceUInt8.lift(__rb);
+      return FfiConverterArrayBuffer.lift(__rb);
     } finally {
       nativeModule().rustbuffer_free(__rb);
     }
@@ -109,6 +71,9 @@ export function convertMnemonicToSeed(
   );
 }
 
+/**
+ * Create a single CET
+ */
 export function createCet(
   localOutput: TxOutput,
   localPayoutSerialId: bigint,
@@ -160,11 +125,11 @@ export function createCet(
 
 export function createCetAdaptorPointsFromOracleInfo(
   oracleInfo: Array<OracleInfo>,
-  msgs: Array<Array<Array<Array<number>>>>
-): Array<Array<number>> /*throws*/ {
+  msgs: Array<Array<Array<ArrayBuffer>>>
+): Array<ArrayBuffer> /*throws*/ {
   return ((__rb: Uint8Array) => {
     try {
-      return FfiConverterSequenceSequenceUInt8.lift(__rb);
+      return FfiConverterSequenceBytes.lift(__rb);
     } finally {
       nativeModule().rustbuffer_free(__rb);
     }
@@ -179,60 +144,7 @@ export function createCetAdaptorPointsFromOracleInfo(
             oracleInfo,
             nativeModule().rustbuffer_alloc
           ),
-          FfiConverterSequenceSequenceSequenceSequenceUInt8.lower(
-            msgs,
-            nativeModule().rustbuffer_alloc
-          ),
-          callStatus
-        );
-      },
-      /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString)
-    )
-  );
-}
-
-export function createCetAdaptorSignatureFromOracleInfo(
-  cet: Transaction,
-  oracleInfo: OracleInfo,
-  fundingSk: Array<number>,
-  fundingScriptPubkey: Array<number>,
-  totalCollateral: bigint,
-  msgs: Array<Array<number>>
-): AdaptorSignature /*throws*/ {
-  return ((__rb: Uint8Array) => {
-    try {
-      return FfiConverterTypeAdaptorSignature.lift(__rb);
-    } finally {
-      nativeModule().rustbuffer_free(__rb);
-    }
-  })(
-    uniffiCaller.rustCallWithError(
-      /*liftError:*/ FfiConverterTypeDLCError.lift.bind(
-        FfiConverterTypeDLCError
-      ),
-      /*caller:*/ (callStatus) => {
-        return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_create_cet_adaptor_signature_from_oracle_info(
-          FfiConverterTypeTransaction.lower(
-            cet,
-            nativeModule().rustbuffer_alloc
-          ),
-          FfiConverterTypeOracleInfo.lower(
-            oracleInfo,
-            nativeModule().rustbuffer_alloc
-          ),
-          FfiConverterSequenceUInt8.lower(
-            fundingSk,
-            nativeModule().rustbuffer_alloc
-          ),
-          FfiConverterSequenceUInt8.lower(
-            fundingScriptPubkey,
-            nativeModule().rustbuffer_alloc
-          ),
-          FfiConverterUInt64.lower(
-            totalCollateral,
-            nativeModule().rustbuffer_alloc
-          ),
-          FfiConverterSequenceSequenceUInt8.lower(
+          FfiConverterSequenceSequenceSequenceBytes.lower(
             msgs,
             nativeModule().rustbuffer_alloc
           ),
@@ -247,10 +159,10 @@ export function createCetAdaptorSignatureFromOracleInfo(
 export function createCetAdaptorSigsFromOracleInfo(
   cets: Array<Transaction>,
   oracleInfo: Array<OracleInfo>,
-  fundingSecretKey: Array<number>,
-  fundingScriptPubkey: Array<number>,
+  fundingSecretKey: ArrayBuffer,
+  fundingScriptPubkey: ArrayBuffer,
   fundOutputValue: bigint,
-  msgs: Array<Array<Array<Array<number>>>>
+  msgs: Array<Array<Array<ArrayBuffer>>>
 ): Array<AdaptorSignature> /*throws*/ {
   return ((__rb: Uint8Array) => {
     try {
@@ -273,11 +185,11 @@ export function createCetAdaptorSigsFromOracleInfo(
             oracleInfo,
             nativeModule().rustbuffer_alloc
           ),
-          FfiConverterSequenceUInt8.lower(
+          FfiConverterArrayBuffer.lower(
             fundingSecretKey,
             nativeModule().rustbuffer_alloc
           ),
-          FfiConverterSequenceUInt8.lower(
+          FfiConverterArrayBuffer.lower(
             fundingScriptPubkey,
             nativeModule().rustbuffer_alloc
           ),
@@ -285,7 +197,7 @@ export function createCetAdaptorSigsFromOracleInfo(
             fundOutputValue,
             nativeModule().rustbuffer_alloc
           ),
-          FfiConverterSequenceSequenceSequenceSequenceUInt8.lower(
+          FfiConverterSequenceSequenceSequenceBytes.lower(
             msgs,
             nativeModule().rustbuffer_alloc
           ),
@@ -297,11 +209,14 @@ export function createCetAdaptorSigsFromOracleInfo(
   );
 }
 
+/**
+ * Create adaptor signatures from pre-computed adaptor points.
+ */
 export function createCetAdaptorSigsFromPoints(
   cets: Array<Transaction>,
-  adaptorPoints: Array<Array<number>>,
-  fundingSecretKey: Array<number>,
-  fundingScriptPubkey: Array<number>,
+  adaptorPoints: Array<ArrayBuffer>,
+  fundingSecretKey: ArrayBuffer,
+  fundingScriptPubkey: ArrayBuffer,
   fundOutputValue: bigint
 ): Array<AdaptorSignature> /*throws*/ {
   return ((__rb: Uint8Array) => {
@@ -321,15 +236,15 @@ export function createCetAdaptorSigsFromPoints(
             cets,
             nativeModule().rustbuffer_alloc
           ),
-          FfiConverterSequenceSequenceUInt8.lower(
+          FfiConverterSequenceBytes.lower(
             adaptorPoints,
             nativeModule().rustbuffer_alloc
           ),
-          FfiConverterSequenceUInt8.lower(
+          FfiConverterArrayBuffer.lower(
             fundingSecretKey,
             nativeModule().rustbuffer_alloc
           ),
-          FfiConverterSequenceUInt8.lower(
+          FfiConverterArrayBuffer.lower(
             fundingScriptPubkey,
             nativeModule().rustbuffer_alloc
           ),
@@ -345,11 +260,14 @@ export function createCetAdaptorSigsFromPoints(
   );
 }
 
+/**
+ * Create multiple CETs
+ */
 export function createCets(
   fundTxId: string,
   fundVout: number,
-  localFinalScriptPubkey: Array<number>,
-  remoteFinalScriptPubkey: Array<number>,
+  localFinalScriptPubkey: ArrayBuffer,
+  remoteFinalScriptPubkey: ArrayBuffer,
   outcomes: Array<Payout>,
   lockTime: number,
   localSerialId: bigint,
@@ -370,11 +288,11 @@ export function createCets(
         return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_create_cets(
           FfiConverterString.lower(fundTxId, nativeModule().rustbuffer_alloc),
           FfiConverterUInt32.lower(fundVout, nativeModule().rustbuffer_alloc),
-          FfiConverterSequenceUInt8.lower(
+          FfiConverterArrayBuffer.lower(
             localFinalScriptPubkey,
             nativeModule().rustbuffer_alloc
           ),
-          FfiConverterSequenceUInt8.lower(
+          FfiConverterArrayBuffer.lower(
             remoteFinalScriptPubkey,
             nativeModule().rustbuffer_alloc
           ),
@@ -399,6 +317,9 @@ export function createCets(
   );
 }
 
+/**
+ * Create complete DLC transactions
+ */
 export function createDlcTransactions(
   outcomes: Array<Payout>,
   localParams: PartyParams,
@@ -459,13 +380,17 @@ export function createDlcTransactions(
   );
 }
 
+/**
+ * Derive child extended private key from parent extended key
+ * Input: 78-byte encoded xpriv, Output: 78-byte encoded xpriv
+ */
 export function createExtkeyFromParentPath(
-  extkey: Array<number>,
+  extkey: ArrayBuffer,
   path: string
-): Array<number> /*throws*/ {
+): ArrayBuffer /*throws*/ {
   return ((__rb: Uint8Array) => {
     try {
-      return FfiConverterSequenceUInt8.lift(__rb);
+      return FfiConverterArrayBuffer.lift(__rb);
     } finally {
       nativeModule().rustbuffer_free(__rb);
     }
@@ -476,7 +401,7 @@ export function createExtkeyFromParentPath(
       ),
       /*caller:*/ (callStatus) => {
         return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_create_extkey_from_parent_path(
-          FfiConverterSequenceUInt8.lower(
+          FfiConverterArrayBuffer.lower(
             extkey,
             nativeModule().rustbuffer_alloc
           ),
@@ -489,13 +414,17 @@ export function createExtkeyFromParentPath(
   );
 }
 
+/**
+ * Create master extended private key from 64-byte seed
+ * Returns 78-byte encoded xpriv
+ */
 export function createExtkeyFromSeed(
-  seed: Array<number>,
+  seed: ArrayBuffer,
   network: string
-): Array<number> /*throws*/ {
+): ArrayBuffer /*throws*/ {
   return ((__rb: Uint8Array) => {
     try {
-      return FfiConverterSequenceUInt8.lift(__rb);
+      return FfiConverterArrayBuffer.lift(__rb);
     } finally {
       nativeModule().rustbuffer_free(__rb);
     }
@@ -506,10 +435,7 @@ export function createExtkeyFromSeed(
       ),
       /*caller:*/ (callStatus) => {
         return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_create_extkey_from_seed(
-          FfiConverterSequenceUInt8.lower(
-            seed,
-            nativeModule().rustbuffer_alloc
-          ),
+          FfiConverterArrayBuffer.lower(seed, nativeModule().rustbuffer_alloc),
           FfiConverterString.lower(network, nativeModule().rustbuffer_alloc),
           callStatus
         );
@@ -519,13 +445,16 @@ export function createExtkeyFromSeed(
   );
 }
 
+/**
+ * Create a funding script pubkey for DLC transactions
+ */
 export function createFundTxLockingScript(
-  localFundPubkey: Array<number>,
-  remoteFundPubkey: Array<number>
-): Array<number> /*throws*/ {
+  localFundPubkey: ArrayBuffer,
+  remoteFundPubkey: ArrayBuffer
+): ArrayBuffer /*throws*/ {
   return ((__rb: Uint8Array) => {
     try {
-      return FfiConverterSequenceUInt8.lift(__rb);
+      return FfiConverterArrayBuffer.lift(__rb);
     } finally {
       nativeModule().rustbuffer_free(__rb);
     }
@@ -536,11 +465,11 @@ export function createFundTxLockingScript(
       ),
       /*caller:*/ (callStatus) => {
         return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_create_fund_tx_locking_script(
-          FfiConverterSequenceUInt8.lower(
+          FfiConverterArrayBuffer.lower(
             localFundPubkey,
             nativeModule().rustbuffer_alloc
           ),
-          FfiConverterSequenceUInt8.lower(
+          FfiConverterArrayBuffer.lower(
             remoteFundPubkey,
             nativeModule().rustbuffer_alloc
           ),
@@ -552,9 +481,12 @@ export function createFundTxLockingScript(
   );
 }
 
+/**
+ * Create a refund transaction
+ */
 export function createRefundTransaction(
-  localFinalScriptPubkey: Array<number>,
-  remoteFinalScriptPubkey: Array<number>,
+  localFinalScriptPubkey: ArrayBuffer,
+  remoteFinalScriptPubkey: ArrayBuffer,
   localAmount: bigint,
   remoteAmount: bigint,
   lockTime: number,
@@ -574,11 +506,11 @@ export function createRefundTransaction(
       ),
       /*caller:*/ (callStatus) => {
         return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_create_refund_transaction(
-          FfiConverterSequenceUInt8.lower(
+          FfiConverterArrayBuffer.lower(
             localFinalScriptPubkey,
             nativeModule().rustbuffer_alloc
           ),
-          FfiConverterSequenceUInt8.lower(
+          FfiConverterArrayBuffer.lower(
             remoteFinalScriptPubkey,
             nativeModule().rustbuffer_alloc
           ),
@@ -601,6 +533,9 @@ export function createRefundTransaction(
   );
 }
 
+/**
+ * Create spliced DLC transactions
+ */
 export function createSplicedDlcTransactions(
   outcomes: Array<Payout>,
   localParams: PartyParams,
@@ -661,15 +596,19 @@ export function createSplicedDlcTransactions(
   );
 }
 
+/**
+ * DEPRECATED: Use create_extkey_from_seed + create_extkey_from_parent_path instead
+ * This function handles both seeds (64 bytes) and xprivs (78 bytes) which is confusing
+ */
 export function createXprivFromParentPath(
-  seedOrXpriv: Array<number>,
+  seedOrXpriv: ArrayBuffer,
   baseDerivationPath: string,
   network: string,
   path: string
-): Array<number> /*throws*/ {
+): ArrayBuffer /*throws*/ {
   return ((__rb: Uint8Array) => {
     try {
-      return FfiConverterSequenceUInt8.lift(__rb);
+      return FfiConverterArrayBuffer.lift(__rb);
     } finally {
       nativeModule().rustbuffer_free(__rb);
     }
@@ -680,7 +619,7 @@ export function createXprivFromParentPath(
       ),
       /*caller:*/ (callStatus) => {
         return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_create_xpriv_from_parent_path(
-          FfiConverterSequenceUInt8.lower(
+          FfiConverterArrayBuffer.lower(
             seedOrXpriv,
             nativeModule().rustbuffer_alloc
           ),
@@ -699,12 +638,12 @@ export function createXprivFromParentPath(
 }
 
 export function extractEcdsaSignatureFromOracleSignatures(
-  oracleSignatures: Array<Array<number>>,
-  adaptorSignature: Array<number>
-): Array<number> /*throws*/ {
+  oracleSignatures: Array<ArrayBuffer>,
+  adaptorSignature: ArrayBuffer
+): ArrayBuffer /*throws*/ {
   return ((__rb: Uint8Array) => {
     try {
-      return FfiConverterSequenceUInt8.lift(__rb);
+      return FfiConverterArrayBuffer.lift(__rb);
     } finally {
       nativeModule().rustbuffer_free(__rb);
     }
@@ -715,11 +654,11 @@ export function extractEcdsaSignatureFromOracleSignatures(
       ),
       /*caller:*/ (callStatus) => {
         return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_extract_ecdsa_signature_from_oracle_signatures(
-          FfiConverterSequenceSequenceUInt8.lower(
+          FfiConverterSequenceBytes.lower(
             oracleSignatures,
             nativeModule().rustbuffer_alloc
           ),
-          FfiConverterSequenceUInt8.lower(
+          FfiConverterArrayBuffer.lower(
             adaptorSignature,
             nativeModule().rustbuffer_alloc
           ),
@@ -731,129 +670,17 @@ export function extractEcdsaSignatureFromOracleSignatures(
   );
 }
 
-export function getCetAdaptorSignatureInputs(
-  cet: Transaction,
-  oracleInfo: Array<OracleInfo>,
-  fundingScriptPubkey: Array<number>,
-  fundOutputValue: bigint,
-  msgs: Array<Array<Array<number>>>
-): CetAdaptorSignatureDebugInfo /*throws*/ {
-  return ((__rb: Uint8Array) => {
-    try {
-      return FfiConverterTypeCetAdaptorSignatureDebugInfo.lift(__rb);
-    } finally {
-      nativeModule().rustbuffer_free(__rb);
-    }
-  })(
-    uniffiCaller.rustCallWithError(
-      /*liftError:*/ FfiConverterTypeDLCError.lift.bind(
-        FfiConverterTypeDLCError
-      ),
-      /*caller:*/ (callStatus) => {
-        return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_get_cet_adaptor_signature_inputs(
-          FfiConverterTypeTransaction.lower(
-            cet,
-            nativeModule().rustbuffer_alloc
-          ),
-          FfiConverterSequenceTypeOracleInfo.lower(
-            oracleInfo,
-            nativeModule().rustbuffer_alloc
-          ),
-          FfiConverterSequenceUInt8.lower(
-            fundingScriptPubkey,
-            nativeModule().rustbuffer_alloc
-          ),
-          FfiConverterUInt64.lower(
-            fundOutputValue,
-            nativeModule().rustbuffer_alloc
-          ),
-          FfiConverterSequenceSequenceSequenceUInt8.lower(
-            msgs,
-            nativeModule().rustbuffer_alloc
-          ),
-          callStatus
-        );
-      },
-      /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString)
-    )
-  );
-}
-
-export function getCetSighash(
-  cet: Transaction,
-  fundingScriptPubkey: Array<number>,
-  fundOutputValue: bigint
-): Array<number> /*throws*/ {
-  return ((__rb: Uint8Array) => {
-    try {
-      return FfiConverterSequenceUInt8.lift(__rb);
-    } finally {
-      nativeModule().rustbuffer_free(__rb);
-    }
-  })(
-    uniffiCaller.rustCallWithError(
-      /*liftError:*/ FfiConverterTypeDLCError.lift.bind(
-        FfiConverterTypeDLCError
-      ),
-      /*caller:*/ (callStatus) => {
-        return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_get_cet_sighash(
-          FfiConverterTypeTransaction.lower(
-            cet,
-            nativeModule().rustbuffer_alloc
-          ),
-          FfiConverterSequenceUInt8.lower(
-            fundingScriptPubkey,
-            nativeModule().rustbuffer_alloc
-          ),
-          FfiConverterUInt64.lower(
-            fundOutputValue,
-            nativeModule().rustbuffer_alloc
-          ),
-          callStatus
-        );
-      },
-      /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString)
-    )
-  );
-}
-
-export function getChangeOutputAndFees(
-  params: PartyParams,
-  feeRate: bigint
-): ChangeOutputAndFees /*throws*/ {
-  return ((__rb: Uint8Array) => {
-    try {
-      return FfiConverterTypeChangeOutputAndFees.lift(__rb);
-    } finally {
-      nativeModule().rustbuffer_free(__rb);
-    }
-  })(
-    uniffiCaller.rustCallWithError(
-      /*liftError:*/ FfiConverterTypeDLCError.lift.bind(
-        FfiConverterTypeDLCError
-      ),
-      /*caller:*/ (callStatus) => {
-        return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_get_change_output_and_fees(
-          FfiConverterTypePartyParams.lower(
-            params,
-            nativeModule().rustbuffer_alloc
-          ),
-          FfiConverterUInt64.lower(feeRate, nativeModule().rustbuffer_alloc),
-          callStatus
-        );
-      },
-      /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString)
-    )
-  );
-}
-
+/**
+ * Extract public key from extended key (private or public)
+ * Input: 78-byte encoded xpriv/xpub, Output: 33-byte compressed public key
+ */
 export function getPubkeyFromExtkey(
-  extkey: Array<number>,
+  extkey: ArrayBuffer,
   network: string
-): Array<number> /*throws*/ {
+): ArrayBuffer /*throws*/ {
   return ((__rb: Uint8Array) => {
     try {
-      return FfiConverterSequenceUInt8.lift(__rb);
+      return FfiConverterArrayBuffer.lift(__rb);
     } finally {
       nativeModule().rustbuffer_free(__rb);
     }
@@ -864,7 +691,7 @@ export function getPubkeyFromExtkey(
       ),
       /*caller:*/ (callStatus) => {
         return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_get_pubkey_from_extkey(
-          FfiConverterSequenceUInt8.lower(
+          FfiConverterArrayBuffer.lower(
             extkey,
             nativeModule().rustbuffer_alloc
           ),
@@ -877,45 +704,9 @@ export function getPubkeyFromExtkey(
   );
 }
 
-export function getRawFundingTransactionInputSignature(
-  fundingTransaction: Transaction,
-  privkey: Array<number>,
-  prevTxId: string,
-  prevTxVout: number,
-  value: bigint
-): Array<number> /*throws*/ {
-  return ((__rb: Uint8Array) => {
-    try {
-      return FfiConverterSequenceUInt8.lift(__rb);
-    } finally {
-      nativeModule().rustbuffer_free(__rb);
-    }
-  })(
-    uniffiCaller.rustCallWithError(
-      /*liftError:*/ FfiConverterTypeDLCError.lift.bind(
-        FfiConverterTypeDLCError
-      ),
-      /*caller:*/ (callStatus) => {
-        return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_get_raw_funding_transaction_input_signature(
-          FfiConverterTypeTransaction.lower(
-            fundingTransaction,
-            nativeModule().rustbuffer_alloc
-          ),
-          FfiConverterSequenceUInt8.lower(
-            privkey,
-            nativeModule().rustbuffer_alloc
-          ),
-          FfiConverterString.lower(prevTxId, nativeModule().rustbuffer_alloc),
-          FfiConverterUInt32.lower(prevTxVout, nativeModule().rustbuffer_alloc),
-          FfiConverterUInt64.lower(value, nativeModule().rustbuffer_alloc),
-          callStatus
-        );
-      },
-      /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString)
-    )
-  );
-}
-
+/**
+ * Get total input virtual size for fee calculation
+ */
 export function getTotalInputVsize(inputs: Array<TxInputInfo>): number {
   return FfiConverterUInt32.lift(
     uniffiCaller.rustCall(
@@ -933,13 +724,17 @@ export function getTotalInputVsize(inputs: Array<TxInputInfo>): number {
   );
 }
 
+/**
+ * Convert extended private key to extended public key
+ * Input: 78-byte encoded xpriv, Output: 78-byte encoded xpub
+ */
 export function getXpubFromXpriv(
-  xpriv: Array<number>,
+  xpriv: ArrayBuffer,
   network: string
-): Array<number> /*throws*/ {
+): ArrayBuffer /*throws*/ {
   return ((__rb: Uint8Array) => {
     try {
-      return FfiConverterSequenceUInt8.lift(__rb);
+      return FfiConverterArrayBuffer.lift(__rb);
     } finally {
       nativeModule().rustbuffer_free(__rb);
     }
@@ -950,217 +745,8 @@ export function getXpubFromXpriv(
       ),
       /*caller:*/ (callStatus) => {
         return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_get_xpub_from_xpriv(
-          FfiConverterSequenceUInt8.lower(
-            xpriv,
-            nativeModule().rustbuffer_alloc
-          ),
+          FfiConverterArrayBuffer.lower(xpriv, nativeModule().rustbuffer_alloc),
           FfiConverterString.lower(network, nativeModule().rustbuffer_alloc),
-          callStatus
-        );
-      },
-      /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString)
-    )
-  );
-}
-
-export function isDustOutput(output: TxOutput): boolean {
-  return FfiConverterBool.lift(
-    uniffiCaller.rustCall(
-      /*caller:*/ (callStatus) => {
-        return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_is_dust_output(
-          FfiConverterTypeTxOutput.lower(
-            output,
-            nativeModule().rustbuffer_alloc
-          ),
-          callStatus
-        );
-      },
-      /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString)
-    )
-  );
-}
-
-export function signCet(
-  cet: Transaction,
-  adaptorSignature: Array<number>,
-  oracleSignatures: Array<Array<number>>,
-  fundingSecretKey: Array<number>,
-  otherPubkey: Array<number>,
-  fundingScriptPubkey: Array<number>,
-  fundOutputValue: bigint
-): Transaction /*throws*/ {
-  return ((__rb: Uint8Array) => {
-    try {
-      return FfiConverterTypeTransaction.lift(__rb);
-    } finally {
-      nativeModule().rustbuffer_free(__rb);
-    }
-  })(
-    uniffiCaller.rustCallWithError(
-      /*liftError:*/ FfiConverterTypeDLCError.lift.bind(
-        FfiConverterTypeDLCError
-      ),
-      /*caller:*/ (callStatus) => {
-        return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_sign_cet(
-          FfiConverterTypeTransaction.lower(
-            cet,
-            nativeModule().rustbuffer_alloc
-          ),
-          FfiConverterSequenceUInt8.lower(
-            adaptorSignature,
-            nativeModule().rustbuffer_alloc
-          ),
-          FfiConverterSequenceSequenceUInt8.lower(
-            oracleSignatures,
-            nativeModule().rustbuffer_alloc
-          ),
-          FfiConverterSequenceUInt8.lower(
-            fundingSecretKey,
-            nativeModule().rustbuffer_alloc
-          ),
-          FfiConverterSequenceUInt8.lower(
-            otherPubkey,
-            nativeModule().rustbuffer_alloc
-          ),
-          FfiConverterSequenceUInt8.lower(
-            fundingScriptPubkey,
-            nativeModule().rustbuffer_alloc
-          ),
-          FfiConverterUInt64.lower(
-            fundOutputValue,
-            nativeModule().rustbuffer_alloc
-          ),
-          callStatus
-        );
-      },
-      /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString)
-    )
-  );
-}
-
-export function signFundTransactionInput(
-  fundTransaction: Transaction,
-  privkey: Array<number>,
-  prevTxId: string,
-  prevTxVout: number,
-  value: bigint
-): Transaction /*throws*/ {
-  return ((__rb: Uint8Array) => {
-    try {
-      return FfiConverterTypeTransaction.lift(__rb);
-    } finally {
-      nativeModule().rustbuffer_free(__rb);
-    }
-  })(
-    uniffiCaller.rustCallWithError(
-      /*liftError:*/ FfiConverterTypeDLCError.lift.bind(
-        FfiConverterTypeDLCError
-      ),
-      /*caller:*/ (callStatus) => {
-        return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_sign_fund_transaction_input(
-          FfiConverterTypeTransaction.lower(
-            fundTransaction,
-            nativeModule().rustbuffer_alloc
-          ),
-          FfiConverterSequenceUInt8.lower(
-            privkey,
-            nativeModule().rustbuffer_alloc
-          ),
-          FfiConverterString.lower(prevTxId, nativeModule().rustbuffer_alloc),
-          FfiConverterUInt32.lower(prevTxVout, nativeModule().rustbuffer_alloc),
-          FfiConverterUInt64.lower(value, nativeModule().rustbuffer_alloc),
-          callStatus
-        );
-      },
-      /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString)
-    )
-  );
-}
-
-export function signMultiSigInput(
-  tx: Transaction,
-  dlcInput: DlcInputInfo,
-  localPrivkey: Array<number>,
-  remoteSignature: Array<number>
-): Transaction /*throws*/ {
-  return ((__rb: Uint8Array) => {
-    try {
-      return FfiConverterTypeTransaction.lift(__rb);
-    } finally {
-      nativeModule().rustbuffer_free(__rb);
-    }
-  })(
-    uniffiCaller.rustCallWithError(
-      /*liftError:*/ FfiConverterTypeDLCError.lift.bind(
-        FfiConverterTypeDLCError
-      ),
-      /*caller:*/ (callStatus) => {
-        return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_sign_multi_sig_input(
-          FfiConverterTypeTransaction.lower(
-            tx,
-            nativeModule().rustbuffer_alloc
-          ),
-          FfiConverterTypeDlcInputInfo.lower(
-            dlcInput,
-            nativeModule().rustbuffer_alloc
-          ),
-          FfiConverterSequenceUInt8.lower(
-            localPrivkey,
-            nativeModule().rustbuffer_alloc
-          ),
-          FfiConverterSequenceUInt8.lower(
-            remoteSignature,
-            nativeModule().rustbuffer_alloc
-          ),
-          callStatus
-        );
-      },
-      /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString)
-    )
-  );
-}
-
-export function verifyCetAdaptorSigFromOracleInfo(
-  adaptorSig: AdaptorSignature,
-  cet: Transaction,
-  oracleInfo: Array<OracleInfo>,
-  pubkey: Array<number>,
-  fundingScriptPubkey: Array<number>,
-  totalCollateral: bigint,
-  msgs: Array<Array<Array<number>>>
-): boolean {
-  return FfiConverterBool.lift(
-    uniffiCaller.rustCall(
-      /*caller:*/ (callStatus) => {
-        return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_verify_cet_adaptor_sig_from_oracle_info(
-          FfiConverterTypeAdaptorSignature.lower(
-            adaptorSig,
-            nativeModule().rustbuffer_alloc
-          ),
-          FfiConverterTypeTransaction.lower(
-            cet,
-            nativeModule().rustbuffer_alloc
-          ),
-          FfiConverterSequenceTypeOracleInfo.lower(
-            oracleInfo,
-            nativeModule().rustbuffer_alloc
-          ),
-          FfiConverterSequenceUInt8.lower(
-            pubkey,
-            nativeModule().rustbuffer_alloc
-          ),
-          FfiConverterSequenceUInt8.lower(
-            fundingScriptPubkey,
-            nativeModule().rustbuffer_alloc
-          ),
-          FfiConverterUInt64.lower(
-            totalCollateral,
-            nativeModule().rustbuffer_alloc
-          ),
-          FfiConverterSequenceSequenceSequenceUInt8.lower(
-            msgs,
-            nativeModule().rustbuffer_alloc
-          ),
           callStatus
         );
       },
@@ -1172,11 +758,11 @@ export function verifyCetAdaptorSigFromOracleInfo(
 export function verifyCetAdaptorSigsFromOracleInfo(
   adaptorSigs: Array<AdaptorSignature>,
   cets: Array<Transaction>,
-  oracleInfo: Array<OracleInfo>,
-  pubkey: Array<number>,
-  fundingScriptPubkey: Array<number>,
+  oracleInfos: Array<OracleInfo>,
+  pubkey: ArrayBuffer,
+  fundingScriptPubkey: ArrayBuffer,
   totalCollateral: bigint,
-  msgs: Array<Array<Array<Array<number>>>>
+  msgs: Array<Array<Array<ArrayBuffer>>>
 ): boolean {
   return FfiConverterBool.lift(
     uniffiCaller.rustCall(
@@ -1191,14 +777,14 @@ export function verifyCetAdaptorSigsFromOracleInfo(
             nativeModule().rustbuffer_alloc
           ),
           FfiConverterSequenceTypeOracleInfo.lower(
-            oracleInfo,
+            oracleInfos,
             nativeModule().rustbuffer_alloc
           ),
-          FfiConverterSequenceUInt8.lower(
+          FfiConverterArrayBuffer.lower(
             pubkey,
             nativeModule().rustbuffer_alloc
           ),
-          FfiConverterSequenceUInt8.lower(
+          FfiConverterArrayBuffer.lower(
             fundingScriptPubkey,
             nativeModule().rustbuffer_alloc
           ),
@@ -1206,49 +792,8 @@ export function verifyCetAdaptorSigsFromOracleInfo(
             totalCollateral,
             nativeModule().rustbuffer_alloc
           ),
-          FfiConverterSequenceSequenceSequenceSequenceUInt8.lower(
+          FfiConverterSequenceSequenceSequenceBytes.lower(
             msgs,
-            nativeModule().rustbuffer_alloc
-          ),
-          callStatus
-        );
-      },
-      /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString)
-    )
-  );
-}
-
-export function verifyFundTxSignature(
-  fundTx: Transaction,
-  signature: Array<number>,
-  pubkey: Array<number>,
-  txid: string,
-  vout: number,
-  inputAmount: bigint
-): boolean /*throws*/ {
-  return FfiConverterBool.lift(
-    uniffiCaller.rustCallWithError(
-      /*liftError:*/ FfiConverterTypeDLCError.lift.bind(
-        FfiConverterTypeDLCError
-      ),
-      /*caller:*/ (callStatus) => {
-        return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_verify_fund_tx_signature(
-          FfiConverterTypeTransaction.lower(
-            fundTx,
-            nativeModule().rustbuffer_alloc
-          ),
-          FfiConverterSequenceUInt8.lower(
-            signature,
-            nativeModule().rustbuffer_alloc
-          ),
-          FfiConverterSequenceUInt8.lower(
-            pubkey,
-            nativeModule().rustbuffer_alloc
-          ),
-          FfiConverterString.lower(txid, nativeModule().rustbuffer_alloc),
-          FfiConverterUInt32.lower(vout, nativeModule().rustbuffer_alloc),
-          FfiConverterUInt64.lower(
-            inputAmount,
             nativeModule().rustbuffer_alloc
           ),
           callStatus
@@ -1277,8 +822,8 @@ export function version(): string {
 }
 
 export type AdaptorSignature = {
-  signature: Array<number>;
-  proof: Array<number>;
+  signature: ArrayBuffer;
+  proof: ArrayBuffer;
 };
 
 /**
@@ -1295,6 +840,54 @@ export const AdaptorSignature = (() => {
     create,
     new: create,
     defaults: () => Object.freeze(defaults()) as Partial<AdaptorSignature>,
+    verifyFromOracleInfo(
+      self_: AdaptorSignature,
+      cet: Transaction,
+      oracleInfos: Array<OracleInfo>,
+      pubkey: ArrayBuffer,
+      fundingScriptPubkey: ArrayBuffer,
+      totalCollateral: bigint,
+      msgs: Array<Array<ArrayBuffer>>
+    ): boolean {
+      return FfiConverterBool.lift(
+        uniffiCaller.rustCall(
+          /*caller:*/ (callStatus) => {
+            return nativeModule().ubrn_uniffi_ddk_ffi_fn_method_adaptorsignature_verify_from_oracle_info(
+              FfiConverterTypeAdaptorSignature.lower(
+                self_,
+                nativeModule().rustbuffer_alloc
+              ),
+              FfiConverterTypeTransaction.lower(
+                cet,
+                nativeModule().rustbuffer_alloc
+              ),
+              FfiConverterSequenceTypeOracleInfo.lower(
+                oracleInfos,
+                nativeModule().rustbuffer_alloc
+              ),
+              FfiConverterArrayBuffer.lower(
+                pubkey,
+                nativeModule().rustbuffer_alloc
+              ),
+              FfiConverterArrayBuffer.lower(
+                fundingScriptPubkey,
+                nativeModule().rustbuffer_alloc
+              ),
+              FfiConverterUInt64.lower(
+                totalCollateral,
+                nativeModule().rustbuffer_alloc
+              ),
+              FfiConverterSequenceSequenceBytes.lower(
+                msgs,
+                nativeModule().rustbuffer_alloc
+              ),
+              callStatus
+            );
+          },
+          /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString)
+        )
+      );
+    },
   });
 })();
 
@@ -1303,18 +896,18 @@ const FfiConverterTypeAdaptorSignature = (() => {
   class FFIConverter extends AbstractFfiConverterByteArray<TypeName> {
     read(from: RustBuffer): TypeName {
       return {
-        signature: FfiConverterSequenceUInt8.read(from),
-        proof: FfiConverterSequenceUInt8.read(from),
+        signature: FfiConverterArrayBuffer.read(from),
+        proof: FfiConverterArrayBuffer.read(from),
       };
     }
     write(value: TypeName, into: RustBuffer): void {
-      FfiConverterSequenceUInt8.write(value.signature, into);
-      FfiConverterSequenceUInt8.write(value.proof, into);
+      FfiConverterArrayBuffer.write(value.signature, into);
+      FfiConverterArrayBuffer.write(value.proof, into);
     }
     allocationSize(value: TypeName): number {
       return (
-        FfiConverterSequenceUInt8.allocationSize(value.signature) +
-        FfiConverterSequenceUInt8.allocationSize(value.proof)
+        FfiConverterArrayBuffer.allocationSize(value.signature) +
+        FfiConverterArrayBuffer.allocationSize(value.proof)
       );
     }
   }
@@ -1383,14 +976,44 @@ const stringConverter = (() => {
 })();
 const FfiConverterString = uniffiCreateFfiConverterString(stringConverter);
 
+/**
+ * Debug info for CET adaptor signature inputs.
+ *
+ * Contains all the values that go into creating an adaptor signature,
+ * useful for comparing with external signers during debugging.
+ *
+ * This struct is intentionally always available (not feature-gated)
+ * to support production debugging scenarios.
+ */
 export type CetAdaptorSignatureDebugInfo = {
-  sighash: Array<number>;
-  adaptorPoint: Array<number>;
+  /**
+   * The sighash (32 bytes) - this is the message that gets signed
+   */
+  sighash: ArrayBuffer;
+  /**
+   * The adaptor point (33 bytes compressed public key)
+   */
+  adaptorPoint: ArrayBuffer;
+  /**
+   * Input index (always 0 for CETs)
+   */
   inputIndex: number;
-  scriptPubkey: Array<number>;
+  /**
+   * The funding script pubkey used for sighash
+   */
+  scriptPubkey: ArrayBuffer;
+  /**
+   * The fund output value used for sighash
+   */
   value: bigint;
+  /**
+   * The CET txid
+   */
   cetTxid: string;
-  cetRaw: Array<number>;
+  /**
+   * Raw CET bytes for verification
+   */
+  cetRaw: ArrayBuffer;
 };
 
 /**
@@ -1417,33 +1040,33 @@ const FfiConverterTypeCetAdaptorSignatureDebugInfo = (() => {
   class FFIConverter extends AbstractFfiConverterByteArray<TypeName> {
     read(from: RustBuffer): TypeName {
       return {
-        sighash: FfiConverterSequenceUInt8.read(from),
-        adaptorPoint: FfiConverterSequenceUInt8.read(from),
+        sighash: FfiConverterArrayBuffer.read(from),
+        adaptorPoint: FfiConverterArrayBuffer.read(from),
         inputIndex: FfiConverterUInt32.read(from),
-        scriptPubkey: FfiConverterSequenceUInt8.read(from),
+        scriptPubkey: FfiConverterArrayBuffer.read(from),
         value: FfiConverterUInt64.read(from),
         cetTxid: FfiConverterString.read(from),
-        cetRaw: FfiConverterSequenceUInt8.read(from),
+        cetRaw: FfiConverterArrayBuffer.read(from),
       };
     }
     write(value: TypeName, into: RustBuffer): void {
-      FfiConverterSequenceUInt8.write(value.sighash, into);
-      FfiConverterSequenceUInt8.write(value.adaptorPoint, into);
+      FfiConverterArrayBuffer.write(value.sighash, into);
+      FfiConverterArrayBuffer.write(value.adaptorPoint, into);
       FfiConverterUInt32.write(value.inputIndex, into);
-      FfiConverterSequenceUInt8.write(value.scriptPubkey, into);
+      FfiConverterArrayBuffer.write(value.scriptPubkey, into);
       FfiConverterUInt64.write(value.value, into);
       FfiConverterString.write(value.cetTxid, into);
-      FfiConverterSequenceUInt8.write(value.cetRaw, into);
+      FfiConverterArrayBuffer.write(value.cetRaw, into);
     }
     allocationSize(value: TypeName): number {
       return (
-        FfiConverterSequenceUInt8.allocationSize(value.sighash) +
-        FfiConverterSequenceUInt8.allocationSize(value.adaptorPoint) +
+        FfiConverterArrayBuffer.allocationSize(value.sighash) +
+        FfiConverterArrayBuffer.allocationSize(value.adaptorPoint) +
         FfiConverterUInt32.allocationSize(value.inputIndex) +
-        FfiConverterSequenceUInt8.allocationSize(value.scriptPubkey) +
+        FfiConverterArrayBuffer.allocationSize(value.scriptPubkey) +
         FfiConverterUInt64.allocationSize(value.value) +
         FfiConverterString.allocationSize(value.cetTxid) +
-        FfiConverterSequenceUInt8.allocationSize(value.cetRaw)
+        FfiConverterArrayBuffer.allocationSize(value.cetRaw)
       );
     }
   }
@@ -1452,7 +1075,7 @@ const FfiConverterTypeCetAdaptorSignatureDebugInfo = (() => {
 
 export type TxOutput = {
   value: bigint;
-  scriptPubkey: Array<number>;
+  scriptPubkey: ArrayBuffer;
 };
 
 /**
@@ -1467,6 +1090,22 @@ export const TxOutput = (() => {
     create,
     new: create,
     defaults: () => Object.freeze(defaults()) as Partial<TxOutput>,
+    isDust(self_: TxOutput): boolean {
+      return FfiConverterBool.lift(
+        uniffiCaller.rustCall(
+          /*caller:*/ (callStatus) => {
+            return nativeModule().ubrn_uniffi_ddk_ffi_fn_method_txoutput_is_dust(
+              FfiConverterTypeTxOutput.lower(
+                self_,
+                nativeModule().rustbuffer_alloc
+              ),
+              callStatus
+            );
+          },
+          /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString)
+        )
+      );
+    },
   });
 })();
 
@@ -1476,17 +1115,17 @@ const FfiConverterTypeTxOutput = (() => {
     read(from: RustBuffer): TypeName {
       return {
         value: FfiConverterUInt64.read(from),
-        scriptPubkey: FfiConverterSequenceUInt8.read(from),
+        scriptPubkey: FfiConverterArrayBuffer.read(from),
       };
     }
     write(value: TypeName, into: RustBuffer): void {
       FfiConverterUInt64.write(value.value, into);
-      FfiConverterSequenceUInt8.write(value.scriptPubkey, into);
+      FfiConverterArrayBuffer.write(value.scriptPubkey, into);
     }
     allocationSize(value: TypeName): number {
       return (
         FfiConverterUInt64.allocationSize(value.value) +
-        FfiConverterSequenceUInt8.allocationSize(value.scriptPubkey)
+        FfiConverterArrayBuffer.allocationSize(value.scriptPubkey)
       );
     }
   }
@@ -1545,9 +1184,9 @@ const FfiConverterTypeChangeOutputAndFees = (() => {
 export type TxInput = {
   txid: string;
   vout: number;
-  scriptSig: Array<number>;
+  scriptSig: ArrayBuffer;
   sequence: number;
-  witness: Array<Array<number>>;
+  witness: Array<ArrayBuffer>;
 };
 
 /**
@@ -1572,25 +1211,25 @@ const FfiConverterTypeTxInput = (() => {
       return {
         txid: FfiConverterString.read(from),
         vout: FfiConverterUInt32.read(from),
-        scriptSig: FfiConverterSequenceUInt8.read(from),
+        scriptSig: FfiConverterArrayBuffer.read(from),
         sequence: FfiConverterUInt32.read(from),
-        witness: FfiConverterSequenceSequenceUInt8.read(from),
+        witness: FfiConverterSequenceBytes.read(from),
       };
     }
     write(value: TypeName, into: RustBuffer): void {
       FfiConverterString.write(value.txid, into);
       FfiConverterUInt32.write(value.vout, into);
-      FfiConverterSequenceUInt8.write(value.scriptSig, into);
+      FfiConverterArrayBuffer.write(value.scriptSig, into);
       FfiConverterUInt32.write(value.sequence, into);
-      FfiConverterSequenceSequenceUInt8.write(value.witness, into);
+      FfiConverterSequenceBytes.write(value.witness, into);
     }
     allocationSize(value: TypeName): number {
       return (
         FfiConverterString.allocationSize(value.txid) +
         FfiConverterUInt32.allocationSize(value.vout) +
-        FfiConverterSequenceUInt8.allocationSize(value.scriptSig) +
+        FfiConverterArrayBuffer.allocationSize(value.scriptSig) +
         FfiConverterUInt32.allocationSize(value.sequence) +
-        FfiConverterSequenceSequenceUInt8.allocationSize(value.witness)
+        FfiConverterSequenceBytes.allocationSize(value.witness)
       );
     }
   }
@@ -1602,7 +1241,7 @@ export type Transaction = {
   lockTime: number;
   inputs: Array<TxInput>;
   outputs: Array<TxOutput>;
-  rawBytes: Array<number>;
+  rawBytes: ArrayBuffer;
 };
 
 /**
@@ -1619,6 +1258,411 @@ export const Transaction = (() => {
     create,
     new: create,
     defaults: () => Object.freeze(defaults()) as Partial<Transaction>,
+    addSignature(
+      self_: Transaction,
+      signature: ArrayBuffer,
+      pubkey: ArrayBuffer,
+      inputIndex: number
+    ): Transaction {
+      return ((__rb: Uint8Array) => {
+        try {
+          return FfiConverterTypeTransaction.lift(__rb);
+        } finally {
+          nativeModule().rustbuffer_free(__rb);
+        }
+      })(
+        uniffiCaller.rustCallWithError(
+          /*liftError:*/ FfiConverterTypeDLCError.lift.bind(
+            FfiConverterTypeDLCError
+          ),
+          /*caller:*/ (callStatus) => {
+            return nativeModule().ubrn_uniffi_ddk_ffi_fn_method_transaction_add_signature(
+              FfiConverterTypeTransaction.lower(
+                self_,
+                nativeModule().rustbuffer_alloc
+              ),
+              FfiConverterArrayBuffer.lower(
+                signature,
+                nativeModule().rustbuffer_alloc
+              ),
+              FfiConverterArrayBuffer.lower(
+                pubkey,
+                nativeModule().rustbuffer_alloc
+              ),
+              FfiConverterUInt32.lower(
+                inputIndex,
+                nativeModule().rustbuffer_alloc
+              ),
+              callStatus
+            );
+          },
+          /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString)
+        )
+      );
+    },
+    cetAdaptorSignatureFromOracleInfo(
+      self_: Transaction,
+      oracleInfo: OracleInfo,
+      fundingSk: ArrayBuffer,
+      fundingScriptPubkey: ArrayBuffer,
+      totalCollateral: bigint,
+      msgs: Array<ArrayBuffer>
+    ): AdaptorSignature {
+      return ((__rb: Uint8Array) => {
+        try {
+          return FfiConverterTypeAdaptorSignature.lift(__rb);
+        } finally {
+          nativeModule().rustbuffer_free(__rb);
+        }
+      })(
+        uniffiCaller.rustCallWithError(
+          /*liftError:*/ FfiConverterTypeDLCError.lift.bind(
+            FfiConverterTypeDLCError
+          ),
+          /*caller:*/ (callStatus) => {
+            return nativeModule().ubrn_uniffi_ddk_ffi_fn_method_transaction_cet_adaptor_signature_from_oracle_info(
+              FfiConverterTypeTransaction.lower(
+                self_,
+                nativeModule().rustbuffer_alloc
+              ),
+              FfiConverterTypeOracleInfo.lower(
+                oracleInfo,
+                nativeModule().rustbuffer_alloc
+              ),
+              FfiConverterArrayBuffer.lower(
+                fundingSk,
+                nativeModule().rustbuffer_alloc
+              ),
+              FfiConverterArrayBuffer.lower(
+                fundingScriptPubkey,
+                nativeModule().rustbuffer_alloc
+              ),
+              FfiConverterUInt64.lower(
+                totalCollateral,
+                nativeModule().rustbuffer_alloc
+              ),
+              FfiConverterSequenceBytes.lower(
+                msgs,
+                nativeModule().rustbuffer_alloc
+              ),
+              callStatus
+            );
+          },
+          /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString)
+        )
+      );
+    },
+    cetAdaptorSignatureInputs(
+      self_: Transaction,
+      oracleInfo: Array<OracleInfo>,
+      fundingScriptPubkey: ArrayBuffer,
+      fundOutputValue: bigint,
+      msgs: Array<Array<ArrayBuffer>>
+    ): CetAdaptorSignatureDebugInfo {
+      return ((__rb: Uint8Array) => {
+        try {
+          return FfiConverterTypeCetAdaptorSignatureDebugInfo.lift(__rb);
+        } finally {
+          nativeModule().rustbuffer_free(__rb);
+        }
+      })(
+        uniffiCaller.rustCallWithError(
+          /*liftError:*/ FfiConverterTypeDLCError.lift.bind(
+            FfiConverterTypeDLCError
+          ),
+          /*caller:*/ (callStatus) => {
+            return nativeModule().ubrn_uniffi_ddk_ffi_fn_method_transaction_cet_adaptor_signature_inputs(
+              FfiConverterTypeTransaction.lower(
+                self_,
+                nativeModule().rustbuffer_alloc
+              ),
+              FfiConverterSequenceTypeOracleInfo.lower(
+                oracleInfo,
+                nativeModule().rustbuffer_alloc
+              ),
+              FfiConverterArrayBuffer.lower(
+                fundingScriptPubkey,
+                nativeModule().rustbuffer_alloc
+              ),
+              FfiConverterUInt64.lower(
+                fundOutputValue,
+                nativeModule().rustbuffer_alloc
+              ),
+              FfiConverterSequenceSequenceBytes.lower(
+                msgs,
+                nativeModule().rustbuffer_alloc
+              ),
+              callStatus
+            );
+          },
+          /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString)
+        )
+      );
+    },
+    cetSighash(
+      self_: Transaction,
+      fundingScriptPubkey: ArrayBuffer,
+      fundOutputValue: bigint
+    ): ArrayBuffer {
+      return ((__rb: Uint8Array) => {
+        try {
+          return FfiConverterArrayBuffer.lift(__rb);
+        } finally {
+          nativeModule().rustbuffer_free(__rb);
+        }
+      })(
+        uniffiCaller.rustCallWithError(
+          /*liftError:*/ FfiConverterTypeDLCError.lift.bind(
+            FfiConverterTypeDLCError
+          ),
+          /*caller:*/ (callStatus) => {
+            return nativeModule().ubrn_uniffi_ddk_ffi_fn_method_transaction_cet_sighash(
+              FfiConverterTypeTransaction.lower(
+                self_,
+                nativeModule().rustbuffer_alloc
+              ),
+              FfiConverterArrayBuffer.lower(
+                fundingScriptPubkey,
+                nativeModule().rustbuffer_alloc
+              ),
+              FfiConverterUInt64.lower(
+                fundOutputValue,
+                nativeModule().rustbuffer_alloc
+              ),
+              callStatus
+            );
+          },
+          /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString)
+        )
+      );
+    },
+    rawFundingInputSignature(
+      self_: Transaction,
+      privkey: ArrayBuffer,
+      prevTxId: string,
+      prevTxVout: number,
+      value: bigint
+    ): ArrayBuffer {
+      return ((__rb: Uint8Array) => {
+        try {
+          return FfiConverterArrayBuffer.lift(__rb);
+        } finally {
+          nativeModule().rustbuffer_free(__rb);
+        }
+      })(
+        uniffiCaller.rustCallWithError(
+          /*liftError:*/ FfiConverterTypeDLCError.lift.bind(
+            FfiConverterTypeDLCError
+          ),
+          /*caller:*/ (callStatus) => {
+            return nativeModule().ubrn_uniffi_ddk_ffi_fn_method_transaction_raw_funding_input_signature(
+              FfiConverterTypeTransaction.lower(
+                self_,
+                nativeModule().rustbuffer_alloc
+              ),
+              FfiConverterArrayBuffer.lower(
+                privkey,
+                nativeModule().rustbuffer_alloc
+              ),
+              FfiConverterString.lower(
+                prevTxId,
+                nativeModule().rustbuffer_alloc
+              ),
+              FfiConverterUInt32.lower(
+                prevTxVout,
+                nativeModule().rustbuffer_alloc
+              ),
+              FfiConverterUInt64.lower(value, nativeModule().rustbuffer_alloc),
+              callStatus
+            );
+          },
+          /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString)
+        )
+      );
+    },
+    signCet(
+      self_: Transaction,
+      adaptorSignature: ArrayBuffer,
+      oracleSignatures: Array<ArrayBuffer>,
+      fundingSecretKey: ArrayBuffer,
+      otherPubkey: ArrayBuffer,
+      fundingScriptPubkey: ArrayBuffer,
+      fundOutputValue: bigint
+    ): Transaction {
+      return ((__rb: Uint8Array) => {
+        try {
+          return FfiConverterTypeTransaction.lift(__rb);
+        } finally {
+          nativeModule().rustbuffer_free(__rb);
+        }
+      })(
+        uniffiCaller.rustCallWithError(
+          /*liftError:*/ FfiConverterTypeDLCError.lift.bind(
+            FfiConverterTypeDLCError
+          ),
+          /*caller:*/ (callStatus) => {
+            return nativeModule().ubrn_uniffi_ddk_ffi_fn_method_transaction_sign_cet(
+              FfiConverterTypeTransaction.lower(
+                self_,
+                nativeModule().rustbuffer_alloc
+              ),
+              FfiConverterArrayBuffer.lower(
+                adaptorSignature,
+                nativeModule().rustbuffer_alloc
+              ),
+              FfiConverterSequenceBytes.lower(
+                oracleSignatures,
+                nativeModule().rustbuffer_alloc
+              ),
+              FfiConverterArrayBuffer.lower(
+                fundingSecretKey,
+                nativeModule().rustbuffer_alloc
+              ),
+              FfiConverterArrayBuffer.lower(
+                otherPubkey,
+                nativeModule().rustbuffer_alloc
+              ),
+              FfiConverterArrayBuffer.lower(
+                fundingScriptPubkey,
+                nativeModule().rustbuffer_alloc
+              ),
+              FfiConverterUInt64.lower(
+                fundOutputValue,
+                nativeModule().rustbuffer_alloc
+              ),
+              callStatus
+            );
+          },
+          /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString)
+        )
+      );
+    },
+    signFundInput(
+      self_: Transaction,
+      privkey: ArrayBuffer,
+      prevTxId: string,
+      prevTxVout: number,
+      value: bigint
+    ): Transaction {
+      return ((__rb: Uint8Array) => {
+        try {
+          return FfiConverterTypeTransaction.lift(__rb);
+        } finally {
+          nativeModule().rustbuffer_free(__rb);
+        }
+      })(
+        uniffiCaller.rustCallWithError(
+          /*liftError:*/ FfiConverterTypeDLCError.lift.bind(
+            FfiConverterTypeDLCError
+          ),
+          /*caller:*/ (callStatus) => {
+            return nativeModule().ubrn_uniffi_ddk_ffi_fn_method_transaction_sign_fund_input(
+              FfiConverterTypeTransaction.lower(
+                self_,
+                nativeModule().rustbuffer_alloc
+              ),
+              FfiConverterArrayBuffer.lower(
+                privkey,
+                nativeModule().rustbuffer_alloc
+              ),
+              FfiConverterString.lower(
+                prevTxId,
+                nativeModule().rustbuffer_alloc
+              ),
+              FfiConverterUInt32.lower(
+                prevTxVout,
+                nativeModule().rustbuffer_alloc
+              ),
+              FfiConverterUInt64.lower(value, nativeModule().rustbuffer_alloc),
+              callStatus
+            );
+          },
+          /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString)
+        )
+      );
+    },
+    signMultiSigInput(
+      self_: Transaction,
+      dlcInput: DlcInputInfo,
+      localPrivkey: ArrayBuffer,
+      remoteSignature: ArrayBuffer
+    ): Transaction {
+      return ((__rb: Uint8Array) => {
+        try {
+          return FfiConverterTypeTransaction.lift(__rb);
+        } finally {
+          nativeModule().rustbuffer_free(__rb);
+        }
+      })(
+        uniffiCaller.rustCallWithError(
+          /*liftError:*/ FfiConverterTypeDLCError.lift.bind(
+            FfiConverterTypeDLCError
+          ),
+          /*caller:*/ (callStatus) => {
+            return nativeModule().ubrn_uniffi_ddk_ffi_fn_method_transaction_sign_multi_sig_input(
+              FfiConverterTypeTransaction.lower(
+                self_,
+                nativeModule().rustbuffer_alloc
+              ),
+              FfiConverterTypeDlcInputInfo.lower(
+                dlcInput,
+                nativeModule().rustbuffer_alloc
+              ),
+              FfiConverterArrayBuffer.lower(
+                localPrivkey,
+                nativeModule().rustbuffer_alloc
+              ),
+              FfiConverterArrayBuffer.lower(
+                remoteSignature,
+                nativeModule().rustbuffer_alloc
+              ),
+              callStatus
+            );
+          },
+          /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString)
+        )
+      );
+    },
+    verifyFundSignature(
+      self_: Transaction,
+      signature: ArrayBuffer,
+      pubkey: ArrayBuffer,
+      txid: string,
+      vout: number,
+      inputAmount: bigint
+    ): boolean {
+      return FfiConverterBool.lift(
+        uniffiCaller.rustCallWithError(
+          /*liftError:*/ FfiConverterTypeDLCError.lift.bind(
+            FfiConverterTypeDLCError
+          ),
+          /*caller:*/ (callStatus) => {
+            return nativeModule().ubrn_uniffi_ddk_ffi_fn_method_transaction_verify_fund_signature(
+              FfiConverterTypeTransaction.lower(
+                self_,
+                nativeModule().rustbuffer_alloc
+              ),
+              FfiConverterArrayBuffer.lower(
+                signature,
+                nativeModule().rustbuffer_alloc
+              ),
+              FfiConverterArrayBuffer.lower(
+                pubkey,
+                nativeModule().rustbuffer_alloc
+              ),
+              FfiConverterString.lower(txid, nativeModule().rustbuffer_alloc),
+              FfiConverterUInt32.lower(vout, nativeModule().rustbuffer_alloc),
+              FfiConverterUInt64.lower(
+                inputAmount,
+                nativeModule().rustbuffer_alloc
+              ),
+              callStatus
+            );
+          },
+          /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString)
+        )
+      );
+    },
   });
 })();
 
@@ -1631,7 +1675,7 @@ const FfiConverterTypeTransaction = (() => {
         lockTime: FfiConverterUInt32.read(from),
         inputs: FfiConverterSequenceTypeTxInput.read(from),
         outputs: FfiConverterSequenceTypeTxOutput.read(from),
-        rawBytes: FfiConverterSequenceUInt8.read(from),
+        rawBytes: FfiConverterArrayBuffer.read(from),
       };
     }
     write(value: TypeName, into: RustBuffer): void {
@@ -1639,7 +1683,7 @@ const FfiConverterTypeTransaction = (() => {
       FfiConverterUInt32.write(value.lockTime, into);
       FfiConverterSequenceTypeTxInput.write(value.inputs, into);
       FfiConverterSequenceTypeTxOutput.write(value.outputs, into);
-      FfiConverterSequenceUInt8.write(value.rawBytes, into);
+      FfiConverterArrayBuffer.write(value.rawBytes, into);
     }
     allocationSize(value: TypeName): number {
       return (
@@ -1647,7 +1691,7 @@ const FfiConverterTypeTransaction = (() => {
         FfiConverterUInt32.allocationSize(value.lockTime) +
         FfiConverterSequenceTypeTxInput.allocationSize(value.inputs) +
         FfiConverterSequenceTypeTxOutput.allocationSize(value.outputs) +
-        FfiConverterSequenceUInt8.allocationSize(value.rawBytes)
+        FfiConverterArrayBuffer.allocationSize(value.rawBytes)
       );
     }
   }
@@ -1657,12 +1701,12 @@ const FfiConverterTypeTransaction = (() => {
 export type DlcInputInfo = {
   fundTx: Transaction;
   fundVout: number;
-  localFundPubkey: Array<number>;
-  remoteFundPubkey: Array<number>;
+  localFundPubkey: ArrayBuffer;
+  remoteFundPubkey: ArrayBuffer;
   fundAmount: bigint;
   maxWitnessLen: number;
   inputSerialId: bigint;
-  contractId: Array<number>;
+  contractId: ArrayBuffer;
 };
 
 /**
@@ -1689,34 +1733,34 @@ const FfiConverterTypeDlcInputInfo = (() => {
       return {
         fundTx: FfiConverterTypeTransaction.read(from),
         fundVout: FfiConverterUInt32.read(from),
-        localFundPubkey: FfiConverterSequenceUInt8.read(from),
-        remoteFundPubkey: FfiConverterSequenceUInt8.read(from),
+        localFundPubkey: FfiConverterArrayBuffer.read(from),
+        remoteFundPubkey: FfiConverterArrayBuffer.read(from),
         fundAmount: FfiConverterUInt64.read(from),
         maxWitnessLen: FfiConverterUInt32.read(from),
         inputSerialId: FfiConverterUInt64.read(from),
-        contractId: FfiConverterSequenceUInt8.read(from),
+        contractId: FfiConverterArrayBuffer.read(from),
       };
     }
     write(value: TypeName, into: RustBuffer): void {
       FfiConverterTypeTransaction.write(value.fundTx, into);
       FfiConverterUInt32.write(value.fundVout, into);
-      FfiConverterSequenceUInt8.write(value.localFundPubkey, into);
-      FfiConverterSequenceUInt8.write(value.remoteFundPubkey, into);
+      FfiConverterArrayBuffer.write(value.localFundPubkey, into);
+      FfiConverterArrayBuffer.write(value.remoteFundPubkey, into);
       FfiConverterUInt64.write(value.fundAmount, into);
       FfiConverterUInt32.write(value.maxWitnessLen, into);
       FfiConverterUInt64.write(value.inputSerialId, into);
-      FfiConverterSequenceUInt8.write(value.contractId, into);
+      FfiConverterArrayBuffer.write(value.contractId, into);
     }
     allocationSize(value: TypeName): number {
       return (
         FfiConverterTypeTransaction.allocationSize(value.fundTx) +
         FfiConverterUInt32.allocationSize(value.fundVout) +
-        FfiConverterSequenceUInt8.allocationSize(value.localFundPubkey) +
-        FfiConverterSequenceUInt8.allocationSize(value.remoteFundPubkey) +
+        FfiConverterArrayBuffer.allocationSize(value.localFundPubkey) +
+        FfiConverterArrayBuffer.allocationSize(value.remoteFundPubkey) +
         FfiConverterUInt64.allocationSize(value.fundAmount) +
         FfiConverterUInt32.allocationSize(value.maxWitnessLen) +
         FfiConverterUInt64.allocationSize(value.inputSerialId) +
-        FfiConverterSequenceUInt8.allocationSize(value.contractId)
+        FfiConverterArrayBuffer.allocationSize(value.contractId)
       );
     }
   }
@@ -1727,7 +1771,7 @@ export type DlcTransactions = {
   fund: Transaction;
   cets: Array<Transaction>;
   refund: Transaction;
-  fundingScriptPubkey: Array<number>;
+  fundingScriptPubkey: ArrayBuffer;
 };
 
 /**
@@ -1755,21 +1799,21 @@ const FfiConverterTypeDlcTransactions = (() => {
         fund: FfiConverterTypeTransaction.read(from),
         cets: FfiConverterSequenceTypeTransaction.read(from),
         refund: FfiConverterTypeTransaction.read(from),
-        fundingScriptPubkey: FfiConverterSequenceUInt8.read(from),
+        fundingScriptPubkey: FfiConverterArrayBuffer.read(from),
       };
     }
     write(value: TypeName, into: RustBuffer): void {
       FfiConverterTypeTransaction.write(value.fund, into);
       FfiConverterSequenceTypeTransaction.write(value.cets, into);
       FfiConverterTypeTransaction.write(value.refund, into);
-      FfiConverterSequenceUInt8.write(value.fundingScriptPubkey, into);
+      FfiConverterArrayBuffer.write(value.fundingScriptPubkey, into);
     }
     allocationSize(value: TypeName): number {
       return (
         FfiConverterTypeTransaction.allocationSize(value.fund) +
         FfiConverterSequenceTypeTransaction.allocationSize(value.cets) +
         FfiConverterTypeTransaction.allocationSize(value.refund) +
-        FfiConverterSequenceUInt8.allocationSize(value.fundingScriptPubkey)
+        FfiConverterArrayBuffer.allocationSize(value.fundingScriptPubkey)
       );
     }
   }
@@ -1777,8 +1821,8 @@ const FfiConverterTypeDlcTransactions = (() => {
 })();
 
 export type OracleInfo = {
-  publicKey: Array<number>;
-  nonces: Array<Array<number>>;
+  publicKey: ArrayBuffer;
+  nonces: Array<ArrayBuffer>;
 };
 
 /**
@@ -1803,18 +1847,18 @@ const FfiConverterTypeOracleInfo = (() => {
   class FFIConverter extends AbstractFfiConverterByteArray<TypeName> {
     read(from: RustBuffer): TypeName {
       return {
-        publicKey: FfiConverterSequenceUInt8.read(from),
-        nonces: FfiConverterSequenceSequenceUInt8.read(from),
+        publicKey: FfiConverterArrayBuffer.read(from),
+        nonces: FfiConverterSequenceBytes.read(from),
       };
     }
     write(value: TypeName, into: RustBuffer): void {
-      FfiConverterSequenceUInt8.write(value.publicKey, into);
-      FfiConverterSequenceSequenceUInt8.write(value.nonces, into);
+      FfiConverterArrayBuffer.write(value.publicKey, into);
+      FfiConverterSequenceBytes.write(value.nonces, into);
     }
     allocationSize(value: TypeName): number {
       return (
-        FfiConverterSequenceUInt8.allocationSize(value.publicKey) +
-        FfiConverterSequenceSequenceUInt8.allocationSize(value.nonces)
+        FfiConverterArrayBuffer.allocationSize(value.publicKey) +
+        FfiConverterSequenceBytes.allocationSize(value.nonces)
       );
     }
   }
@@ -1824,7 +1868,7 @@ const FfiConverterTypeOracleInfo = (() => {
 export type TxInputInfo = {
   txid: string;
   vout: number;
-  scriptSig: Array<number>;
+  scriptSig: ArrayBuffer;
   maxWitnessLength: number;
   serialId: bigint;
 };
@@ -1853,7 +1897,7 @@ const FfiConverterTypeTxInputInfo = (() => {
       return {
         txid: FfiConverterString.read(from),
         vout: FfiConverterUInt32.read(from),
-        scriptSig: FfiConverterSequenceUInt8.read(from),
+        scriptSig: FfiConverterArrayBuffer.read(from),
         maxWitnessLength: FfiConverterUInt32.read(from),
         serialId: FfiConverterUInt64.read(from),
       };
@@ -1861,7 +1905,7 @@ const FfiConverterTypeTxInputInfo = (() => {
     write(value: TypeName, into: RustBuffer): void {
       FfiConverterString.write(value.txid, into);
       FfiConverterUInt32.write(value.vout, into);
-      FfiConverterSequenceUInt8.write(value.scriptSig, into);
+      FfiConverterArrayBuffer.write(value.scriptSig, into);
       FfiConverterUInt32.write(value.maxWitnessLength, into);
       FfiConverterUInt64.write(value.serialId, into);
     }
@@ -1869,7 +1913,7 @@ const FfiConverterTypeTxInputInfo = (() => {
       return (
         FfiConverterString.allocationSize(value.txid) +
         FfiConverterUInt32.allocationSize(value.vout) +
-        FfiConverterSequenceUInt8.allocationSize(value.scriptSig) +
+        FfiConverterArrayBuffer.allocationSize(value.scriptSig) +
         FfiConverterUInt32.allocationSize(value.maxWitnessLength) +
         FfiConverterUInt64.allocationSize(value.serialId)
       );
@@ -1879,10 +1923,10 @@ const FfiConverterTypeTxInputInfo = (() => {
 })();
 
 export type PartyParams = {
-  fundPubkey: Array<number>;
-  changeScriptPubkey: Array<number>;
+  fundPubkey: ArrayBuffer;
+  changeScriptPubkey: ArrayBuffer;
   changeSerialId: bigint;
-  payoutScriptPubkey: Array<number>;
+  payoutScriptPubkey: ArrayBuffer;
   payoutSerialId: bigint;
   inputs: Array<TxInputInfo>;
   inputAmount: bigint;
@@ -1904,6 +1948,38 @@ export const PartyParams = (() => {
     create,
     new: create,
     defaults: () => Object.freeze(defaults()) as Partial<PartyParams>,
+    changeOutputAndFees(
+      self_: PartyParams,
+      feeRate: bigint
+    ): ChangeOutputAndFees {
+      return ((__rb: Uint8Array) => {
+        try {
+          return FfiConverterTypeChangeOutputAndFees.lift(__rb);
+        } finally {
+          nativeModule().rustbuffer_free(__rb);
+        }
+      })(
+        uniffiCaller.rustCallWithError(
+          /*liftError:*/ FfiConverterTypeDLCError.lift.bind(
+            FfiConverterTypeDLCError
+          ),
+          /*caller:*/ (callStatus) => {
+            return nativeModule().ubrn_uniffi_ddk_ffi_fn_method_partyparams_change_output_and_fees(
+              FfiConverterTypePartyParams.lower(
+                self_,
+                nativeModule().rustbuffer_alloc
+              ),
+              FfiConverterUInt64.lower(
+                feeRate,
+                nativeModule().rustbuffer_alloc
+              ),
+              callStatus
+            );
+          },
+          /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString)
+        )
+      );
+    },
   });
 })();
 
@@ -1912,10 +1988,10 @@ const FfiConverterTypePartyParams = (() => {
   class FFIConverter extends AbstractFfiConverterByteArray<TypeName> {
     read(from: RustBuffer): TypeName {
       return {
-        fundPubkey: FfiConverterSequenceUInt8.read(from),
-        changeScriptPubkey: FfiConverterSequenceUInt8.read(from),
+        fundPubkey: FfiConverterArrayBuffer.read(from),
+        changeScriptPubkey: FfiConverterArrayBuffer.read(from),
         changeSerialId: FfiConverterUInt64.read(from),
-        payoutScriptPubkey: FfiConverterSequenceUInt8.read(from),
+        payoutScriptPubkey: FfiConverterArrayBuffer.read(from),
         payoutSerialId: FfiConverterUInt64.read(from),
         inputs: FfiConverterSequenceTypeTxInputInfo.read(from),
         inputAmount: FfiConverterUInt64.read(from),
@@ -1924,10 +2000,10 @@ const FfiConverterTypePartyParams = (() => {
       };
     }
     write(value: TypeName, into: RustBuffer): void {
-      FfiConverterSequenceUInt8.write(value.fundPubkey, into);
-      FfiConverterSequenceUInt8.write(value.changeScriptPubkey, into);
+      FfiConverterArrayBuffer.write(value.fundPubkey, into);
+      FfiConverterArrayBuffer.write(value.changeScriptPubkey, into);
       FfiConverterUInt64.write(value.changeSerialId, into);
-      FfiConverterSequenceUInt8.write(value.payoutScriptPubkey, into);
+      FfiConverterArrayBuffer.write(value.payoutScriptPubkey, into);
       FfiConverterUInt64.write(value.payoutSerialId, into);
       FfiConverterSequenceTypeTxInputInfo.write(value.inputs, into);
       FfiConverterUInt64.write(value.inputAmount, into);
@@ -1936,10 +2012,10 @@ const FfiConverterTypePartyParams = (() => {
     }
     allocationSize(value: TypeName): number {
       return (
-        FfiConverterSequenceUInt8.allocationSize(value.fundPubkey) +
-        FfiConverterSequenceUInt8.allocationSize(value.changeScriptPubkey) +
+        FfiConverterArrayBuffer.allocationSize(value.fundPubkey) +
+        FfiConverterArrayBuffer.allocationSize(value.changeScriptPubkey) +
         FfiConverterUInt64.allocationSize(value.changeSerialId) +
-        FfiConverterSequenceUInt8.allocationSize(value.payoutScriptPubkey) +
+        FfiConverterArrayBuffer.allocationSize(value.payoutScriptPubkey) +
         FfiConverterUInt64.allocationSize(value.payoutSerialId) +
         FfiConverterSequenceTypeTxInputInfo.allocationSize(value.inputs) +
         FfiConverterUInt64.allocationSize(value.inputAmount) +
@@ -1994,7 +2070,51 @@ const FfiConverterTypePayout = (() => {
   return new FFIConverter();
 })();
 
-// Flat error type: DlcError
+export enum ExtendedKey {
+  InvalidMnemonic,
+  InvalidXpriv,
+  InvalidXpub,
+  InvalidDerivationPath,
+}
+
+const FfiConverterTypeExtendedKey = (() => {
+  const ordinalConverter = FfiConverterInt32;
+  type TypeName = ExtendedKey;
+  class FFIConverter extends AbstractFfiConverterByteArray<TypeName> {
+    read(from: RustBuffer): TypeName {
+      switch (ordinalConverter.read(from)) {
+        case 1:
+          return ExtendedKey.InvalidMnemonic;
+        case 2:
+          return ExtendedKey.InvalidXpriv;
+        case 3:
+          return ExtendedKey.InvalidXpub;
+        case 4:
+          return ExtendedKey.InvalidDerivationPath;
+        default:
+          throw new UniffiInternalError.UnexpectedEnumCase();
+      }
+    }
+    write(value: TypeName, into: RustBuffer): void {
+      switch (value) {
+        case ExtendedKey.InvalidMnemonic:
+          return ordinalConverter.write(1, into);
+        case ExtendedKey.InvalidXpriv:
+          return ordinalConverter.write(2, into);
+        case ExtendedKey.InvalidXpub:
+          return ordinalConverter.write(3, into);
+        case ExtendedKey.InvalidDerivationPath:
+          return ordinalConverter.write(4, into);
+      }
+    }
+    allocationSize(value: TypeName): number {
+      return ordinalConverter.allocationSize(0);
+    }
+  }
+  return new FFIConverter();
+})();
+
+// Error type: DlcError
 export enum DlcError_Tags {
   InvalidSignature = 'InvalidSignature',
   InvalidPublicKey = 'InvalidPublicKey',
@@ -2008,247 +2128,332 @@ export enum DlcError_Tags {
   KeyError = 'KeyError',
 }
 export const DlcError = (() => {
-  class InvalidSignature extends UniffiError {
-    /**
-     * @private
-     * This field is private and should not be used.
-     */
-    readonly [uniffiTypeNameSymbol]: string = 'DlcError';
-    /**
-     * @private
-     * This field is private and should not be used.
-     */
-    readonly [variantOrdinalSymbol] = 1;
-
-    readonly tag = DlcError_Tags.InvalidSignature;
-
-    constructor(message: string) {
-      super('DlcError', 'InvalidSignature', message);
-    }
-
-    static instanceOf(e: any): e is InvalidSignature {
-      return instanceOf(e) && (e as any)[variantOrdinalSymbol] === 1;
-    }
-  }
-  class InvalidPublicKey extends UniffiError {
-    /**
-     * @private
-     * This field is private and should not be used.
-     */
-    readonly [uniffiTypeNameSymbol]: string = 'DlcError';
-    /**
-     * @private
-     * This field is private and should not be used.
-     */
-    readonly [variantOrdinalSymbol] = 2;
-
-    readonly tag = DlcError_Tags.InvalidPublicKey;
-
-    constructor(message: string) {
-      super('DlcError', 'InvalidPublicKey', message);
-    }
-
-    static instanceOf(e: any): e is InvalidPublicKey {
-      return instanceOf(e) && (e as any)[variantOrdinalSymbol] === 2;
-    }
-  }
-  class InvalidTransaction extends UniffiError {
-    /**
-     * @private
-     * This field is private and should not be used.
-     */
-    readonly [uniffiTypeNameSymbol]: string = 'DlcError';
-    /**
-     * @private
-     * This field is private and should not be used.
-     */
-    readonly [variantOrdinalSymbol] = 3;
-
-    readonly tag = DlcError_Tags.InvalidTransaction;
-
-    constructor(message: string) {
-      super('DlcError', 'InvalidTransaction', message);
-    }
-
-    static instanceOf(e: any): e is InvalidTransaction {
-      return instanceOf(e) && (e as any)[variantOrdinalSymbol] === 3;
-    }
-  }
-  class InsufficientFunds extends UniffiError {
-    /**
-     * @private
-     * This field is private and should not be used.
-     */
-    readonly [uniffiTypeNameSymbol]: string = 'DlcError';
-    /**
-     * @private
-     * This field is private and should not be used.
-     */
-    readonly [variantOrdinalSymbol] = 4;
-
-    readonly tag = DlcError_Tags.InsufficientFunds;
-
-    constructor(message: string) {
-      super('DlcError', 'InsufficientFunds', message);
-    }
-
-    static instanceOf(e: any): e is InsufficientFunds {
-      return instanceOf(e) && (e as any)[variantOrdinalSymbol] === 4;
-    }
-  }
-  class InvalidArgument extends UniffiError {
-    /**
-     * @private
-     * This field is private and should not be used.
-     */
-    readonly [uniffiTypeNameSymbol]: string = 'DlcError';
-    /**
-     * @private
-     * This field is private and should not be used.
-     */
-    readonly [variantOrdinalSymbol] = 5;
-
-    readonly tag = DlcError_Tags.InvalidArgument;
-
-    constructor(message: string) {
-      super('DlcError', 'InvalidArgument', message);
-    }
-
-    static instanceOf(e: any): e is InvalidArgument {
-      return instanceOf(e) && (e as any)[variantOrdinalSymbol] === 5;
-    }
-  }
-  class SerializationError extends UniffiError {
-    /**
-     * @private
-     * This field is private and should not be used.
-     */
-    readonly [uniffiTypeNameSymbol]: string = 'DlcError';
-    /**
-     * @private
-     * This field is private and should not be used.
-     */
-    readonly [variantOrdinalSymbol] = 6;
-
-    readonly tag = DlcError_Tags.SerializationError;
-
-    constructor(message: string) {
-      super('DlcError', 'SerializationError', message);
-    }
-
-    static instanceOf(e: any): e is SerializationError {
-      return instanceOf(e) && (e as any)[variantOrdinalSymbol] === 6;
-    }
-  }
-  class Secp256k1Error extends UniffiError {
-    /**
-     * @private
-     * This field is private and should not be used.
-     */
-    readonly [uniffiTypeNameSymbol]: string = 'DlcError';
-    /**
-     * @private
-     * This field is private and should not be used.
-     */
-    readonly [variantOrdinalSymbol] = 7;
-
-    readonly tag = DlcError_Tags.Secp256k1Error;
-
-    constructor(message: string) {
-      super('DlcError', 'Secp256k1Error', message);
-    }
-
-    static instanceOf(e: any): e is Secp256k1Error {
-      return instanceOf(e) && (e as any)[variantOrdinalSymbol] === 7;
-    }
-  }
-  class MiniscriptError extends UniffiError {
-    /**
-     * @private
-     * This field is private and should not be used.
-     */
-    readonly [uniffiTypeNameSymbol]: string = 'DlcError';
-    /**
-     * @private
-     * This field is private and should not be used.
-     */
-    readonly [variantOrdinalSymbol] = 8;
-
-    readonly tag = DlcError_Tags.MiniscriptError;
-
-    constructor(message: string) {
-      super('DlcError', 'MiniscriptError', message);
-    }
-
-    static instanceOf(e: any): e is MiniscriptError {
-      return instanceOf(e) && (e as any)[variantOrdinalSymbol] === 8;
-    }
-  }
-  class InvalidNetwork extends UniffiError {
-    /**
-     * @private
-     * This field is private and should not be used.
-     */
-    readonly [uniffiTypeNameSymbol]: string = 'DlcError';
-    /**
-     * @private
-     * This field is private and should not be used.
-     */
-    readonly [variantOrdinalSymbol] = 9;
-
-    readonly tag = DlcError_Tags.InvalidNetwork;
-
-    constructor(message: string) {
-      super('DlcError', 'InvalidNetwork', message);
-    }
-
-    static instanceOf(e: any): e is InvalidNetwork {
-      return instanceOf(e) && (e as any)[variantOrdinalSymbol] === 9;
-    }
-  }
-  class KeyError extends UniffiError {
-    /**
-     * @private
-     * This field is private and should not be used.
-     */
-    readonly [uniffiTypeNameSymbol]: string = 'DlcError';
-    /**
-     * @private
-     * This field is private and should not be used.
-     */
-    readonly [variantOrdinalSymbol] = 10;
-
-    readonly tag = DlcError_Tags.KeyError;
-
-    constructor(message: string) {
-      super('DlcError', 'KeyError', message);
-    }
-
-    static instanceOf(e: any): e is KeyError {
-      return instanceOf(e) && (e as any)[variantOrdinalSymbol] === 10;
-    }
-  }
-
-  // Utility function which does not rely on instanceof.
-  function instanceOf(e: any): e is DlcError {
-    return (e as any)[uniffiTypeNameSymbol] === 'DlcError';
-  }
-  return {
-    InvalidSignature,
-    InvalidPublicKey,
-    InvalidTransaction,
-    InsufficientFunds,
-    InvalidArgument,
-    SerializationError,
-    Secp256k1Error,
-    MiniscriptError,
-    InvalidNetwork,
-    KeyError,
-    instanceOf,
+  type InvalidSignature__interface = {
+    tag: DlcError_Tags.InvalidSignature;
   };
-})();
+  class InvalidSignature_
+    extends UniffiError
+    implements InvalidSignature__interface
+  {
+    /**
+     * @private
+     * This field is private and should not be used, use `tag` instead.
+     */
+    readonly [uniffiTypeNameSymbol] = 'DlcError';
+    readonly tag = DlcError_Tags.InvalidSignature;
+    constructor() {
+      super('DlcError', 'InvalidSignature');
+    }
 
-// Union type for DlcError error type.
+    static new(): InvalidSignature_ {
+      return new InvalidSignature_();
+    }
+
+    static instanceOf(obj: any): obj is InvalidSignature_ {
+      return obj.tag === DlcError_Tags.InvalidSignature;
+    }
+    static hasInner(obj: any): obj is InvalidSignature_ {
+      return false;
+    }
+  }
+
+  type InvalidPublicKey__interface = {
+    tag: DlcError_Tags.InvalidPublicKey;
+  };
+  class InvalidPublicKey_
+    extends UniffiError
+    implements InvalidPublicKey__interface
+  {
+    /**
+     * @private
+     * This field is private and should not be used, use `tag` instead.
+     */
+    readonly [uniffiTypeNameSymbol] = 'DlcError';
+    readonly tag = DlcError_Tags.InvalidPublicKey;
+    constructor() {
+      super('DlcError', 'InvalidPublicKey');
+    }
+
+    static new(): InvalidPublicKey_ {
+      return new InvalidPublicKey_();
+    }
+
+    static instanceOf(obj: any): obj is InvalidPublicKey_ {
+      return obj.tag === DlcError_Tags.InvalidPublicKey;
+    }
+    static hasInner(obj: any): obj is InvalidPublicKey_ {
+      return false;
+    }
+  }
+
+  type InvalidTransaction__interface = {
+    tag: DlcError_Tags.InvalidTransaction;
+  };
+  class InvalidTransaction_
+    extends UniffiError
+    implements InvalidTransaction__interface
+  {
+    /**
+     * @private
+     * This field is private and should not be used, use `tag` instead.
+     */
+    readonly [uniffiTypeNameSymbol] = 'DlcError';
+    readonly tag = DlcError_Tags.InvalidTransaction;
+    constructor() {
+      super('DlcError', 'InvalidTransaction');
+    }
+
+    static new(): InvalidTransaction_ {
+      return new InvalidTransaction_();
+    }
+
+    static instanceOf(obj: any): obj is InvalidTransaction_ {
+      return obj.tag === DlcError_Tags.InvalidTransaction;
+    }
+    static hasInner(obj: any): obj is InvalidTransaction_ {
+      return false;
+    }
+  }
+
+  type InsufficientFunds__interface = {
+    tag: DlcError_Tags.InsufficientFunds;
+  };
+  class InsufficientFunds_
+    extends UniffiError
+    implements InsufficientFunds__interface
+  {
+    /**
+     * @private
+     * This field is private and should not be used, use `tag` instead.
+     */
+    readonly [uniffiTypeNameSymbol] = 'DlcError';
+    readonly tag = DlcError_Tags.InsufficientFunds;
+    constructor() {
+      super('DlcError', 'InsufficientFunds');
+    }
+
+    static new(): InsufficientFunds_ {
+      return new InsufficientFunds_();
+    }
+
+    static instanceOf(obj: any): obj is InsufficientFunds_ {
+      return obj.tag === DlcError_Tags.InsufficientFunds;
+    }
+    static hasInner(obj: any): obj is InsufficientFunds_ {
+      return false;
+    }
+  }
+
+  type InvalidArgument__interface = {
+    tag: DlcError_Tags.InvalidArgument;
+    inner: Readonly<{ message: string }>;
+  };
+  class InvalidArgument_
+    extends UniffiError
+    implements InvalidArgument__interface
+  {
+    /**
+     * @private
+     * This field is private and should not be used, use `tag` instead.
+     */
+    readonly [uniffiTypeNameSymbol] = 'DlcError';
+    readonly tag = DlcError_Tags.InvalidArgument;
+    readonly inner: Readonly<{ message: string }>;
+    constructor(inner: { message: string }) {
+      super('DlcError', 'InvalidArgument');
+
+      this.inner = Object.freeze(inner);
+    }
+    static new(inner: { message: string }): InvalidArgument_ {
+      return new InvalidArgument_(inner);
+    }
+
+    static instanceOf(obj: any): obj is InvalidArgument_ {
+      return obj.tag === DlcError_Tags.InvalidArgument;
+    }
+    static hasInner(obj: any): obj is InvalidArgument_ {
+      return InvalidArgument_.instanceOf(obj);
+    }
+
+    static getInner(obj: InvalidArgument_): Readonly<{ message: string }> {
+      return obj.inner;
+    }
+  }
+
+  type SerializationError__interface = {
+    tag: DlcError_Tags.SerializationError;
+  };
+  class SerializationError_
+    extends UniffiError
+    implements SerializationError__interface
+  {
+    /**
+     * @private
+     * This field is private and should not be used, use `tag` instead.
+     */
+    readonly [uniffiTypeNameSymbol] = 'DlcError';
+    readonly tag = DlcError_Tags.SerializationError;
+    constructor() {
+      super('DlcError', 'SerializationError');
+    }
+
+    static new(): SerializationError_ {
+      return new SerializationError_();
+    }
+
+    static instanceOf(obj: any): obj is SerializationError_ {
+      return obj.tag === DlcError_Tags.SerializationError;
+    }
+    static hasInner(obj: any): obj is SerializationError_ {
+      return false;
+    }
+  }
+
+  type Secp256k1Error__interface = {
+    tag: DlcError_Tags.Secp256k1Error;
+    inner: Readonly<{ message: string }>;
+  };
+  class Secp256k1Error_
+    extends UniffiError
+    implements Secp256k1Error__interface
+  {
+    /**
+     * @private
+     * This field is private and should not be used, use `tag` instead.
+     */
+    readonly [uniffiTypeNameSymbol] = 'DlcError';
+    readonly tag = DlcError_Tags.Secp256k1Error;
+    readonly inner: Readonly<{ message: string }>;
+    constructor(inner: { message: string }) {
+      super('DlcError', 'Secp256k1Error');
+
+      this.inner = Object.freeze(inner);
+    }
+    static new(inner: { message: string }): Secp256k1Error_ {
+      return new Secp256k1Error_(inner);
+    }
+
+    static instanceOf(obj: any): obj is Secp256k1Error_ {
+      return obj.tag === DlcError_Tags.Secp256k1Error;
+    }
+    static hasInner(obj: any): obj is Secp256k1Error_ {
+      return Secp256k1Error_.instanceOf(obj);
+    }
+
+    static getInner(obj: Secp256k1Error_): Readonly<{ message: string }> {
+      return obj.inner;
+    }
+  }
+
+  type MiniscriptError__interface = {
+    tag: DlcError_Tags.MiniscriptError;
+  };
+  class MiniscriptError_
+    extends UniffiError
+    implements MiniscriptError__interface
+  {
+    /**
+     * @private
+     * This field is private and should not be used, use `tag` instead.
+     */
+    readonly [uniffiTypeNameSymbol] = 'DlcError';
+    readonly tag = DlcError_Tags.MiniscriptError;
+    constructor() {
+      super('DlcError', 'MiniscriptError');
+    }
+
+    static new(): MiniscriptError_ {
+      return new MiniscriptError_();
+    }
+
+    static instanceOf(obj: any): obj is MiniscriptError_ {
+      return obj.tag === DlcError_Tags.MiniscriptError;
+    }
+    static hasInner(obj: any): obj is MiniscriptError_ {
+      return false;
+    }
+  }
+
+  type InvalidNetwork__interface = {
+    tag: DlcError_Tags.InvalidNetwork;
+  };
+  class InvalidNetwork_
+    extends UniffiError
+    implements InvalidNetwork__interface
+  {
+    /**
+     * @private
+     * This field is private and should not be used, use `tag` instead.
+     */
+    readonly [uniffiTypeNameSymbol] = 'DlcError';
+    readonly tag = DlcError_Tags.InvalidNetwork;
+    constructor() {
+      super('DlcError', 'InvalidNetwork');
+    }
+
+    static new(): InvalidNetwork_ {
+      return new InvalidNetwork_();
+    }
+
+    static instanceOf(obj: any): obj is InvalidNetwork_ {
+      return obj.tag === DlcError_Tags.InvalidNetwork;
+    }
+    static hasInner(obj: any): obj is InvalidNetwork_ {
+      return false;
+    }
+  }
+
+  type KeyError__interface = {
+    tag: DlcError_Tags.KeyError;
+    inner: Readonly<{ key: ExtendedKey }>;
+  };
+  class KeyError_ extends UniffiError implements KeyError__interface {
+    /**
+     * @private
+     * This field is private and should not be used, use `tag` instead.
+     */
+    readonly [uniffiTypeNameSymbol] = 'DlcError';
+    readonly tag = DlcError_Tags.KeyError;
+    readonly inner: Readonly<{ key: ExtendedKey }>;
+    constructor(inner: { key: ExtendedKey }) {
+      super('DlcError', 'KeyError');
+
+      this.inner = Object.freeze(inner);
+    }
+    static new(inner: { key: ExtendedKey }): KeyError_ {
+      return new KeyError_(inner);
+    }
+
+    static instanceOf(obj: any): obj is KeyError_ {
+      return obj.tag === DlcError_Tags.KeyError;
+    }
+    static hasInner(obj: any): obj is KeyError_ {
+      return KeyError_.instanceOf(obj);
+    }
+
+    static getInner(obj: KeyError_): Readonly<{ key: ExtendedKey }> {
+      return obj.inner;
+    }
+  }
+
+  function instanceOf(obj: any): obj is DlcError {
+    return obj[uniffiTypeNameSymbol] === 'DlcError';
+  }
+
+  return Object.freeze({
+    instanceOf,
+    InvalidSignature: InvalidSignature_,
+    InvalidPublicKey: InvalidPublicKey_,
+    InvalidTransaction: InvalidTransaction_,
+    InsufficientFunds: InsufficientFunds_,
+    InvalidArgument: InvalidArgument_,
+    SerializationError: SerializationError_,
+    Secp256k1Error: Secp256k1Error_,
+    MiniscriptError: MiniscriptError_,
+    InvalidNetwork: InvalidNetwork_,
+    KeyError: KeyError_,
+  });
+})();
 export type DlcError = InstanceType<
   (typeof DlcError)[
     | 'InvalidSignature'
@@ -2263,219 +2468,148 @@ export type DlcError = InstanceType<
     | 'KeyError']
 >;
 
+// FfiConverter for enum DlcError
 const FfiConverterTypeDLCError = (() => {
-  const intConverter = FfiConverterInt32;
+  const ordinalConverter = FfiConverterInt32;
   type TypeName = DlcError;
-  class FfiConverter extends AbstractFfiConverterByteArray<TypeName> {
+  class FFIConverter extends AbstractFfiConverterByteArray<TypeName> {
     read(from: RustBuffer): TypeName {
-      switch (intConverter.read(from)) {
+      switch (ordinalConverter.read(from)) {
         case 1:
-          return new DlcError.InvalidSignature(FfiConverterString.read(from));
-
+          return new DlcError.InvalidSignature();
         case 2:
-          return new DlcError.InvalidPublicKey(FfiConverterString.read(from));
-
+          return new DlcError.InvalidPublicKey();
         case 3:
-          return new DlcError.InvalidTransaction(FfiConverterString.read(from));
-
+          return new DlcError.InvalidTransaction();
         case 4:
-          return new DlcError.InsufficientFunds(FfiConverterString.read(from));
-
+          return new DlcError.InsufficientFunds();
         case 5:
-          return new DlcError.InvalidArgument(FfiConverterString.read(from));
-
+          return new DlcError.InvalidArgument({
+            message: FfiConverterString.read(from),
+          });
         case 6:
-          return new DlcError.SerializationError(FfiConverterString.read(from));
-
+          return new DlcError.SerializationError();
         case 7:
-          return new DlcError.Secp256k1Error(FfiConverterString.read(from));
-
+          return new DlcError.Secp256k1Error({
+            message: FfiConverterString.read(from),
+          });
         case 8:
-          return new DlcError.MiniscriptError(FfiConverterString.read(from));
-
+          return new DlcError.MiniscriptError();
         case 9:
-          return new DlcError.InvalidNetwork(FfiConverterString.read(from));
-
+          return new DlcError.InvalidNetwork();
         case 10:
-          return new DlcError.KeyError(FfiConverterString.read(from));
-
+          return new DlcError.KeyError({
+            key: FfiConverterTypeExtendedKey.read(from),
+          });
         default:
           throw new UniffiInternalError.UnexpectedEnumCase();
       }
     }
     write(value: TypeName, into: RustBuffer): void {
-      const obj = value as any;
-      const index = obj[variantOrdinalSymbol] as number;
-      intConverter.write(index, into);
+      switch (value.tag) {
+        case DlcError_Tags.InvalidSignature: {
+          ordinalConverter.write(1, into);
+          return;
+        }
+        case DlcError_Tags.InvalidPublicKey: {
+          ordinalConverter.write(2, into);
+          return;
+        }
+        case DlcError_Tags.InvalidTransaction: {
+          ordinalConverter.write(3, into);
+          return;
+        }
+        case DlcError_Tags.InsufficientFunds: {
+          ordinalConverter.write(4, into);
+          return;
+        }
+        case DlcError_Tags.InvalidArgument: {
+          ordinalConverter.write(5, into);
+          const inner = value.inner;
+          FfiConverterString.write(inner.message, into);
+          return;
+        }
+        case DlcError_Tags.SerializationError: {
+          ordinalConverter.write(6, into);
+          return;
+        }
+        case DlcError_Tags.Secp256k1Error: {
+          ordinalConverter.write(7, into);
+          const inner = value.inner;
+          FfiConverterString.write(inner.message, into);
+          return;
+        }
+        case DlcError_Tags.MiniscriptError: {
+          ordinalConverter.write(8, into);
+          return;
+        }
+        case DlcError_Tags.InvalidNetwork: {
+          ordinalConverter.write(9, into);
+          return;
+        }
+        case DlcError_Tags.KeyError: {
+          ordinalConverter.write(10, into);
+          const inner = value.inner;
+          FfiConverterTypeExtendedKey.write(inner.key, into);
+          return;
+        }
+        default:
+          // Throwing from here means that DlcError_Tags hasn't matched an ordinal.
+          throw new UniffiInternalError.UnexpectedEnumCase();
+      }
     }
     allocationSize(value: TypeName): number {
-      return intConverter.allocationSize(0);
-    }
-  }
-  return new FfiConverter();
-})();
-
-// Flat error type: ExtendedKey
-export enum ExtendedKey_Tags {
-  InvalidMnemonic = 'InvalidMnemonic',
-  InvalidXpriv = 'InvalidXpriv',
-  InvalidXpub = 'InvalidXpub',
-  InvalidDerivationPath = 'InvalidDerivationPath',
-}
-export const ExtendedKey = (() => {
-  class InvalidMnemonic extends UniffiError {
-    /**
-     * @private
-     * This field is private and should not be used.
-     */
-    readonly [uniffiTypeNameSymbol]: string = 'ExtendedKey';
-    /**
-     * @private
-     * This field is private and should not be used.
-     */
-    readonly [variantOrdinalSymbol] = 1;
-
-    readonly tag = ExtendedKey_Tags.InvalidMnemonic;
-
-    constructor(message: string) {
-      super('ExtendedKey', 'InvalidMnemonic', message);
-    }
-
-    static instanceOf(e: any): e is InvalidMnemonic {
-      return instanceOf(e) && (e as any)[variantOrdinalSymbol] === 1;
-    }
-  }
-  class InvalidXpriv extends UniffiError {
-    /**
-     * @private
-     * This field is private and should not be used.
-     */
-    readonly [uniffiTypeNameSymbol]: string = 'ExtendedKey';
-    /**
-     * @private
-     * This field is private and should not be used.
-     */
-    readonly [variantOrdinalSymbol] = 2;
-
-    readonly tag = ExtendedKey_Tags.InvalidXpriv;
-
-    constructor(message: string) {
-      super('ExtendedKey', 'InvalidXpriv', message);
-    }
-
-    static instanceOf(e: any): e is InvalidXpriv {
-      return instanceOf(e) && (e as any)[variantOrdinalSymbol] === 2;
-    }
-  }
-  class InvalidXpub extends UniffiError {
-    /**
-     * @private
-     * This field is private and should not be used.
-     */
-    readonly [uniffiTypeNameSymbol]: string = 'ExtendedKey';
-    /**
-     * @private
-     * This field is private and should not be used.
-     */
-    readonly [variantOrdinalSymbol] = 3;
-
-    readonly tag = ExtendedKey_Tags.InvalidXpub;
-
-    constructor(message: string) {
-      super('ExtendedKey', 'InvalidXpub', message);
-    }
-
-    static instanceOf(e: any): e is InvalidXpub {
-      return instanceOf(e) && (e as any)[variantOrdinalSymbol] === 3;
-    }
-  }
-  class InvalidDerivationPath extends UniffiError {
-    /**
-     * @private
-     * This field is private and should not be used.
-     */
-    readonly [uniffiTypeNameSymbol]: string = 'ExtendedKey';
-    /**
-     * @private
-     * This field is private and should not be used.
-     */
-    readonly [variantOrdinalSymbol] = 4;
-
-    readonly tag = ExtendedKey_Tags.InvalidDerivationPath;
-
-    constructor(message: string) {
-      super('ExtendedKey', 'InvalidDerivationPath', message);
-    }
-
-    static instanceOf(e: any): e is InvalidDerivationPath {
-      return instanceOf(e) && (e as any)[variantOrdinalSymbol] === 4;
-    }
-  }
-
-  // Utility function which does not rely on instanceof.
-  function instanceOf(e: any): e is ExtendedKey {
-    return (e as any)[uniffiTypeNameSymbol] === 'ExtendedKey';
-  }
-  return {
-    InvalidMnemonic,
-    InvalidXpriv,
-    InvalidXpub,
-    InvalidDerivationPath,
-    instanceOf,
-  };
-})();
-
-// Union type for ExtendedKey error type.
-export type ExtendedKey = InstanceType<
-  (typeof ExtendedKey)[
-    | 'InvalidMnemonic'
-    | 'InvalidXpriv'
-    | 'InvalidXpub'
-    | 'InvalidDerivationPath']
->;
-
-const FfiConverterTypeExtendedKey = (() => {
-  const intConverter = FfiConverterInt32;
-  type TypeName = ExtendedKey;
-  class FfiConverter extends AbstractFfiConverterByteArray<TypeName> {
-    read(from: RustBuffer): TypeName {
-      switch (intConverter.read(from)) {
-        case 1:
-          return new ExtendedKey.InvalidMnemonic(FfiConverterString.read(from));
-
-        case 2:
-          return new ExtendedKey.InvalidXpriv(FfiConverterString.read(from));
-
-        case 3:
-          return new ExtendedKey.InvalidXpub(FfiConverterString.read(from));
-
-        case 4:
-          return new ExtendedKey.InvalidDerivationPath(
-            FfiConverterString.read(from)
-          );
-
+      switch (value.tag) {
+        case DlcError_Tags.InvalidSignature: {
+          return ordinalConverter.allocationSize(1);
+        }
+        case DlcError_Tags.InvalidPublicKey: {
+          return ordinalConverter.allocationSize(2);
+        }
+        case DlcError_Tags.InvalidTransaction: {
+          return ordinalConverter.allocationSize(3);
+        }
+        case DlcError_Tags.InsufficientFunds: {
+          return ordinalConverter.allocationSize(4);
+        }
+        case DlcError_Tags.InvalidArgument: {
+          const inner = value.inner;
+          let size = ordinalConverter.allocationSize(5);
+          size += FfiConverterString.allocationSize(inner.message);
+          return size;
+        }
+        case DlcError_Tags.SerializationError: {
+          return ordinalConverter.allocationSize(6);
+        }
+        case DlcError_Tags.Secp256k1Error: {
+          const inner = value.inner;
+          let size = ordinalConverter.allocationSize(7);
+          size += FfiConverterString.allocationSize(inner.message);
+          return size;
+        }
+        case DlcError_Tags.MiniscriptError: {
+          return ordinalConverter.allocationSize(8);
+        }
+        case DlcError_Tags.InvalidNetwork: {
+          return ordinalConverter.allocationSize(9);
+        }
+        case DlcError_Tags.KeyError: {
+          const inner = value.inner;
+          let size = ordinalConverter.allocationSize(10);
+          size += FfiConverterTypeExtendedKey.allocationSize(inner.key);
+          return size;
+        }
         default:
           throw new UniffiInternalError.UnexpectedEnumCase();
       }
     }
-    write(value: TypeName, into: RustBuffer): void {
-      const obj = value as any;
-      const index = obj[variantOrdinalSymbol] as number;
-      intConverter.write(index, into);
-    }
-    allocationSize(value: TypeName): number {
-      return intConverter.allocationSize(0);
-    }
   }
-  return new FfiConverter();
+  return new FFIConverter();
 })();
 
-// FfiConverter for Array<number>
-const FfiConverterSequenceUInt8 = new FfiConverterArray(FfiConverterUInt8);
-
-// FfiConverter for Array<Array<number>>
-const FfiConverterSequenceSequenceUInt8 = new FfiConverterArray(
-  FfiConverterSequenceUInt8
+// FfiConverter for Array<ArrayBuffer>
+const FfiConverterSequenceBytes = new FfiConverterArray(
+  FfiConverterArrayBuffer
 );
 
 // FfiConverter for Array<TxInput>
@@ -2511,14 +2645,14 @@ const FfiConverterSequenceTypeOracleInfo = new FfiConverterArray(
   FfiConverterTypeOracleInfo
 );
 
-// FfiConverter for Array<Array<Array<number>>>
-const FfiConverterSequenceSequenceSequenceUInt8 = new FfiConverterArray(
-  FfiConverterSequenceSequenceUInt8
+// FfiConverter for Array<Array<ArrayBuffer>>
+const FfiConverterSequenceSequenceBytes = new FfiConverterArray(
+  FfiConverterSequenceBytes
 );
 
-// FfiConverter for Array<Array<Array<Array<number>>>>
-const FfiConverterSequenceSequenceSequenceSequenceUInt8 = new FfiConverterArray(
-  FfiConverterSequenceSequenceSequenceUInt8
+// FfiConverter for Array<Array<Array<ArrayBuffer>>>
+const FfiConverterSequenceSequenceSequenceBytes = new FfiConverterArray(
+  FfiConverterSequenceSequenceBytes
 );
 
 // FfiConverter for Array<AdaptorSignature>
@@ -2554,45 +2688,29 @@ function uniffiEnsureInitialized() {
     );
   }
   if (
-    nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_add_signature_to_transaction() !==
-    1337
-  ) {
-    throw new UniffiInternalError.ApiChecksumMismatch(
-      'uniffi_ddk_ffi_checksum_func_add_signature_to_transaction'
-    );
-  }
-  if (
     nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_convert_mnemonic_to_seed() !==
-    65049
+    29793
   ) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       'uniffi_ddk_ffi_checksum_func_convert_mnemonic_to_seed'
     );
   }
-  if (nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_create_cet() !== 23081) {
+  if (nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_create_cet() !== 62951) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       'uniffi_ddk_ffi_checksum_func_create_cet'
     );
   }
   if (
     nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_create_cet_adaptor_points_from_oracle_info() !==
-    6552
+    14977
   ) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       'uniffi_ddk_ffi_checksum_func_create_cet_adaptor_points_from_oracle_info'
     );
   }
   if (
-    nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_create_cet_adaptor_signature_from_oracle_info() !==
-    65174
-  ) {
-    throw new UniffiInternalError.ApiChecksumMismatch(
-      'uniffi_ddk_ffi_checksum_func_create_cet_adaptor_signature_from_oracle_info'
-    );
-  }
-  if (
     nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_create_cet_adaptor_sigs_from_oracle_info() !==
-    15699
+    5605
   ) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       'uniffi_ddk_ffi_checksum_func_create_cet_adaptor_sigs_from_oracle_info'
@@ -2600,14 +2718,14 @@ function uniffiEnsureInitialized() {
   }
   if (
     nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_create_cet_adaptor_sigs_from_points() !==
-    33705
+    39452
   ) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       'uniffi_ddk_ffi_checksum_func_create_cet_adaptor_sigs_from_points'
     );
   }
   if (
-    nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_create_cets() !== 50529
+    nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_create_cets() !== 22051
   ) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       'uniffi_ddk_ffi_checksum_func_create_cets'
@@ -2615,7 +2733,7 @@ function uniffiEnsureInitialized() {
   }
   if (
     nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_create_dlc_transactions() !==
-    29518
+    47767
   ) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       'uniffi_ddk_ffi_checksum_func_create_dlc_transactions'
@@ -2623,7 +2741,7 @@ function uniffiEnsureInitialized() {
   }
   if (
     nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_create_extkey_from_parent_path() !==
-    26671
+    23090
   ) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       'uniffi_ddk_ffi_checksum_func_create_extkey_from_parent_path'
@@ -2631,7 +2749,7 @@ function uniffiEnsureInitialized() {
   }
   if (
     nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_create_extkey_from_seed() !==
-    12526
+    45469
   ) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       'uniffi_ddk_ffi_checksum_func_create_extkey_from_seed'
@@ -2639,7 +2757,7 @@ function uniffiEnsureInitialized() {
   }
   if (
     nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_create_fund_tx_locking_script() !==
-    2761
+    37235
   ) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       'uniffi_ddk_ffi_checksum_func_create_fund_tx_locking_script'
@@ -2647,7 +2765,7 @@ function uniffiEnsureInitialized() {
   }
   if (
     nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_create_refund_transaction() !==
-    57261
+    40230
   ) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       'uniffi_ddk_ffi_checksum_func_create_refund_transaction'
@@ -2655,7 +2773,7 @@ function uniffiEnsureInitialized() {
   }
   if (
     nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_create_spliced_dlc_transactions() !==
-    19497
+    44189
   ) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       'uniffi_ddk_ffi_checksum_func_create_spliced_dlc_transactions'
@@ -2663,7 +2781,7 @@ function uniffiEnsureInitialized() {
   }
   if (
     nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_create_xpriv_from_parent_path() !==
-    34808
+    7895
   ) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       'uniffi_ddk_ffi_checksum_func_create_xpriv_from_parent_path'
@@ -2671,54 +2789,23 @@ function uniffiEnsureInitialized() {
   }
   if (
     nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_extract_ecdsa_signature_from_oracle_signatures() !==
-    8006
+    4868
   ) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       'uniffi_ddk_ffi_checksum_func_extract_ecdsa_signature_from_oracle_signatures'
     );
   }
   if (
-    nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_get_cet_adaptor_signature_inputs() !==
-    14595
-  ) {
-    throw new UniffiInternalError.ApiChecksumMismatch(
-      'uniffi_ddk_ffi_checksum_func_get_cet_adaptor_signature_inputs'
-    );
-  }
-  if (
-    nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_get_cet_sighash() !== 10643
-  ) {
-    throw new UniffiInternalError.ApiChecksumMismatch(
-      'uniffi_ddk_ffi_checksum_func_get_cet_sighash'
-    );
-  }
-  if (
-    nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_get_change_output_and_fees() !==
-    44150
-  ) {
-    throw new UniffiInternalError.ApiChecksumMismatch(
-      'uniffi_ddk_ffi_checksum_func_get_change_output_and_fees'
-    );
-  }
-  if (
     nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_get_pubkey_from_extkey() !==
-    64637
+    18050
   ) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       'uniffi_ddk_ffi_checksum_func_get_pubkey_from_extkey'
     );
   }
   if (
-    nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_get_raw_funding_transaction_input_signature() !==
-    35708
-  ) {
-    throw new UniffiInternalError.ApiChecksumMismatch(
-      'uniffi_ddk_ffi_checksum_func_get_raw_funding_transaction_input_signature'
-    );
-  }
-  if (
     nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_get_total_input_vsize() !==
-    38213
+    2998
   ) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       'uniffi_ddk_ffi_checksum_func_get_total_input_vsize'
@@ -2726,65 +2813,21 @@ function uniffiEnsureInitialized() {
   }
   if (
     nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_get_xpub_from_xpriv() !==
-    44344
+    8843
   ) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       'uniffi_ddk_ffi_checksum_func_get_xpub_from_xpriv'
     );
   }
   if (
-    nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_is_dust_output() !== 64174
-  ) {
-    throw new UniffiInternalError.ApiChecksumMismatch(
-      'uniffi_ddk_ffi_checksum_func_is_dust_output'
-    );
-  }
-  if (nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_sign_cet() !== 43957) {
-    throw new UniffiInternalError.ApiChecksumMismatch(
-      'uniffi_ddk_ffi_checksum_func_sign_cet'
-    );
-  }
-  if (
-    nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_sign_fund_transaction_input() !==
-    50531
-  ) {
-    throw new UniffiInternalError.ApiChecksumMismatch(
-      'uniffi_ddk_ffi_checksum_func_sign_fund_transaction_input'
-    );
-  }
-  if (
-    nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_sign_multi_sig_input() !==
-    14569
-  ) {
-    throw new UniffiInternalError.ApiChecksumMismatch(
-      'uniffi_ddk_ffi_checksum_func_sign_multi_sig_input'
-    );
-  }
-  if (
-    nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_verify_cet_adaptor_sig_from_oracle_info() !==
-    52232
-  ) {
-    throw new UniffiInternalError.ApiChecksumMismatch(
-      'uniffi_ddk_ffi_checksum_func_verify_cet_adaptor_sig_from_oracle_info'
-    );
-  }
-  if (
     nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_verify_cet_adaptor_sigs_from_oracle_info() !==
-    14181
+    32235
   ) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       'uniffi_ddk_ffi_checksum_func_verify_cet_adaptor_sigs_from_oracle_info'
     );
   }
-  if (
-    nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_verify_fund_tx_signature() !==
-    27316
-  ) {
-    throw new UniffiInternalError.ApiChecksumMismatch(
-      'uniffi_ddk_ffi_checksum_func_verify_fund_tx_signature'
-    );
-  }
-  if (nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_version() !== 22317) {
+  if (nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_version() !== 2994) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       'uniffi_ddk_ffi_checksum_func_version'
     );

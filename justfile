@@ -18,13 +18,22 @@ uniffi:
 # mirror the `bindings:` section of ddk-rn/ubrn.config.yaml, which this low-level
 # command can't read, so the dirs are passed explicitly.
 #
+# Generation is LIBRARY-based (not from the .udl): it extracts the interface from
+# the compiled lib so it includes proc-macro exports (records, methods, errors)
+# that no .udl declares. Extract from the CDYLIB (.dylib/.so), NOT the staticlib
+# (.a): a static archive lets the linker garbage-collect "unreferenced" metadata
+# (more aggressively on Linux than macOS), which drops record/object metadata and
+# fails with "object <Name> not found". The cdylib keeps all exported symbols.
+#
 # Generate the JSI bindings
 uniffi-jsi:
-  cd {{justfile_directory()}}/ddk-ffi && uniffi-bindgen-react-native generate jsi bindings \
-    --crate ddk_ffi \
+  cd {{justfile_directory()}}/ddk-ffi && cargo build && \
+    LIB="$(ls {{justfile_directory()}}/ddk-ffi/target/debug/libddk_ffi.dylib {{justfile_directory()}}/ddk-ffi/target/debug/libddk_ffi.so 2>/dev/null | head -1)" && \
+    uniffi-bindgen-react-native generate jsi bindings \
+    --library \
     --ts-dir {{justfile_directory()}}/ddk-rn/src \
     --cpp-dir {{justfile_directory()}}/ddk-rn/cpp \
-    {{justfile_directory()}}/ddk-ffi/src/ddk_ffi.udl
+    "$LIB"
 
 # Generate the TurboModule bindings
 uniffi-turbo:
