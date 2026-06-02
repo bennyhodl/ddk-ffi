@@ -1,16 +1,32 @@
 # ====================
-# React Native Bindings
+# Develop
 # ====================
 
-# Build the complete React Native bindings
-uniffi:
-  just uniffi-jsi
-  just uniffi-turbo
-  just build-ios
-  just build-android
-  @echo ""
-  @echo "🎉 Uniffi build complete! 🎉"
-  @echo "🔥 Run 'just example-ios' to test the build"
+# Check all Rust crates (cargo test) and the TypeScript bindings (tsc)
+check:
+    cd {{justfile_directory()}}/ddk-ffi && cargo test --all-features
+    cd {{justfile_directory()}}/ddk-ts && cargo test
+    cd {{justfile_directory()}}/ddk-rn && pnpm typecheck
+
+# Lint all Rust crates (rustfmt + clippy) and the React Native bindings (eslint)
+lint:
+    cd {{justfile_directory()}}/ddk-ffi && cargo fmt -- --check && cargo clippy --all-features -- -D warnings
+    cd {{justfile_directory()}}/ddk-ts && cargo fmt -- --check && cargo clippy -- -D warnings
+    cd {{justfile_directory()}}/ddk-rn && pnpm lint
+
+# ====================
+# Build bindings
+# ====================
+
+# Build all bindings: React Native (iOS) + TypeScript/Node.js
+build:
+    just uniffi-jsi
+    just uniffi-turbo
+    just build-ios
+    cd {{justfile_directory()}}/ddk-ts && pnpm install && pnpm build
+    @echo ""
+    @echo "🎉 Bindings built — React Native (iOS) + TypeScript 🎉"
+    @echo "🔥 Run 'just example-ios' to test the build"
 
 # TS-bindings config (e.g. strictTypeChecking) is read from ddk-ffi/uniffi.toml,
 # which ubrn auto-discovers next to the crate's Cargo.toml — the --config flag is
@@ -41,17 +57,21 @@ uniffi-turbo:
     --config {{justfile_directory()}}/ddk-rn/ubrn.config.yaml \
     --native-bindings
 
-# Build the iOS bindings
+# Build the iOS XCFramework
 build-ios:
   cd {{justfile_directory()}}/ddk-rn && uniffi-bindgen-react-native build ios \
     --config {{justfile_directory()}}/ddk-rn/ubrn.config.yaml --and-generate
 
-# Build the Android bindings
+# Build the Android JNI libraries (not part of `just build`; needs the NDK)
 build-android:
   cd {{justfile_directory()}}/ddk-rn && uniffi-bindgen-react-native build android \
     --config {{justfile_directory()}}/ddk-rn/ubrn.config.yaml --and-generate
 
-# Build the example app with the React Native bindings
+# ====================
+# Example app
+# ====================
+
+# Build the example app (iOS + Android)
 example:
   cd {{justfile_directory()}}/ddk-rn/example && pnpm install
   just example-ios
@@ -65,35 +85,18 @@ example-ios:
 example-android:
   cd {{justfile_directory()}}/ddk-rn/example/android && ./gradlew build
 
+# ====================
+# Maintenance
+# ====================
+
 # Clean all build artifacts and dependencies
 clean:
   # Clean React Native bindings
   cd {{justfile_directory()}}/ddk-rn && rm -rf cpp/ddk_ffi.* cpp/ddk-rn.* cpp/UniffiCallInvoker.h src/ddk_ffi*.ts src/NativeDdkRn.ts ios/DdkRn.xcframework android/src/main/jniLibs lib ios/build android/build example/ios/build example/android/build example/android/app/build example/ios/Pods example/ios/Podfile.lock example/ios/DdkRnExample.xcworkspace src/index.tsx
-  
+
   # Clean TypeScript/Node.js bindings
   cd {{justfile_directory()}}/ddk-ts && rm -rf node_modules dist target pnpm-lock.yaml
   cd {{justfile_directory()}}/ddk-ts/example && rm -rf node_modules dist
-
-# ====================
-# TypeScript (Node.js) Bindings
-# ====================
-
-# Build TypeScript bindings for current platform
-ts-build:
-    cd {{justfile_directory()}}/ddk-ts && pnpm install && pnpm build
-
-# Build TypeScript bindings for all supported platforms (Darwin ARM64 and Linux x64)
-ts-build-all:
-    cd {{justfile_directory()}}/ddk-ts && pnpm install && pnpm build:darwin-arm64 && pnpm build:linux-x64
-
-# Run TypeScript example
-ts-example:
-    cd {{justfile_directory()}}/ddk-ts && pnpm build
-    cd {{justfile_directory()}}/ddk-ts/example && pnpm install && pnpm build && pnpm start
-
-# Run TypeScript tests
-ts-test:
-    cd {{justfile_directory()}}/ddk-ts && pnpm test
 
 # ====================
 # Release
