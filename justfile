@@ -74,14 +74,6 @@ clean:
   cd {{justfile_directory()}}/ddk-ts && rm -rf node_modules dist target pnpm-lock.yaml
   cd {{justfile_directory()}}/ddk-ts/example && rm -rf node_modules dist
 
-# Release the React Native bindings
-rn-release:
-  cd {{justfile_directory()}}/ddk-rn && node scripts/release.js
-
-# Create binary archives for the React Native bindings
-rn-release-archives:
-  cd {{justfile_directory()}}/ddk-rn && node scripts/create-binary-archives.js
-
 # ====================
 # TypeScript (Node.js) Bindings
 # ====================
@@ -103,14 +95,18 @@ ts-example:
 ts-test:
     cd {{justfile_directory()}}/ddk-ts && pnpm test
 
-# Release TypeScript package to npm
-ts-release version:
-    cd {{justfile_directory()}}/ddk-ts && node scripts/release.sh {{version}}
-
 # ====================
-# Unified Release
+# Release
 # ====================
 
-# Unified release for both React Native and TypeScript packages
-release version:
-    node {{justfile_directory()}}/scripts/unified-release.js {{version}}
+# Gate on a clean, up-to-date, CI-green commit, then bump versions, tag, and push
+# the tag (triggers publish.yml, which builds native binaries and publishes both
+# npm packages). Pass a bump flag or explicit version:
+#   just release            # patch bump
+#   just release --minor    # minor bump
+#   just release 0.4.0      # explicit version
+#   just release --dry      # validate the gates without mutating anything
+
+# Bump versions, tag, and push to trigger the npm publish on CI
+release *args:
+    node {{justfile_directory()}}/scripts/prep-release.js {{args}}
