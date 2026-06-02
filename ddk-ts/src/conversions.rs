@@ -2,10 +2,10 @@ use crate::types::*;
 use napi::bindgen_prelude::*;
 
 // Helper function to convert BigInt to u64 safely
-pub fn bigint_to_u64(bi: &BigInt) -> Result<u64> {
+pub fn bigint_to_u64(bi: &BigInt) -> Result<u64, &'static str> {
   let (sign_bit, value, _lossless) = bi.get_u64();
   if sign_bit {
-    return Err(Error::from_reason("BigInt value is negative"));
+    return Err(Error::new("InvalidArgument", "BigInt value is negative"));
   }
   Ok(value)
 }
@@ -40,10 +40,11 @@ impl From<ddk_ffi::Transaction> for Transaction {
 
 // Convert NAPI Transaction to ddk_ffi Transaction
 impl TryFrom<Transaction> for ddk_ffi::Transaction {
-  type Error = napi::Error;
+  type Error = napi::Error<&'static str>;
 
-  fn try_from(tx: Transaction) -> Result<Self> {
-    let outputs: Result<Vec<_>> = tx.outputs.into_iter().map(TryInto::try_into).collect();
+  fn try_from(tx: Transaction) -> Result<Self, &'static str> {
+    let outputs: Result<Vec<_>, &'static str> =
+      tx.outputs.into_iter().map(TryInto::try_into).collect();
     Ok(ddk_ffi::Transaction {
       version: tx.version,
       lock_time: tx.lock_time,
@@ -82,9 +83,9 @@ impl From<ddk_ffi::TxInput> for TxInput {
 
 // Convert NAPI TxOutput to ddk_ffi TxOutput
 impl TryFrom<TxOutput> for ddk_ffi::TxOutput {
-  type Error = napi::Error;
+  type Error = napi::Error<&'static str>;
 
-  fn try_from(output: TxOutput) -> Result<Self> {
+  fn try_from(output: TxOutput) -> Result<Self, &'static str> {
     Ok(ddk_ffi::TxOutput {
       value: bigint_to_u64(&output.value)?,
       script_pubkey: output.script_pubkey.to_vec(),
@@ -104,9 +105,9 @@ impl From<ddk_ffi::TxOutput> for TxOutput {
 
 // Convert NAPI TxInputInfo to ddk_ffi TxInputInfo
 impl TryFrom<TxInputInfo> for ddk_ffi::TxInputInfo {
-  type Error = napi::Error;
+  type Error = napi::Error<&'static str>;
 
-  fn try_from(info: TxInputInfo) -> Result<Self> {
+  fn try_from(info: TxInputInfo) -> Result<Self, &'static str> {
     Ok(ddk_ffi::TxInputInfo {
       txid: info.txid,
       vout: info.vout,
@@ -131,9 +132,9 @@ impl From<ddk_ffi::TxInputInfo> for TxInputInfo {
 }
 
 impl TryFrom<Payout> for ddk_ffi::Payout {
-  type Error = napi::Error;
+  type Error = napi::Error<&'static str>;
 
-  fn try_from(outcome: Payout) -> Result<Self> {
+  fn try_from(outcome: Payout) -> Result<Self, &'static str> {
     Ok(ddk_ffi::Payout {
       offer: bigint_to_u64(&outcome.offer)?,
       accept: bigint_to_u64(&outcome.accept)?,
@@ -150,9 +151,9 @@ impl From<ddk_ffi::Payout> for Payout {
 }
 // Convert NAPI DlcInputInfo to ddk_ffi DlcInputInfo
 impl TryFrom<DlcInputInfo> for ddk_ffi::DlcInputInfo {
-  type Error = napi::Error;
+  type Error = napi::Error<&'static str>;
 
-  fn try_from(info: DlcInputInfo) -> Result<Self> {
+  fn try_from(info: DlcInputInfo) -> Result<Self, &'static str> {
     Ok(ddk_ffi::DlcInputInfo {
       fund_tx: info.fund_tx.try_into()?,
       fund_vout: info.fund_vout,
@@ -184,11 +185,12 @@ impl From<ddk_ffi::DlcInputInfo> for DlcInputInfo {
 
 // Convert NAPI PartyParams to ddk_ffi PartyParams
 impl TryFrom<PartyParams> for ddk_ffi::PartyParams {
-  type Error = napi::Error;
+  type Error = napi::Error<&'static str>;
 
-  fn try_from(params: PartyParams) -> Result<Self> {
-    let inputs: Result<Vec<_>> = params.inputs.into_iter().map(TryInto::try_into).collect();
-    let dlc_inputs: Result<Vec<_>> = params
+  fn try_from(params: PartyParams) -> Result<Self, &'static str> {
+    let inputs: Result<Vec<_>, &'static str> =
+      params.inputs.into_iter().map(TryInto::try_into).collect();
+    let dlc_inputs: Result<Vec<_>, &'static str> = params
       .dlc_inputs
       .into_iter()
       .map(TryInto::try_into)

@@ -1,9 +1,11 @@
 #![deny(clippy::all)]
 
 pub mod conversions;
+mod error;
 mod types;
 
 use conversions::*;
+use error::map_dlc_error;
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use types::*;
@@ -11,7 +13,7 @@ use types::*;
 // Import ddk_ffi crate
 extern crate ddk_ffi;
 
-// fn log_to_console(env: Env, message: &str) -> Result<()> {
+// fn log_to_console(env: Env, message: &str) -> Result<(), &'static str> {
 //   let global = env.get_global()?;
 //   let console: Object = global.get_named_property("console")?;
 //   let log_fn: Function = console.get_named_property("log")?;
@@ -29,12 +31,12 @@ pub fn version() -> String {
 pub fn create_fund_tx_locking_script(
   local_fund_pubkey: Buffer,
   remote_fund_pubkey: Buffer,
-) -> Result<Buffer> {
+) -> Result<Buffer, &'static str> {
   let local_pubkey = buffer_to_vec(&local_fund_pubkey);
   let remote_pubkey = buffer_to_vec(&remote_fund_pubkey);
 
-  let result = ddk_ffi::create_fund_tx_locking_script(local_pubkey, remote_pubkey)
-    .map_err(|e| Error::from_reason(format!("{:?}", e)))?;
+  let result =
+    ddk_ffi::create_fund_tx_locking_script(local_pubkey, remote_pubkey).map_err(map_dlc_error)?;
 
   Ok(vec_to_buffer(result))
 }
@@ -49,23 +51,23 @@ pub fn create_dlc_transactions(
   fund_lock_time: u32,
   cet_lock_time: u32,
   fund_output_serial_id: BigInt,
-) -> Result<DlcTransactions> {
+) -> Result<DlcTransactions, &'static str> {
   // log_to_console(env, "create_dlc_transactions: parsing inputs")
-  //   .map_err(|e| Error::from_reason(format!("{:?}", e)))?;
+  //   .map_err(map_dlc_error)?;
 
-  let ffi_outcomes: Result<Vec<ddk_ffi::Payout>> =
+  let ffi_outcomes: Result<Vec<ddk_ffi::Payout>, &'static str> =
     outcomes.into_iter().map(TryInto::try_into).collect();
 
   let ffi_local_params = local_params.try_into()?;
   let ffi_remote_params = remote_params.try_into()?;
   // log_to_console(env, "create_dlc_transactions: inputs parsed correctly")
-  //   .map_err(|e| Error::from_reason(format!("{:?}", e)))?;
+  //   .map_err(map_dlc_error)?;
 
   // log_to_console(
   //   env,
   //   "create_dlc_transactions: calling ddk_ffi::create_dlc_transactions with inputs",
   // )
-  // .map_err(|e| Error::from_reason(format!("{:?}", e)))?;
+  // .map_err(map_dlc_error)?;
 
   let result = ddk_ffi::create_dlc_transactions(
     ffi_outcomes?,
@@ -77,13 +79,7 @@ pub fn create_dlc_transactions(
     cet_lock_time,
     bigint_to_u64(&fund_output_serial_id)?,
   )
-  .map_err(|e| {
-    // let _ = log_to_console(
-    //   env,
-    //   &format!("ddk_ffi::create_dlc_transactions: error: {:?}", e),
-    // );
-    Error::from_reason(format!("{:?}", e))
-  })?;
+  .map_err(map_dlc_error)?;
 
   Ok(result.into())
 }
@@ -98,8 +94,8 @@ pub fn create_spliced_dlc_transactions(
   fund_lock_time: u32,
   cet_lock_time: u32,
   fund_output_serial_id: BigInt,
-) -> Result<DlcTransactions> {
-  let ffi_outcomes: Result<Vec<ddk_ffi::Payout>> =
+) -> Result<DlcTransactions, &'static str> {
+  let ffi_outcomes: Result<Vec<ddk_ffi::Payout>, &'static str> =
     outcomes.into_iter().map(TryInto::try_into).collect();
 
   let ffi_local_params = local_params.try_into()?;
@@ -115,7 +111,7 @@ pub fn create_spliced_dlc_transactions(
     cet_lock_time,
     bigint_to_u64(&fund_output_serial_id)?,
   )
-  .map_err(|e| Error::from_reason(format!("{:?}", e)))?;
+  .map_err(map_dlc_error)?;
 
   Ok(result.into())
 }
@@ -129,7 +125,7 @@ pub fn create_cet(
   fund_tx_id: String,
   fund_vout: u32,
   lock_time: u32,
-) -> Result<Transaction> {
+) -> Result<Transaction, &'static str> {
   let result = ddk_ffi::create_cet(
     local_output.try_into()?,
     bigint_to_u64(&local_payout_serial_id)?,
@@ -139,7 +135,7 @@ pub fn create_cet(
     fund_vout,
     lock_time,
   )
-  .map_err(|e| Error::from_reason(format!("{:?}", e)))?;
+  .map_err(map_dlc_error)?;
 
   Ok(result.into())
 }
@@ -154,8 +150,8 @@ pub fn create_cets(
   lock_time: u32,
   local_serial_id: BigInt,
   remote_serial_id: BigInt,
-) -> Result<Vec<Transaction>> {
-  let ffi_outcomes: Result<Vec<ddk_ffi::Payout>> =
+) -> Result<Vec<Transaction>, &'static str> {
+  let ffi_outcomes: Result<Vec<ddk_ffi::Payout>, &'static str> =
     outcomes.into_iter().map(TryInto::try_into).collect();
 
   let result = ddk_ffi::create_cets(
@@ -168,7 +164,7 @@ pub fn create_cets(
     bigint_to_u64(&local_serial_id)?,
     bigint_to_u64(&remote_serial_id)?,
   )
-  .map_err(|e| Error::from_reason(format!("{:?}", e)))?;
+  .map_err(map_dlc_error)?;
 
   Ok(result.into_iter().map(Into::into).collect())
 }
@@ -182,7 +178,7 @@ pub fn create_refund_transaction(
   lock_time: u32,
   fund_tx_id: String,
   fund_vout: u32,
-) -> Result<Transaction> {
+) -> Result<Transaction, &'static str> {
   let result = ddk_ffi::create_refund_transaction(
     buffer_to_vec(&local_final_script_pubkey),
     buffer_to_vec(&remote_final_script_pubkey),
@@ -192,80 +188,84 @@ pub fn create_refund_transaction(
     fund_tx_id,
     fund_vout,
   )
-  .map_err(|e| Error::from_reason(format!("{:?}", e)))?;
+  .map_err(map_dlc_error)?;
 
   Ok(result.into())
 }
 
 #[napi]
-pub fn is_dust_output(output: TxOutput) -> Result<bool> {
-  let ffi_output = output.try_into()?;
-  Ok(ddk_ffi::is_dust_output(ffi_output))
+pub fn is_dust(output: TxOutput) -> Result<bool, &'static str> {
+  let ffi_output: ddk_ffi::TxOutput = output.try_into()?;
+  Ok(ffi_output.is_dust())
 }
 
 #[napi]
-pub fn get_change_output_and_fees(
+pub fn change_output_and_fees(
   params: PartyParams,
   fee_rate: BigInt,
-) -> Result<ChangeOutputAndFees> {
-  let result = ddk_ffi::get_change_output_and_fees(params.try_into()?, bigint_to_u64(&fee_rate)?)
-    .map_err(|e| Error::from_reason(format!("{:?}", e)))?;
+) -> Result<ChangeOutputAndFees, &'static str> {
+  let ffi_params: ddk_ffi::PartyParams = params.try_into()?;
+  let result = ffi_params
+    .change_output_and_fees(bigint_to_u64(&fee_rate)?)
+    .map_err(map_dlc_error)?;
 
   Ok(result.into())
 }
 
 #[napi]
-pub fn get_total_input_vsize(inputs: Vec<TxInputInfo>) -> Result<u32> {
-  let ffi_inputs: Result<Vec<ddk_ffi::TxInputInfo>> =
+pub fn get_total_input_vsize(inputs: Vec<TxInputInfo>) -> Result<u32, &'static str> {
+  let ffi_inputs: Result<Vec<ddk_ffi::TxInputInfo>, &'static str> =
     inputs.into_iter().map(TryInto::try_into).collect();
 
   Ok(ddk_ffi::get_total_input_vsize(ffi_inputs?))
 }
 
 #[napi]
-pub fn verify_fund_tx_signature(
+pub fn verify_fund_signature(
   fund_tx: Transaction,
   signature: Buffer,
   pubkey: Buffer,
   txid: String,
   vout: u32,
   input_amount: BigInt,
-) -> Result<bool> {
-  let result = ddk_ffi::verify_fund_tx_signature(
-    fund_tx.try_into()?,
-    buffer_to_vec(&signature),
-    buffer_to_vec(&pubkey),
-    txid,
-    vout,
-    bigint_to_u64(&input_amount)?,
-  )
-  .map_err(|e| Error::from_reason(format!("{:?}", e)))?;
+) -> Result<bool, &'static str> {
+  let ffi_tx: ddk_ffi::Transaction = fund_tx.try_into()?;
+  let result = ffi_tx
+    .verify_fund_signature(
+      buffer_to_vec(&signature),
+      buffer_to_vec(&pubkey),
+      txid,
+      vout,
+      bigint_to_u64(&input_amount)?,
+    )
+    .map_err(map_dlc_error)?;
 
   Ok(result)
 }
 
 #[napi]
-pub fn get_raw_funding_transaction_input_signature(
+pub fn raw_funding_input_signature(
   funding_transaction: Transaction,
   privkey: Buffer,
   prev_tx_id: String,
   prev_tx_vout: u32,
   value: BigInt,
-) -> Result<Buffer> {
-  let result = ddk_ffi::get_raw_funding_transaction_input_signature(
-    funding_transaction.try_into()?,
-    buffer_to_vec(&privkey),
-    prev_tx_id,
-    prev_tx_vout,
-    bigint_to_u64(&value)?,
-  )
-  .map_err(|e| Error::from_reason(format!("{:?}", e)))?;
+) -> Result<Buffer, &'static str> {
+  let ffi_tx: ddk_ffi::Transaction = funding_transaction.try_into()?;
+  let result = ffi_tx
+    .raw_funding_input_signature(
+      buffer_to_vec(&privkey),
+      prev_tx_id,
+      prev_tx_vout,
+      bigint_to_u64(&value)?,
+    )
+    .map_err(map_dlc_error)?;
 
   Ok(vec_to_buffer(result))
 }
 
 #[napi]
-pub fn verify_cet_adaptor_sig_from_oracle_info(
+pub fn verify_from_oracle_info(
   adaptor_sig: AdaptorSignature,
   cet: Transaction,
   oracle_info: Vec<OracleInfo>,
@@ -288,8 +288,8 @@ pub fn verify_cet_adaptor_sig_from_oracle_info(
     return false;
   };
 
-  ddk_ffi::verify_cet_adaptor_sig_from_oracle_info(
-    adaptor_sig.into(),
+  let ffi_adaptor_sig: ddk_ffi::AdaptorSignature = adaptor_sig.into();
+  ffi_adaptor_sig.verify_from_oracle_info(
     ffi_cet,
     ffi_oracle_info,
     buffer_to_vec(&pubkey),
@@ -305,32 +305,34 @@ pub fn sign_multi_sig_input(
   dlc_input: DlcInputInfo,
   local_privkey: Buffer,
   remote_signature: Buffer,
-) -> Result<Transaction> {
-  let result = ddk_ffi::sign_multi_sig_input(
-    tx.try_into()?,
-    dlc_input.try_into()?,
-    buffer_to_vec(&local_privkey),
-    buffer_to_vec(&remote_signature),
-  )
-  .map_err(|e| Error::from_reason(format!("{:?}", e)))?;
+) -> Result<Transaction, &'static str> {
+  let ffi_tx: ddk_ffi::Transaction = tx.try_into()?;
+  let result = ffi_tx
+    .sign_multi_sig_input(
+      dlc_input.try_into()?,
+      buffer_to_vec(&local_privkey),
+      buffer_to_vec(&remote_signature),
+    )
+    .map_err(map_dlc_error)?;
 
   Ok(result.into())
 }
 
 #[napi]
-pub fn add_signature_to_transaction(
+pub fn add_signature(
   tx: Transaction,
   signature: Buffer,
   pubkey: Buffer,
   input_index: u32,
-) -> Result<Transaction> {
-  let result = ddk_ffi::add_signature_to_transaction(
-    tx.try_into()?,
-    buffer_to_vec(&signature),
-    buffer_to_vec(&pubkey),
-    input_index,
-  )
-  .map_err(|e| Error::from_reason(format!("{:?}", e)))?;
+) -> Result<Transaction, &'static str> {
+  let ffi_tx: ddk_ffi::Transaction = tx.try_into()?;
+  let result = ffi_tx
+    .add_signature(
+      buffer_to_vec(&signature),
+      buffer_to_vec(&pubkey),
+      input_index,
+    )
+    .map_err(map_dlc_error)?;
 
   Ok(result.into())
 }
@@ -380,21 +382,22 @@ pub fn verify_cet_adaptor_sigs_from_oracle_info(
 }
 
 #[napi]
-pub fn sign_fund_transaction_input(
+pub fn sign_fund_input(
   fund_transaction: Transaction,
   privkey: Buffer,
   prev_tx_id: String,
   prev_tx_vout: u32,
   value: BigInt,
-) -> Result<Transaction> {
-  let result = ddk_ffi::sign_fund_transaction_input(
-    fund_transaction.try_into()?,
-    buffer_to_vec(&privkey),
-    prev_tx_id,
-    prev_tx_vout,
-    bigint_to_u64(&value)?,
-  )
-  .map_err(|e| Error::from_reason(format!("{:?}", e)))?;
+) -> Result<Transaction, &'static str> {
+  let ffi_tx: ddk_ffi::Transaction = fund_transaction.try_into()?;
+  let result = ffi_tx
+    .sign_fund_input(
+      buffer_to_vec(&privkey),
+      prev_tx_id,
+      prev_tx_vout,
+      bigint_to_u64(&value)?,
+    )
+    .map_err(map_dlc_error)?;
 
   Ok(result.into())
 }
@@ -408,17 +411,18 @@ pub fn sign_cet(
   other_pubkey: Buffer,
   funding_script_pubkey: Buffer,
   fund_output_value: BigInt,
-) -> Result<Transaction> {
-  let result = ddk_ffi::sign_cet(
-    cet.try_into()?,
-    buffer_to_vec(&adaptor_signature),
-    oracle_signatures.iter().map(buffer_to_vec).collect(),
-    buffer_to_vec(&funding_secret_key),
-    buffer_to_vec(&other_pubkey),
-    buffer_to_vec(&funding_script_pubkey),
-    bigint_to_u64(&fund_output_value)?,
-  )
-  .map_err(|e| Error::from_reason(format!("{:?}", e)))?;
+) -> Result<Transaction, &'static str> {
+  let ffi_cet: ddk_ffi::Transaction = cet.try_into()?;
+  let result = ffi_cet
+    .sign_cet(
+      buffer_to_vec(&adaptor_signature),
+      oracle_signatures.iter().map(buffer_to_vec).collect(),
+      buffer_to_vec(&funding_secret_key),
+      buffer_to_vec(&other_pubkey),
+      buffer_to_vec(&funding_script_pubkey),
+      bigint_to_u64(&fund_output_value)?,
+    )
+    .map_err(map_dlc_error)?;
 
   Ok(result.into())
 }
@@ -431,7 +435,7 @@ pub fn create_cet_adaptor_sigs_from_oracle_info(
   funding_script_pubkey: Buffer,
   fund_output_value: BigInt,
   msgs: Vec<Vec<Vec<Buffer>>>,
-) -> Result<Vec<AdaptorSignature>> {
+) -> Result<Vec<AdaptorSignature>, &'static str> {
   let ffi_msgs = msgs
     .into_iter()
     .map(|cet_msgs| {
@@ -457,7 +461,7 @@ pub fn create_cet_adaptor_sigs_from_oracle_info(
     bigint_to_u64(&fund_output_value)?,
     ffi_msgs,
   )
-  .map_err(|e| Error::from_reason(format!("{:?}", e)))?;
+  .map_err(map_dlc_error)?;
 
   let result = sigs
     .into_iter()
@@ -474,7 +478,7 @@ pub fn create_cet_adaptor_sigs_from_points(
   funding_secret_key: Buffer,
   funding_script_pubkey: Buffer,
   fund_output_value: BigInt,
-) -> Result<Vec<AdaptorSignature>> {
+) -> Result<Vec<AdaptorSignature>, &'static str> {
   let ffi_adaptor_points: Vec<Vec<u8>> = adaptor_points.iter().map(buffer_to_vec).collect();
 
   let sigs = ddk_ffi::create_cet_adaptor_sigs_from_points(
@@ -487,7 +491,7 @@ pub fn create_cet_adaptor_sigs_from_points(
     buffer_to_vec(&funding_script_pubkey),
     bigint_to_u64(&fund_output_value)?,
   )
-  .map_err(|e| Error::from_reason(format!("{:?}", e)))?;
+  .map_err(map_dlc_error)?;
 
   let result = sigs
     .into_iter()
@@ -498,26 +502,27 @@ pub fn create_cet_adaptor_sigs_from_points(
 }
 
 #[napi]
-pub fn create_cet_adaptor_signature_from_oracle_info(
+pub fn cet_adaptor_signature_from_oracle_info(
   cet: Transaction,
   oracle_info: OracleInfo,
   funding_sk: Buffer,
   funding_script_pubkey: Buffer,
   total_collateral: BigInt,
   msgs: Vec<Buffer>,
-) -> Result<AdaptorSignature> {
+) -> Result<AdaptorSignature, &'static str> {
   let ffi_oracle_info = oracle_info.into();
   let ffi_msgs: Vec<Vec<u8>> = msgs.iter().map(buffer_to_vec).collect();
 
-  let result = ddk_ffi::create_cet_adaptor_signature_from_oracle_info(
-    cet.try_into()?,
-    ffi_oracle_info,
-    buffer_to_vec(&funding_sk),
-    buffer_to_vec(&funding_script_pubkey),
-    bigint_to_u64(&total_collateral)?,
-    ffi_msgs,
-  )
-  .map_err(|e| Error::from_reason(format!("{:?}", e)))?;
+  let ffi_cet: ddk_ffi::Transaction = cet.try_into()?;
+  let result = ffi_cet
+    .cet_adaptor_signature_from_oracle_info(
+      ffi_oracle_info,
+      buffer_to_vec(&funding_sk),
+      buffer_to_vec(&funding_script_pubkey),
+      bigint_to_u64(&total_collateral)?,
+      ffi_msgs,
+    )
+    .map_err(map_dlc_error)?;
 
   Ok(result.into())
 }
@@ -526,11 +531,9 @@ pub fn create_cet_adaptor_signature_from_oracle_info(
 pub fn create_cet_adaptor_points_from_oracle_info(
   oracle_info: Vec<OracleInfo>,
   msgs: Vec<Vec<Vec<Buffer>>>,
-) -> Result<Vec<Buffer>> {
-  let ffi_oracle_info: Vec<ddk_ffi::OracleInfo> = oracle_info
-    .into_iter()
-    .map(|info| info.into())
-    .collect();
+) -> Result<Vec<Buffer>, &'static str> {
+  let ffi_oracle_info: Vec<ddk_ffi::OracleInfo> =
+    oracle_info.into_iter().map(|info| info.into()).collect();
 
   let ffi_msgs = msgs
     .into_iter()
@@ -546,11 +549,8 @@ pub fn create_cet_adaptor_points_from_oracle_info(
     })
     .collect::<Vec<_>>();
 
-  let points = ddk_ffi::create_cet_adaptor_points_from_oracle_info(
-    ffi_oracle_info,
-    ffi_msgs,
-  )
-  .map_err(|e| Error::from_reason(format!("{:?}", e)))?;
+  let points = ddk_ffi::create_cet_adaptor_points_from_oracle_info(ffi_oracle_info, ffi_msgs)
+    .map_err(map_dlc_error)?;
 
   let result = points
     .into_iter()
@@ -564,7 +564,7 @@ pub fn create_cet_adaptor_points_from_oracle_info(
 pub fn extract_ecdsa_signature_from_oracle_signatures(
   oracle_signatures: Vec<Buffer>,
   adaptor_signature: Buffer,
-) -> Result<Buffer> {
+) -> Result<Buffer, &'static str> {
   let ffi_oracle_signatures = oracle_signatures
     .into_iter()
     .map(|buffer| buffer_to_vec(&buffer))
@@ -576,42 +576,45 @@ pub fn extract_ecdsa_signature_from_oracle_signatures(
     ffi_oracle_signatures,
     ffi_adaptor_signature,
   )
-  .map_err(|e| Error::from_reason(format!("{:?}", e)))?;
+  .map_err(map_dlc_error)?;
 
   Ok(Buffer::from(signature))
 }
 
 #[napi]
-pub fn convert_mnemonic_to_seed(mnemonic: String, passphrase: Option<String>) -> Result<Buffer> {
-  let result = ddk_ffi::convert_mnemonic_to_seed(mnemonic, passphrase)
-    .map_err(|e| Error::from_reason(format!("{:?}", e)))?;
+pub fn convert_mnemonic_to_seed(
+  mnemonic: String,
+  passphrase: Option<String>,
+) -> Result<Buffer, &'static str> {
+  let result = ddk_ffi::convert_mnemonic_to_seed(mnemonic, passphrase).map_err(map_dlc_error)?;
 
   Ok(vec_to_buffer(result))
 }
 
 #[napi]
-pub fn create_extkey_from_seed(seed: Buffer, network: String) -> Result<Buffer> {
+pub fn create_extkey_from_seed(seed: Buffer, network: String) -> Result<Buffer, &'static str> {
   let seed_bytes = buffer_to_vec(&seed);
-  let result = ddk_ffi::create_extkey_from_seed(seed_bytes, network)
-    .map_err(|e| Error::from_reason(format!("{:?}", e)))?;
+  let result = ddk_ffi::create_extkey_from_seed(seed_bytes, network).map_err(map_dlc_error)?;
 
   Ok(vec_to_buffer(result))
 }
 
 #[napi]
-pub fn create_extkey_from_parent_path(extkey: Buffer, path: String) -> Result<Buffer> {
+pub fn create_extkey_from_parent_path(
+  extkey: Buffer,
+  path: String,
+) -> Result<Buffer, &'static str> {
   let extkey_bytes = buffer_to_vec(&extkey);
-  let result = ddk_ffi::create_extkey_from_parent_path(extkey_bytes, path)
-    .map_err(|e| Error::from_reason(format!("{:?}", e)))?;
+  let result =
+    ddk_ffi::create_extkey_from_parent_path(extkey_bytes, path).map_err(map_dlc_error)?;
 
   Ok(vec_to_buffer(result))
 }
 
 #[napi]
-pub fn get_pubkey_from_extkey(extkey: Buffer, network: String) -> Result<Buffer> {
+pub fn get_pubkey_from_extkey(extkey: Buffer, network: String) -> Result<Buffer, &'static str> {
   let extkey_bytes = buffer_to_vec(&extkey);
-  let result = ddk_ffi::get_pubkey_from_extkey(extkey_bytes, network)
-    .map_err(|e| Error::from_reason(format!("{:?}", e)))?;
+  let result = ddk_ffi::get_pubkey_from_extkey(extkey_bytes, network).map_err(map_dlc_error)?;
 
   Ok(vec_to_buffer(result))
 }
@@ -622,20 +625,19 @@ pub fn create_xpriv_from_parent_path(
   base_derivation_path: String,
   network: String,
   path: String,
-) -> Result<Buffer> {
+) -> Result<Buffer, &'static str> {
   let xpriv_bytes = buffer_to_vec(&xpriv);
   let result =
     ddk_ffi::create_xpriv_from_parent_path(xpriv_bytes, base_derivation_path, network, path)
-      .map_err(|e| Error::from_reason(format!("{:?}", e)))?;
+      .map_err(map_dlc_error)?;
 
   Ok(vec_to_buffer(result))
 }
 
 #[napi]
-pub fn get_xpub_from_xpriv(xpriv: Buffer, network: String) -> Result<Buffer> {
+pub fn get_xpub_from_xpriv(xpriv: Buffer, network: String) -> Result<Buffer, &'static str> {
   let xpriv_bytes = buffer_to_vec(&xpriv);
-  let result = ddk_ffi::get_xpub_from_xpriv(xpriv_bytes, network)
-    .map_err(|e| Error::from_reason(format!("{:?}", e)))?;
+  let result = ddk_ffi::get_xpub_from_xpriv(xpriv_bytes, network).map_err(map_dlc_error)?;
 
   Ok(vec_to_buffer(result))
 }
@@ -652,31 +654,30 @@ pub fn get_xpub_from_xpriv(xpriv: Buffer, network: String) -> Result<Buffer> {
 /// - cet_txid: The CET transaction ID
 /// - cet_raw: Raw CET bytes
 #[napi]
-pub fn get_cet_adaptor_signature_inputs(
+pub fn cet_adaptor_signature_inputs(
   cet: Transaction,
   oracle_info: Vec<OracleInfo>,
   funding_script_pubkey: Buffer,
   fund_output_value: BigInt,
   msgs: Vec<Vec<Buffer>>,
-) -> Result<CetAdaptorSignatureDebugInfo> {
-  let ffi_oracle_info: Vec<ddk_ffi::OracleInfo> = oracle_info
-    .into_iter()
-    .map(|info| info.into())
-    .collect();
+) -> Result<CetAdaptorSignatureDebugInfo, &'static str> {
+  let ffi_oracle_info: Vec<ddk_ffi::OracleInfo> =
+    oracle_info.into_iter().map(|info| info.into()).collect();
 
   let ffi_msgs: Vec<Vec<Vec<u8>>> = msgs
     .into_iter()
     .map(|outcome_msgs| outcome_msgs.iter().map(buffer_to_vec).collect())
     .collect();
 
-  let result = ddk_ffi::get_cet_adaptor_signature_inputs(
-    cet.try_into()?,
-    ffi_oracle_info,
-    buffer_to_vec(&funding_script_pubkey),
-    bigint_to_u64(&fund_output_value)?,
-    ffi_msgs,
-  )
-  .map_err(|e| Error::from_reason(format!("{:?}", e)))?;
+  let ffi_cet: ddk_ffi::Transaction = cet.try_into()?;
+  let result = ffi_cet
+    .cet_adaptor_signature_inputs(
+      ffi_oracle_info,
+      buffer_to_vec(&funding_script_pubkey),
+      bigint_to_u64(&fund_output_value)?,
+      ffi_msgs,
+    )
+    .map_err(map_dlc_error)?;
 
   Ok(CetAdaptorSignatureDebugInfo {
     sighash: vec_to_buffer(result.sighash),
@@ -692,17 +693,18 @@ pub fn get_cet_adaptor_signature_inputs(
 /// Get the sighash for a CET - the actual 32-byte message that gets signed.
 /// This is useful for comparing with Fordefi's sighash calculation.
 #[napi]
-pub fn get_cet_sighash(
+pub fn cet_sighash(
   cet: Transaction,
   funding_script_pubkey: Buffer,
   fund_output_value: BigInt,
-) -> Result<Buffer> {
-  let result = ddk_ffi::get_cet_sighash(
-    cet.try_into()?,
-    buffer_to_vec(&funding_script_pubkey),
-    bigint_to_u64(&fund_output_value)?,
-  )
-  .map_err(|e| Error::from_reason(format!("{:?}", e)))?;
+) -> Result<Buffer, &'static str> {
+  let ffi_cet: ddk_ffi::Transaction = cet.try_into()?;
+  let result = ffi_cet
+    .cet_sighash(
+      buffer_to_vec(&funding_script_pubkey),
+      bigint_to_u64(&fund_output_value)?,
+    )
+    .map_err(map_dlc_error)?;
 
   Ok(vec_to_buffer(result))
 }

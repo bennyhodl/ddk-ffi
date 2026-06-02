@@ -23,7 +23,7 @@ use secp256k1_zkp::{schnorr::Signature as SchnorrSignature, All, EcdsaAdaptorSig
 use std::str::FromStr;
 use std::sync::OnceLock;
 
-uniffi::include_scaffolding!("ddk_ffi");
+uniffi::setup_scaffolding!();
 
 static SECP_CONTEXT: OnceLock<Secp256k1<All>> = OnceLock::new();
 
@@ -31,6 +31,7 @@ pub fn get_secp_context() -> &'static Secp256k1<All> {
     SECP_CONTEXT.get_or_init(Secp256k1::new)
 }
 
+#[uniffi::export]
 pub fn version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
 }
@@ -45,7 +46,7 @@ const DUST_LIMIT: u64 = 1000;
 pub const P2WPKH_WITNESS_SIZE: usize = 107;
 
 // Error type implementation
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, uniffi::Error)]
 pub enum DLCError {
     #[error("Invalid signature")]
     InvalidSignature,
@@ -55,21 +56,21 @@ pub enum DLCError {
     InvalidTransaction,
     #[error("Insufficient funds")]
     InsufficientFunds,
-    #[error("Invalid argument: {0}")]
-    InvalidArgument(String),
+    #[error("Invalid argument: {message}")]
+    InvalidArgument { message: String },
     #[error("Serialization error")]
     SerializationError,
-    #[error("Secp256k1 error: {0}")]
-    Secp256k1Error(String),
+    #[error("Secp256k1 error: {message}")]
+    Secp256k1Error { message: String },
     #[error("Miniscript error")]
     MiniscriptError,
     #[error("Invalid network")]
     InvalidNetwork,
-    #[error("Extended key error: {0}")]
-    KeyError(ExtendedKey),
+    #[error("Extended key error: {key}")]
+    KeyError { key: ExtendedKey },
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, uniffi::Enum)]
 pub enum ExtendedKey {
     #[error("Invalid mnemonic")]
     InvalidMnemonic,
@@ -84,25 +85,29 @@ pub enum ExtendedKey {
 impl From<ddk_dlc::Error> for DLCError {
     fn from(err: ddk_dlc::Error) -> Self {
         match err {
-            ddk_dlc::Error::Secp256k1(_) => DLCError::Secp256k1Error(err.to_string()),
-            ddk_dlc::Error::InvalidArgument(msg) => DLCError::InvalidArgument(msg),
+            ddk_dlc::Error::Secp256k1(_) => DLCError::Secp256k1Error {
+                message: err.to_string(),
+            },
+            ddk_dlc::Error::InvalidArgument(msg) => DLCError::InvalidArgument { message: msg },
             ddk_dlc::Error::Miniscript(_) => DLCError::MiniscriptError,
             ddk_dlc::Error::P2wpkh(_) => DLCError::InvalidTransaction,
-            ddk_dlc::Error::InputsIndex(_) => {
-                DLCError::InvalidArgument("Error from rust-dlc: InputsIndex".to_string())
-            }
+            ddk_dlc::Error::InputsIndex(_) => DLCError::InvalidArgument {
+                message: "Error from rust-dlc: InputsIndex".to_string(),
+            },
         }
     }
 }
 
 impl From<secp256k1_zkp::Error> for DLCError {
     fn from(err: secp256k1_zkp::Error) -> Self {
-        DLCError::Secp256k1Error(err.to_string())
+        DLCError::Secp256k1Error {
+            message: err.to_string(),
+        }
     }
 }
 
 // UniFFI struct definitions (as defined in UDL)
-#[derive(Clone)]
+#[derive(Clone, uniffi::Record)]
 pub struct Transaction {
     pub version: i32,
     pub lock_time: u32,
@@ -111,7 +116,7 @@ pub struct Transaction {
     pub raw_bytes: Vec<u8>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, uniffi::Record)]
 pub struct TxInput {
     pub txid: String,
     pub vout: u32,
@@ -120,13 +125,24 @@ pub struct TxInput {
     pub witness: Vec<Vec<u8>>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, uniffi::Record)]
 pub struct TxOutput {
     pub value: u64,
     pub script_pubkey: Vec<u8>,
 }
 
-#[derive(Clone)]
+// uniffi 0.31 record method, exported via proc-macro alongside the UDL
+// `dictionary TxOutput`. Requires library-based binding generation (see the
+// `uniffi-jsi` justfile recipe); the UDL does not declare it.
+#[uniffi::export]
+impl TxOutput {
+    /// Returns true if this output's value is below the dust limit.
+    pub fn is_dust(&self) -> bool {
+        self.value < DUST_LIMIT
+    }
+}
+
+#[derive(Clone, uniffi::Record)]
 pub struct TxInputInfo {
     pub txid: String,
     pub vout: u32,
@@ -135,13 +151,13 @@ pub struct TxInputInfo {
     pub serial_id: u64,
 }
 
-#[derive(Clone)]
+#[derive(Clone, uniffi::Record)]
 pub struct Payout {
     pub offer: u64,
     pub accept: u64,
 }
 
-#[derive(Clone)]
+#[derive(Clone, uniffi::Record)]
 pub struct DlcInputInfo {
     pub fund_tx: Transaction,
     pub fund_vout: u32,
@@ -153,7 +169,7 @@ pub struct DlcInputInfo {
     pub contract_id: Vec<u8>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, uniffi::Record)]
 pub struct PartyParams {
     pub fund_pubkey: Vec<u8>,
     pub change_script_pubkey: Vec<u8>,
@@ -166,7 +182,7 @@ pub struct PartyParams {
     pub dlc_inputs: Vec<DlcInputInfo>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, uniffi::Record)]
 pub struct DlcTransactions {
     pub fund: Transaction,
     pub cets: Vec<Transaction>,
@@ -174,20 +190,20 @@ pub struct DlcTransactions {
     pub funding_script_pubkey: Vec<u8>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, uniffi::Record)]
 pub struct AdaptorSignature {
     pub signature: Vec<u8>,
     pub proof: Vec<u8>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, uniffi::Record)]
 pub struct ChangeOutputAndFees {
     pub change_output: TxOutput,
     pub fund_fee: u64,
     pub cet_fee: u64,
 }
 
-#[derive(Clone)]
+#[derive(Clone, uniffi::Record)]
 pub struct OracleInfo {
     pub public_key: Vec<u8>,
     pub nonces: Vec<Vec<u8>>,
@@ -200,7 +216,7 @@ pub struct OracleInfo {
 ///
 /// This struct is intentionally always available (not feature-gated)
 /// to support production debugging scenarios.
-#[derive(Clone)]
+#[derive(Clone, uniffi::Record)]
 pub struct CetAdaptorSignatureDebugInfo {
     /// The sighash (32 bytes) - this is the message that gets signed
     pub sighash: Vec<u8>,
@@ -250,20 +266,420 @@ pub fn btc_tx_to_transaction(tx: &BtcTransaction) -> Transaction {
     }
 }
 
-pub fn add_signature_to_transaction(
-    tx: Transaction,
-    signature: Vec<u8>,
-    pubkey: Vec<u8>,
-    input_index: u32,
-) -> Result<Transaction, DLCError> {
-    let mut tx = transaction_to_btc_tx(&tx).map_err(|_| DLCError::InvalidTransaction)?;
-    let mut witness = Witness::new();
-    witness.push(signature);
-    witness.push(pubkey);
+#[uniffi::export]
+impl Transaction {
+    /// Add a witness signature + pubkey to the input at `input_index`.
+    pub fn add_signature(
+        &self,
+        signature: Vec<u8>,
+        pubkey: Vec<u8>,
+        input_index: u32,
+    ) -> Result<Transaction, DLCError> {
+        let mut tx = transaction_to_btc_tx(self).map_err(|_| DLCError::InvalidTransaction)?;
+        let mut witness = Witness::new();
+        witness.push(signature);
+        witness.push(pubkey);
 
-    tx.input[input_index as usize].witness = witness;
+        tx.input[input_index as usize].witness = witness;
 
-    Ok(btc_tx_to_transaction(&tx))
+        Ok(btc_tx_to_transaction(&tx))
+    }
+
+    /// Verify an ECDSA signature on the P2WPKH input that spends `txid:vout`.
+    pub fn verify_fund_signature(
+        &self,
+        signature: Vec<u8>,
+        pubkey: Vec<u8>,
+        txid: String,
+        vout: u32,
+        input_amount: u64,
+    ) -> Result<bool, DLCError> {
+        let btc_tx = transaction_to_btc_tx(self)?;
+        let pk = PublicKey::from_slice(&pubkey).map_err(|_| DLCError::InvalidPublicKey)?;
+        let input_txid = Txid::from_str(&txid).map_err(|_| DLCError::InvalidArgument {
+            message: "Invalid transaction id".to_string(),
+        })?;
+
+        // Find the input index
+        let input_index = btc_tx
+            .input
+            .iter()
+            .position(|input| {
+                input.previous_output.txid == input_txid && input.previous_output.vout == vout
+            })
+            .ok_or(DLCError::InvalidArgument {
+                message: format!("Input index not found in {input_txid}"),
+            })?;
+
+        // Create a simple P2WPKH script for verification
+        let wpkh = WPubkeyHash::hash(&pk.serialize());
+        let script = bitcoin::ScriptBuf::new_p2wpkh(&wpkh);
+
+        // Parse signature
+        let sig = EcdsaSignature::from_der(&signature).map_err(|_| DLCError::InvalidSignature)?;
+
+        let secp = Secp256k1::verification_only();
+        match ddk_dlc::verify_tx_input_sig(
+            &secp,
+            &sig,
+            &btc_tx,
+            input_index,
+            &script,
+            Amount::from_sat(input_amount),
+            &pk,
+        ) {
+            Ok(()) => Ok(true),
+            Err(_) => Ok(false),
+        }
+    }
+
+    /// Produce the raw ECDSA signature for the P2WPKH input spending `prev_tx_id:prev_tx_vout`.
+    pub fn raw_funding_input_signature(
+        &self,
+        privkey: Vec<u8>,
+        prev_tx_id: String,
+        prev_tx_vout: u32,
+        value: u64,
+    ) -> Result<Vec<u8>, DLCError> {
+        let btc_tx = transaction_to_btc_tx(self)?;
+        let sk = SecretKey::from_slice(&privkey).map_err(|_| DLCError::InvalidArgument {
+            message: "Invalid private key".to_string(),
+        })?;
+        let prev_txid = Txid::from_str(&prev_tx_id).map_err(|_| DLCError::InvalidArgument {
+            message: "Invalid transaction id".to_string(),
+        })?;
+
+        // Find the input index
+        let input_index = btc_tx
+            .input
+            .iter()
+            .position(|input| {
+                input.previous_output.txid == prev_txid
+                    && input.previous_output.vout == prev_tx_vout
+            })
+            .ok_or(DLCError::InvalidArgument {
+                message: format!("Input index not found in {prev_txid}"),
+            })?;
+
+        let secp = get_secp_context();
+        // Create P2WPKH script for signing
+        let pk = PublicKey::from_secret_key(secp, &sk);
+        let wpkh = WPubkeyHash::hash(&pk.serialize());
+        let script = bitcoin::ScriptBuf::new_p2wpkh(&wpkh);
+
+        let sig = ddk_dlc::util::get_sig_for_tx_input(
+            secp,
+            &btc_tx,
+            input_index,
+            &script,
+            Amount::from_sat(value),
+            EcdsaSighashType::All,
+            &sk,
+        )
+        .map_err(DLCError::from)?;
+
+        Ok(sig)
+    }
+
+    /// Sign this funding transaction's P2WPKH input spending `prev_tx_id:prev_tx_vout`.
+    pub fn sign_fund_input(
+        &self,
+        privkey: Vec<u8>,
+        prev_tx_id: String,
+        prev_tx_vout: u32,
+        value: u64,
+    ) -> Result<Transaction, DLCError> {
+        let mut btc_tx = transaction_to_btc_tx(self)?;
+        let sk = SecretKey::from_slice(&privkey).map_err(|_| DLCError::InvalidArgument {
+            message: "Invalid private key".to_string(),
+        })?;
+        let prev_txid = Txid::from_str(&prev_tx_id).map_err(|_| DLCError::InvalidArgument {
+            message: "Invalid transaction id".to_string(),
+        })?;
+
+        // Find the input index
+        let input_index = btc_tx
+            .input
+            .iter()
+            .position(|input| {
+                input.previous_output.txid == prev_txid
+                    && input.previous_output.vout == prev_tx_vout
+            })
+            .ok_or(DLCError::InvalidArgument {
+                message: format!("Input index not found in {prev_txid}"),
+            })?;
+
+        let secp = Secp256k1::signing_only();
+        ddk_dlc::util::sign_p2wpkh_input(
+            &secp,
+            &sk,
+            &mut btc_tx,
+            input_index,
+            EcdsaSighashType::All,
+            Amount::from_sat(value),
+        )
+        .map_err(DLCError::from)?;
+
+        Ok(btc_tx_to_transaction(&btc_tx))
+    }
+
+    /// Sign the DLC multisig funding input described by `dlc_input`.
+    pub fn sign_multi_sig_input(
+        &self,
+        dlc_input: DlcInputInfo,
+        local_privkey: Vec<u8>,
+        remote_signature: Vec<u8>,
+    ) -> Result<Transaction, DLCError> {
+        let secp = get_secp_context();
+        let btc_tx = transaction_to_btc_tx(self)?;
+        let sk = SecretKey::from_slice(&local_privkey).map_err(|_| DLCError::InvalidArgument {
+            message: "Invalid private key".to_string(),
+        })?;
+
+        let local_pk = PublicKey::from_slice(&dlc_input.local_fund_pubkey)
+            .map_err(|_| DLCError::InvalidPublicKey)?;
+        let remote_pk = PublicKey::from_slice(&dlc_input.remote_fund_pubkey)
+            .map_err(|_| DLCError::InvalidPublicKey)?;
+
+        let dlc_input = dlc_input_info_to_rust(&dlc_input)?;
+
+        let signature = ddk_dlc::dlc_input::create_dlc_funding_input_signature(
+            secp,
+            &btc_tx,
+            dlc_input.fund_vout as usize,
+            &dlc_input,
+            &sk,
+        )
+        .map_err(|_| DLCError::InvalidSignature)?;
+
+        let (first, second) = if local_pk < remote_pk {
+            (local_pk, remote_pk)
+        } else {
+            (remote_pk, local_pk)
+        };
+
+        let witness = ddk_dlc::dlc_input::combine_dlc_input_signatures(
+            &dlc_input,
+            &signature,
+            &remote_signature,
+            &first,
+            &second,
+        );
+
+        let mut fund_psbt =
+            Psbt::from_unsigned_tx(btc_tx).map_err(|_| DLCError::InvalidTransaction)?;
+        fund_psbt.inputs[dlc_input.fund_vout as usize].final_script_witness = Some(witness);
+
+        Ok(btc_tx_to_transaction(
+            &fund_psbt.extract_tx_unchecked_fee_rate(),
+        ))
+    }
+
+    /// Finalize this CET by attaching the adaptor signature decrypted with the oracle signatures.
+    pub fn sign_cet(
+        &self,
+        adaptor_signature: Vec<u8>,
+        oracle_signatures: Vec<Vec<u8>>,
+        funding_secret_key: Vec<u8>,
+        other_pubkey: Vec<u8>,
+        funding_script_pubkey: Vec<u8>,
+        fund_output_value: u64,
+    ) -> Result<Transaction, DLCError> {
+        let mut btc_tx = transaction_to_btc_tx(self)?;
+        let adaptor_sig = vec_to_ecdsa_adaptor_signature(adaptor_signature)?;
+        let oracle_sigs = oracle_signatures
+            .iter()
+            .map(|sig| vec_to_schnorr_signature(sig.as_slice()))
+            .collect::<Result<Vec<_>, _>>()?;
+        let funding_sk =
+            SecretKey::from_slice(&funding_secret_key).map_err(|_| DLCError::InvalidArgument {
+                message: "Invalid funding secret key".to_string(),
+            })?;
+        let other_pk =
+            PublicKey::from_slice(&other_pubkey).map_err(|_| DLCError::InvalidPublicKey)?;
+        let funding_pubkey = PublicKey::from_slice(&funding_script_pubkey)
+            .map_err(|_| DLCError::InvalidPublicKey)?;
+        let dlc_redeem_script = ddk_dlc::make_funding_redeemscript(&funding_pubkey, &other_pk);
+        let secp = get_secp_context();
+
+        ddk_dlc::sign_cet(
+            secp,
+            &mut btc_tx,
+            &adaptor_sig,
+            &[oracle_sigs],
+            &funding_sk,
+            &other_pk,
+            dlc_redeem_script.as_script(),
+            Amount::from_sat(fund_output_value),
+        )
+        .map_err(|e| DLCError::Secp256k1Error {
+            message: e.to_string(),
+        })?;
+
+        Ok(btc_tx_to_transaction(&btc_tx))
+    }
+
+    /// Create the adaptor signature for this CET against a single oracle's announcement.
+    pub fn cet_adaptor_signature_from_oracle_info(
+        &self,
+        oracle_info: OracleInfo,
+        funding_sk: Vec<u8>,
+        funding_script_pubkey: Vec<u8>,
+        total_collateral: u64,
+        msgs: Vec<Vec<u8>>,
+    ) -> Result<AdaptorSignature, DLCError> {
+        let btc_tx = transaction_to_btc_tx(self)?;
+        let sk = SecretKey::from_slice(&funding_sk).map_err(|_| DLCError::InvalidArgument {
+            message: "Invalid funding secret key".to_string(),
+        })?;
+        let funding_script = Script::from_bytes(&funding_script_pubkey);
+
+        // Convert oracle info
+        let oracle_pk = XOnlyPublicKey::from_slice(&oracle_info.public_key)
+            .map_err(|_| DLCError::InvalidPublicKey)?;
+        let nonces: Result<Vec<_>, _> = oracle_info
+            .nonces
+            .iter()
+            .map(|n| XOnlyPublicKey::from_slice(n))
+            .collect();
+        let oracle_nonces = nonces.map_err(|_| DLCError::InvalidPublicKey)?;
+
+        let dlc_oracle_info = DlcOracleInfo {
+            public_key: oracle_pk,
+            nonces: oracle_nonces,
+        };
+
+        // Convert messages
+        let messages: Result<Vec<_>, _> = msgs
+            .iter()
+            .map(|msg| Message::from_digest_slice(msg))
+            .collect();
+        let msg_vec = messages.map_err(|_| DLCError::InvalidArgument {
+            message: "Invalid message".to_string(),
+        })?;
+        let nested_msgs = vec![msg_vec]; // Wrap in vector for single oracle
+
+        let secp = get_secp_context();
+        let adaptor_sig = ddk_dlc::create_cet_adaptor_sig_from_oracle_info(
+            secp,
+            &btc_tx,
+            &[dlc_oracle_info],
+            &sk,
+            funding_script,
+            Amount::from_sat(total_collateral),
+            &nested_msgs,
+        )
+        .map_err(DLCError::from)?;
+
+        Ok(AdaptorSignature {
+            signature: adaptor_sig.as_ref().to_vec(),
+            proof: Vec::new(), // EcdsaAdaptorSignature doesn't expose proof directly
+        })
+    }
+
+    /// Get all the inputs that go into creating this CET's adaptor signature.
+    ///
+    /// This debug helper is intentionally always available (not feature-gated)
+    /// to enable debugging signature mismatches in production. Use it to compare
+    /// values with external signers (e.g., Fordefi). Returns the 32-byte sighash,
+    /// the 33-byte adaptor point, the input index (always 0), the funding script,
+    /// the fund output value, the CET txid, and the raw CET bytes.
+    pub fn cet_adaptor_signature_inputs(
+        &self,
+        oracle_info: Vec<OracleInfo>,
+        funding_script_pubkey: Vec<u8>,
+        fund_output_value: u64,
+        msgs: Vec<Vec<Vec<u8>>>,
+    ) -> Result<CetAdaptorSignatureDebugInfo, DLCError> {
+        let btc_tx = transaction_to_btc_tx(self)?;
+        let funding_script = Script::from_bytes(&funding_script_pubkey);
+
+        // Convert oracle info
+        let oracle_infos: Vec<DlcOracleInfo> = oracle_info
+            .iter()
+            .map(|info| {
+                let public_key = XOnlyPublicKey::from_slice(&info.public_key)
+                    .map_err(|_| DLCError::InvalidPublicKey)?;
+                let nonces = info
+                    .nonces
+                    .iter()
+                    .map(|nonce| XOnlyPublicKey::from_slice(nonce))
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|_| DLCError::InvalidArgument {
+                        message: "Invalid nonce pubkey".to_string(),
+                    })?;
+                Ok(DlcOracleInfo { public_key, nonces })
+            })
+            .collect::<Result<Vec<_>, DLCError>>()?;
+
+        // Convert messages
+        let cet_msgs: Vec<Vec<Message>> = msgs
+            .into_iter()
+            .map(|outcome_msgs| {
+                outcome_msgs
+                    .iter()
+                    .map(|m| {
+                        Message::from_digest_slice(m).map_err(|_| DLCError::InvalidArgument {
+                            message: "Invalid message".to_string(),
+                        })
+                    })
+                    .collect::<Result<Vec<_>, _>>()
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let secp = get_secp_context();
+
+        // Get the adaptor point
+        let adaptor_point =
+            ddk_dlc::get_adaptor_point_from_oracle_info(secp, &oracle_infos, &cet_msgs).map_err(
+                |e| DLCError::Secp256k1Error {
+                    message: e.to_string(),
+                },
+            )?;
+
+        // Get the sighash - this is the actual message being signed
+        let sig_hash = ddk_dlc::util::get_sig_hash_msg(
+            &btc_tx,
+            0, // input_index is always 0 for CETs
+            funding_script,
+            Amount::from_sat(fund_output_value),
+        )
+        .map_err(DLCError::from)?;
+
+        Ok(CetAdaptorSignatureDebugInfo {
+            sighash: sig_hash.as_ref().to_vec(),
+            adaptor_point: adaptor_point.serialize().to_vec(),
+            input_index: 0,
+            script_pubkey: funding_script_pubkey,
+            value: fund_output_value,
+            cet_txid: btc_tx.compute_txid().to_string(),
+            cet_raw: self.raw_bytes.clone(),
+        })
+    }
+
+    /// Get the sighash for this CET — the actual 32-byte message that gets signed.
+    ///
+    /// This debug helper is intentionally always available (not feature-gated)
+    /// to enable debugging sighash mismatches in production. Use it to compare
+    /// sighash values with external signers (e.g., Fordefi).
+    pub fn cet_sighash(
+        &self,
+        funding_script_pubkey: Vec<u8>,
+        fund_output_value: u64,
+    ) -> Result<Vec<u8>, DLCError> {
+        let btc_tx = transaction_to_btc_tx(self)?;
+        let funding_script = Script::from_bytes(&funding_script_pubkey);
+
+        let sig_hash = ddk_dlc::util::get_sig_hash_msg(
+            &btc_tx,
+            0, // input_index is always 0 for CETs
+            funding_script,
+            Amount::from_sat(fund_output_value),
+        )
+        .map_err(DLCError::from)?;
+
+        Ok(sig_hash.as_ref().to_vec())
+    }
 }
 
 pub fn plz_work() -> String {
@@ -282,9 +698,14 @@ pub fn dlc_input_info_to_rust(input: &DlcInputInfo) -> Result<RustDlcInputInfo, 
         PublicKey::from_slice(&input.local_fund_pubkey).map_err(|_| DLCError::InvalidPublicKey)?;
     let remote_fund_pubkey =
         PublicKey::from_slice(&input.remote_fund_pubkey).map_err(|_| DLCError::InvalidPublicKey)?;
-    let contract_id: [u8; 32] = input.contract_id.as_slice().try_into().map_err(|_| {
-        DLCError::InvalidArgument("Contract id length must be 32 bytes.".to_string())
-    })?;
+    let contract_id: [u8; 32] =
+        input
+            .contract_id
+            .as_slice()
+            .try_into()
+            .map_err(|_| DLCError::InvalidArgument {
+                message: "Contract id length must be 32 bytes.".to_string(),
+            })?;
     Ok(RustDlcInputInfo {
         fund_tx: btc_tx,
         fund_vout: input.fund_vout,
@@ -312,8 +733,9 @@ pub fn rust_to_dlc_input(input: &RustDlcInputInfo) -> Result<DlcInputInfo, DLCEr
 
 /// Convert UniFFI TxInputInfo to rust-dlc TxInputInfo
 pub fn tx_input_info_to_rust(input: &TxInputInfo) -> Result<DlcTxInputInfo, DLCError> {
-    let txid = Txid::from_str(&input.txid)
-        .map_err(|_| DLCError::InvalidArgument("Invalid transaction id".to_string()))?;
+    let txid = Txid::from_str(&input.txid).map_err(|_| DLCError::InvalidArgument {
+        message: "Invalid transaction id".to_string(),
+    })?;
     Ok(DlcTxInputInfo {
         outpoint: OutPoint {
             txid,
@@ -362,6 +784,7 @@ pub fn rust_dlc_transactions_to_uniffi(dlc_txs: RustDlcTransactions) -> DlcTrans
 }
 
 /// Create a funding script pubkey for DLC transactions
+#[uniffi::export]
 pub fn create_fund_tx_locking_script(
     local_fund_pubkey: Vec<u8>,
     remote_fund_pubkey: Vec<u8>,
@@ -376,6 +799,7 @@ pub fn create_fund_tx_locking_script(
 }
 
 /// Create complete DLC transactions
+#[uniffi::export]
 pub fn create_dlc_transactions(
     outcomes: Vec<Payout>,
     local_params: PartyParams,
@@ -417,6 +841,7 @@ pub fn create_dlc_transactions(
 }
 
 /// Create spliced DLC transactions
+#[uniffi::export]
 pub fn create_spliced_dlc_transactions(
     outcomes: Vec<Payout>,
     local_params: PartyParams,
@@ -458,6 +883,7 @@ pub fn create_spliced_dlc_transactions(
 }
 
 /// Create a single CET
+#[uniffi::export]
 pub fn create_cet(
     local_output: TxOutput,
     local_payout_serial_id: u64,
@@ -467,8 +893,9 @@ pub fn create_cet(
     fund_vout: u32,
     lock_time: u32,
 ) -> Result<Transaction, DLCError> {
-    let txid = Txid::from_str(&fund_tx_id)
-        .map_err(|_| DLCError::InvalidArgument("Invalid transaction id".to_string()))?;
+    let txid = Txid::from_str(&fund_tx_id).map_err(|_| DLCError::InvalidArgument {
+        message: "Invalid transaction id".to_string(),
+    })?;
 
     let local_btc_output = BtcTxOut {
         value: Amount::from_sat(local_output.value),
@@ -503,6 +930,7 @@ pub fn create_cet(
 }
 
 /// Create multiple CETs
+#[uniffi::export]
 pub fn create_cets(
     fund_tx_id: String,
     fund_vout: u32,
@@ -513,8 +941,9 @@ pub fn create_cets(
     local_serial_id: u64,
     remote_serial_id: u64,
 ) -> Result<Vec<Transaction>, DLCError> {
-    let txid = Txid::from_str(&fund_tx_id)
-        .map_err(|_| DLCError::InvalidArgument("Invalid transaction id".to_string()))?;
+    let txid = Txid::from_str(&fund_tx_id).map_err(|_| DLCError::InvalidArgument {
+        message: "Invalid transaction id".to_string(),
+    })?;
 
     let fund_tx_input = TxIn {
         previous_output: OutPoint {
@@ -551,6 +980,7 @@ pub fn create_cets(
 }
 
 /// Create a refund transaction
+#[uniffi::export]
 pub fn create_refund_transaction(
     local_final_script_pubkey: Vec<u8>,
     remote_final_script_pubkey: Vec<u8>,
@@ -560,8 +990,9 @@ pub fn create_refund_transaction(
     fund_tx_id: String,
     fund_vout: u32,
 ) -> Result<Transaction, DLCError> {
-    let txid = Txid::from_str(&fund_tx_id)
-        .map_err(|_| DLCError::InvalidArgument("Invalid transaction id".to_string()))?;
+    let txid = Txid::from_str(&fund_tx_id).map_err(|_| DLCError::InvalidArgument {
+        message: "Invalid transaction id".to_string(),
+    })?;
 
     let local_output = BtcTxOut {
         value: Amount::from_sat(local_amount),
@@ -589,262 +1020,40 @@ pub fn create_refund_transaction(
     Ok(btc_tx_to_transaction(&btc_tx))
 }
 
-/// Check if a transaction output is dust
-pub fn is_dust_output(output: TxOutput) -> bool {
-    output.value < DUST_LIMIT
-}
+#[uniffi::export]
+impl PartyParams {
+    /// Compute the change output and funding/CET fees for this party.
+    pub fn change_output_and_fees(&self, fee_rate: u64) -> Result<ChangeOutputAndFees, DLCError> {
+        let rust_params = party_params_to_rust(self)?;
+        let total_collateral = Amount::from_sat(self.collateral * 2); // Assume bilateral
 
-/// Get change output and fees for a party
-pub fn get_change_output_and_fees(
-    params: PartyParams,
-    fee_rate: u64,
-) -> Result<ChangeOutputAndFees, DLCError> {
-    let rust_params = party_params_to_rust(&params)?;
-    let total_collateral = Amount::from_sat(params.collateral * 2); // Assume bilateral
+        let (change_output, fund_fee, cet_fee) = rust_params
+            .get_change_output_and_fees(total_collateral, fee_rate, Amount::ZERO)
+            .map_err(DLCError::from)?;
 
-    let (change_output, fund_fee, cet_fee) = rust_params
-        .get_change_output_and_fees(total_collateral, fee_rate, Amount::ZERO)
-        .map_err(DLCError::from)?;
+        let uniffi_output = TxOutput {
+            value: change_output.value.to_sat(),
+            script_pubkey: change_output.script_pubkey.to_bytes(),
+        };
 
-    let uniffi_output = TxOutput {
-        value: change_output.value.to_sat(),
-        script_pubkey: change_output.script_pubkey.to_bytes(),
-    };
-
-    Ok(ChangeOutputAndFees {
-        change_output: uniffi_output,
-        fund_fee: fund_fee.to_sat(),
-        cet_fee: cet_fee.to_sat(),
-    })
+        Ok(ChangeOutputAndFees {
+            change_output: uniffi_output,
+            fund_fee: fund_fee.to_sat(),
+            cet_fee: cet_fee.to_sat(),
+        })
+    }
 }
 
 /// Get total input virtual size for fee calculation
+#[uniffi::export]
 pub fn get_total_input_vsize(inputs: Vec<TxInputInfo>) -> u32 {
     // Simplified calculation: P2WPKH inputs are ~148 vbytes each
     inputs.len() as u32 * 148
 }
 
-/// Verify a fund transaction signature
-pub fn verify_fund_tx_signature(
-    fund_tx: Transaction,
-    signature: Vec<u8>,
-    pubkey: Vec<u8>,
-    txid: String,
-    vout: u32,
-    input_amount: u64,
-) -> Result<bool, DLCError> {
-    let btc_tx = transaction_to_btc_tx(&fund_tx)?;
-    let pk = PublicKey::from_slice(&pubkey).map_err(|_| DLCError::InvalidPublicKey)?;
-    let input_txid = Txid::from_str(&txid)
-        .map_err(|_| DLCError::InvalidArgument("Invalid transaction id".to_string()))?;
-
-    // Find the input index
-    let input_index = btc_tx
-        .input
-        .iter()
-        .position(|input| {
-            input.previous_output.txid == input_txid && input.previous_output.vout == vout
-        })
-        .ok_or(DLCError::InvalidArgument(format!(
-            "Input index not found in {input_txid}"
-        )))?;
-
-    // Create a simple P2WPKH script for verification
-    let wpkh = WPubkeyHash::hash(&pk.serialize());
-    let script = bitcoin::ScriptBuf::new_p2wpkh(&wpkh);
-
-    // Parse signature
-    let sig = EcdsaSignature::from_der(&signature).map_err(|_| DLCError::InvalidSignature)?;
-
-    let secp = Secp256k1::verification_only();
-    match ddk_dlc::verify_tx_input_sig(
-        &secp,
-        &sig,
-        &btc_tx,
-        input_index,
-        &script,
-        Amount::from_sat(input_amount),
-        &pk,
-    ) {
-        Ok(()) => Ok(true),
-        Err(_) => Ok(false),
-    }
-}
-
 // ============================================================================
 // SIGNING AND SIGNATURE FUNCTIONS (using rust-dlc library)
 // ============================================================================
-
-/// Get raw signature for a fund transaction input
-pub fn get_raw_funding_transaction_input_signature(
-    funding_transaction: Transaction,
-    privkey: Vec<u8>,
-    prev_tx_id: String,
-    prev_tx_vout: u32,
-    value: u64,
-) -> Result<Vec<u8>, DLCError> {
-    let btc_tx = transaction_to_btc_tx(&funding_transaction)?;
-    let sk = SecretKey::from_slice(&privkey)
-        .map_err(|_| DLCError::InvalidArgument("Invalid private key".to_string()))?;
-    let prev_txid = Txid::from_str(&prev_tx_id)
-        .map_err(|_| DLCError::InvalidArgument("Invalid transaction id".to_string()))?;
-
-    // Find the input index
-    let input_index = btc_tx
-        .input
-        .iter()
-        .position(|input| {
-            input.previous_output.txid == prev_txid && input.previous_output.vout == prev_tx_vout
-        })
-        .ok_or(DLCError::InvalidArgument(format!(
-            "Input index not found in {prev_txid}"
-        )))?;
-
-    let secp = get_secp_context();
-    // Create P2WPKH script for signing
-    let pk = PublicKey::from_secret_key(secp, &sk);
-    let wpkh = WPubkeyHash::hash(&pk.serialize());
-    let script = bitcoin::ScriptBuf::new_p2wpkh(&wpkh);
-
-    let sig = ddk_dlc::util::get_sig_for_tx_input(
-        secp,
-        &btc_tx,
-        input_index,
-        &script,
-        Amount::from_sat(value),
-        EcdsaSighashType::All,
-        &sk,
-    )
-    .map_err(DLCError::from)?;
-
-    Ok(sig)
-}
-
-/// Sign a funding transaction input
-pub fn sign_fund_transaction_input(
-    fund_transaction: Transaction,
-    privkey: Vec<u8>,
-    prev_tx_id: String,
-    prev_tx_vout: u32,
-    value: u64,
-) -> Result<Transaction, DLCError> {
-    let mut btc_tx = transaction_to_btc_tx(&fund_transaction)?;
-    let sk = SecretKey::from_slice(&privkey)
-        .map_err(|_| DLCError::InvalidArgument("Invalid private key".to_string()))?;
-    let prev_txid = Txid::from_str(&prev_tx_id)
-        .map_err(|_| DLCError::InvalidArgument("Invalid transaction id".to_string()))?;
-
-    // Find the input index
-    let input_index = btc_tx
-        .input
-        .iter()
-        .position(|input| {
-            input.previous_output.txid == prev_txid && input.previous_output.vout == prev_tx_vout
-        })
-        .ok_or(DLCError::InvalidArgument(format!(
-            "Input index not found in {prev_txid}"
-        )))?;
-
-    let secp = Secp256k1::signing_only();
-    ddk_dlc::util::sign_p2wpkh_input(
-        &secp,
-        &sk,
-        &mut btc_tx,
-        input_index,
-        EcdsaSighashType::All,
-        Amount::from_sat(value),
-    )
-    .map_err(DLCError::from)?;
-
-    Ok(btc_tx_to_transaction(&btc_tx))
-}
-
-pub fn sign_multi_sig_input(
-    txn: Transaction,
-    dlc_input: DlcInputInfo,
-    local_privkey: Vec<u8>,
-    remote_signature: Vec<u8>,
-) -> Result<Transaction, DLCError> {
-    let secp = get_secp_context();
-    let btc_tx = transaction_to_btc_tx(&txn)?;
-    let sk = SecretKey::from_slice(&local_privkey)
-        .map_err(|_| DLCError::InvalidArgument("Invalid private key".to_string()))?;
-
-    let local_pk = PublicKey::from_slice(&dlc_input.local_fund_pubkey)
-        .map_err(|_| DLCError::InvalidPublicKey)?;
-    let remote_pk = PublicKey::from_slice(&dlc_input.remote_fund_pubkey)
-        .map_err(|_| DLCError::InvalidPublicKey)?;
-
-    let dlc_input = dlc_input_info_to_rust(&dlc_input)?;
-
-    let signature = ddk_dlc::dlc_input::create_dlc_funding_input_signature(
-        secp,
-        &btc_tx,
-        dlc_input.fund_vout as usize,
-        &dlc_input,
-        &sk,
-    )
-    .map_err(|_| DLCError::InvalidSignature)?;
-
-    let (first, second) = if local_pk < remote_pk {
-        (local_pk, remote_pk)
-    } else {
-        (remote_pk, local_pk)
-    };
-
-    let witness = ddk_dlc::dlc_input::combine_dlc_input_signatures(
-        &dlc_input,
-        &signature,
-        &remote_signature,
-        &first,
-        &second,
-    );
-
-    let mut fund_psbt = Psbt::from_unsigned_tx(btc_tx).map_err(|_| DLCError::InvalidTransaction)?;
-    fund_psbt.inputs[dlc_input.fund_vout as usize].final_script_witness = Some(witness);
-
-    Ok(btc_tx_to_transaction(
-        &fund_psbt.extract_tx_unchecked_fee_rate(),
-    ))
-}
-
-pub fn sign_cet(
-    cet: Transaction,
-    adaptor_signature: Vec<u8>,
-    oracle_signatures: Vec<Vec<u8>>,
-    funding_secret_key: Vec<u8>,
-    other_pubkey: Vec<u8>,
-    funding_script_pubkey: Vec<u8>,
-    fund_output_value: u64,
-) -> Result<Transaction, DLCError> {
-    let mut btc_tx = transaction_to_btc_tx(&cet)?;
-    let adaptor_sig = vec_to_ecdsa_adaptor_signature(adaptor_signature)?;
-    let oracle_sigs = oracle_signatures
-        .iter()
-        .map(|sig| vec_to_schnorr_signature(sig.as_slice()))
-        .collect::<Result<Vec<_>, _>>()?;
-    let funding_sk = SecretKey::from_slice(&funding_secret_key)
-        .map_err(|_| DLCError::InvalidArgument("Invalid funding secret key".to_string()))?;
-    let other_pk = PublicKey::from_slice(&other_pubkey).map_err(|_| DLCError::InvalidPublicKey)?;
-    let funding_pubkey =
-        PublicKey::from_slice(&funding_script_pubkey).map_err(|_| DLCError::InvalidPublicKey)?;
-    let dlc_redeem_script = ddk_dlc::make_funding_redeemscript(&funding_pubkey, &other_pk);
-    let secp = get_secp_context();
-
-    ddk_dlc::sign_cet(
-        secp,
-        &mut btc_tx,
-        &adaptor_sig,
-        &[oracle_sigs],
-        &funding_sk,
-        &other_pk,
-        dlc_redeem_script.as_script(),
-        Amount::from_sat(fund_output_value),
-    )
-    .map_err(|e| DLCError::Secp256k1Error(e.to_string()))?;
-
-    Ok(btc_tx_to_transaction(&btc_tx))
-}
 
 fn vec_to_schnorr_signature(signature: &[u8]) -> Result<SchnorrSignature, DLCError> {
     let sig = SchnorrSignature::from_slice(signature).map_err(|_| DLCError::InvalidSignature)?;
@@ -861,18 +1070,21 @@ fn signatures_to_secret(signatures: &[Vec<SchnorrSignature>]) -> Result<SecretKe
         .flatten()
         .map(|x| match secp_utils::schnorrsig_decompose(x) {
             Ok(v) => Ok(v.1),
-            Err(err) => Err(DLCError::Secp256k1Error(err.to_string())),
+            Err(err) => Err(DLCError::Secp256k1Error {
+                message: err.to_string(),
+            }),
         })
         .collect::<Result<Vec<&[u8]>, DLCError>>()?;
 
     if s_values.is_empty() {
-        return Err(DLCError::InvalidArgument(
-            "No signatures provided".to_string(),
-        ));
+        return Err(DLCError::InvalidArgument {
+            message: "No signatures provided".to_string(),
+        });
     }
 
-    let secret = SecretKey::from_slice(s_values[0])
-        .map_err(|_| DLCError::InvalidArgument("Invalid signature".to_string()))?;
+    let secret = SecretKey::from_slice(s_values[0]).map_err(|_| DLCError::InvalidArgument {
+        message: "Invalid signature".to_string(),
+    })?;
 
     let result = s_values.iter().skip(1).fold(secret, |accum, s| {
         let sec = SecretKey::from_slice(s).unwrap();
@@ -882,6 +1094,7 @@ fn signatures_to_secret(signatures: &[Vec<SchnorrSignature>]) -> Result<SecretKe
     Ok(result)
 }
 
+#[uniffi::export]
 pub fn create_cet_adaptor_sigs_from_oracle_info(
     cets: Vec<Transaction>,
     oracle_info: Vec<OracleInfo>,
@@ -904,14 +1117,20 @@ pub fn create_cet_adaptor_sigs_from_oracle_info(
                 .iter()
                 .map(|nonce| XOnlyPublicKey::from_slice(nonce))
                 .collect::<Result<Vec<_>, _>>()
-                .map_err(|_| DLCError::InvalidArgument("Invalid nonce pubkey".to_string()))?;
+                .map_err(|_| DLCError::InvalidArgument {
+                    message: "Invalid nonce pubkey".to_string(),
+                })?;
             Ok(DlcOracleInfo { public_key, nonces })
         })
         .collect::<Result<Vec<_>, DLCError>>()
-        .map_err(|_| DLCError::InvalidArgument("Invalid oracle info".to_string()))?;
+        .map_err(|_| DLCError::InvalidArgument {
+            message: "Invalid oracle info".to_string(),
+        })?;
 
-    let funding_sk = SecretKey::from_slice(&funding_secret_key)
-        .map_err(|_| DLCError::InvalidArgument("Invalid funding secret key".to_string()))?;
+    let funding_sk =
+        SecretKey::from_slice(&funding_secret_key).map_err(|_| DLCError::InvalidArgument {
+            message: "Invalid funding secret key".to_string(),
+        })?;
     let funding_script = Script::from_bytes(&funding_script_pubkey);
     let msgs: Vec<Vec<Vec<Message>>> = msgs
         .iter()
@@ -926,7 +1145,9 @@ pub fn create_cet_adaptor_sigs_from_oracle_info(
                         .map(|msg_bytes| {
                             // For each message (Vec<u8>)
                             Message::from_digest_slice(msg_bytes).map_err(|_| {
-                                DLCError::InvalidArgument("Invalid message".to_string())
+                                DLCError::InvalidArgument {
+                                    message: "Invalid message".to_string(),
+                                }
                             })
                         })
                         .collect::<Result<Vec<_>, _>>()
@@ -944,7 +1165,9 @@ pub fn create_cet_adaptor_sigs_from_oracle_info(
         Amount::from_sat(fund_output_value),
         &msgs,
     )
-    .map_err(|e| DLCError::Secp256k1Error(e.to_string()))?;
+    .map_err(|e| DLCError::Secp256k1Error {
+        message: e.to_string(),
+    })?;
 
     let adaptor_sigs = adaptor_sigs
         .iter()
@@ -958,6 +1181,7 @@ pub fn create_cet_adaptor_sigs_from_oracle_info(
 }
 
 /// Create adaptor signatures from pre-computed adaptor points.
+#[uniffi::export]
 pub fn create_cet_adaptor_sigs_from_points(
     cets: Vec<Transaction>,
     adaptor_points: Vec<Vec<u8>>,
@@ -966,11 +1190,13 @@ pub fn create_cet_adaptor_sigs_from_points(
     fund_output_value: u64,
 ) -> Result<Vec<AdaptorSignature>, DLCError> {
     if cets.len() != adaptor_points.len() {
-        return Err(DLCError::InvalidArgument(format!(
-            "CETs length ({}) does not match adaptor points length ({})",
-            cets.len(),
-            adaptor_points.len()
-        )));
+        return Err(DLCError::InvalidArgument {
+            message: format!(
+                "CETs length ({}) does not match adaptor points length ({})",
+                cets.len(),
+                adaptor_points.len()
+            ),
+        });
     }
 
     let cets = cets
@@ -981,13 +1207,16 @@ pub fn create_cet_adaptor_sigs_from_points(
     let adaptor_points = adaptor_points
         .iter()
         .map(|p| {
-            PublicKey::from_slice(p)
-                .map_err(|_| DLCError::InvalidArgument("Invalid adaptor point".to_string()))
+            PublicKey::from_slice(p).map_err(|_| DLCError::InvalidArgument {
+                message: "Invalid adaptor point".to_string(),
+            })
         })
         .collect::<Result<Vec<_>, _>>()?;
 
-    let funding_sk = SecretKey::from_slice(&funding_secret_key)
-        .map_err(|_| DLCError::InvalidArgument("Invalid funding secret key".to_string()))?;
+    let funding_sk =
+        SecretKey::from_slice(&funding_secret_key).map_err(|_| DLCError::InvalidArgument {
+            message: "Invalid funding secret key".to_string(),
+        })?;
     let funding_script = Script::from_bytes(&funding_script_pubkey);
 
     let inputs: Vec<(&bitcoin::Transaction, &PublicKey)> =
@@ -1001,7 +1230,9 @@ pub fn create_cet_adaptor_sigs_from_points(
         funding_script,
         Amount::from_sat(fund_output_value),
     )
-    .map_err(|e| DLCError::Secp256k1Error(e.to_string()))?;
+    .map_err(|e| DLCError::Secp256k1Error {
+        message: e.to_string(),
+    })?;
 
     let adaptor_sigs = adaptor_sigs
         .iter()
@@ -1014,71 +1245,81 @@ pub fn create_cet_adaptor_sigs_from_points(
     Ok(adaptor_sigs)
 }
 
-pub fn verify_cet_adaptor_sig_from_oracle_info(
-    adaptor_sig: AdaptorSignature,
-    cet: Transaction,
-    oracle_infos: Vec<OracleInfo>,
-    pubkey: Vec<u8>,
-    funding_script_pubkey: Vec<u8>,
-    total_collateral: u64,
-    msgs: Vec<Vec<Vec<u8>>>,
-) -> bool {
-    let secp = get_secp_context();
-    let Ok(btc_tx) = transaction_to_btc_tx(&cet) else {
-        return false;
-    };
-    let Ok(adaptor_sig) = vec_to_ecdsa_adaptor_signature(adaptor_sig.signature) else {
-        return false;
-    };
-    let Ok(oracle_infos) = oracle_infos
-        .iter()
-        .map(|info| {
-            let public_key = XOnlyPublicKey::from_slice(&info.public_key)?;
-            let nonces = info
-                .nonces
-                .iter()
-                .map(|nonce| XOnlyPublicKey::from_slice(nonce))
-                .collect::<Result<Vec<_>, _>>()?;
-            Ok(DlcOracleInfo { public_key, nonces })
-        })
-        .collect::<Result<Vec<_>, ddk_dlc::Error>>()
-    else {
-        return false;
-    };
-    let Ok(pubkey) = PublicKey::from_slice(&pubkey) else {
-        return false;
-    };
-    let funding_script = Script::from_bytes(&funding_script_pubkey);
-    let Ok(msgs) = msgs
-        .into_iter()
-        .map(|msg| {
-            msg.iter()
-                .map(|m| Message::from_digest_slice(m).map_err(|_| DLCError::InvalidArgument))
-                .collect::<Result<Vec<_>, _>>()
-        })
-        .collect::<Result<Vec<_>, _>>()
-    else {
-        return false;
-    };
-    let Ok(adaptor_point) = ddk_dlc::get_adaptor_point_from_oracle_info(secp, &oracle_infos, &msgs)
-    else {
-        return false;
-    };
-    let Ok(_) = ddk_dlc::verify_cet_adaptor_sig_from_point(
-        secp,
-        &adaptor_sig,
-        &btc_tx,
-        &adaptor_point,
-        &pubkey,
-        funding_script,
-        Amount::from_sat(total_collateral),
-    ) else {
-        return false;
-    };
+#[uniffi::export]
+impl AdaptorSignature {
+    /// Verify this adaptor signature for `cet` against the oracle announcement(s).
+    pub fn verify_from_oracle_info(
+        &self,
+        cet: Transaction,
+        oracle_infos: Vec<OracleInfo>,
+        pubkey: Vec<u8>,
+        funding_script_pubkey: Vec<u8>,
+        total_collateral: u64,
+        msgs: Vec<Vec<Vec<u8>>>,
+    ) -> bool {
+        let secp = get_secp_context();
+        let Ok(btc_tx) = transaction_to_btc_tx(&cet) else {
+            return false;
+        };
+        let Ok(adaptor_sig) = vec_to_ecdsa_adaptor_signature(self.signature.clone()) else {
+            return false;
+        };
+        let Ok(oracle_infos) = oracle_infos
+            .iter()
+            .map(|info| {
+                let public_key = XOnlyPublicKey::from_slice(&info.public_key)?;
+                let nonces = info
+                    .nonces
+                    .iter()
+                    .map(|nonce| XOnlyPublicKey::from_slice(nonce))
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(DlcOracleInfo { public_key, nonces })
+            })
+            .collect::<Result<Vec<_>, ddk_dlc::Error>>()
+        else {
+            return false;
+        };
+        let Ok(pubkey) = PublicKey::from_slice(&pubkey) else {
+            return false;
+        };
+        let funding_script = Script::from_bytes(&funding_script_pubkey);
+        let Ok(msgs) = msgs
+            .into_iter()
+            .map(|msg| {
+                msg.iter()
+                    .map(|m| {
+                        Message::from_digest_slice(m).map_err(|_| DLCError::InvalidArgument {
+                            message: "Invalid message".to_string(),
+                        })
+                    })
+                    .collect::<Result<Vec<_>, _>>()
+            })
+            .collect::<Result<Vec<_>, _>>()
+        else {
+            return false;
+        };
+        let Ok(adaptor_point) =
+            ddk_dlc::get_adaptor_point_from_oracle_info(secp, &oracle_infos, &msgs)
+        else {
+            return false;
+        };
+        let Ok(_) = ddk_dlc::verify_cet_adaptor_sig_from_point(
+            secp,
+            &adaptor_sig,
+            &btc_tx,
+            &adaptor_point,
+            &pubkey,
+            funding_script,
+            Amount::from_sat(total_collateral),
+        ) else {
+            return false;
+        };
 
-    true
+        true
+    }
 }
 
+#[uniffi::export]
 pub fn verify_cet_adaptor_sigs_from_oracle_info(
     adaptor_sigs: Vec<AdaptorSignature>,
     cets: Vec<Transaction>,
@@ -1092,8 +1333,7 @@ pub fn verify_cet_adaptor_sigs_from_oracle_info(
         .zip(adaptor_sigs)
         .enumerate()
         .all(|(i, (cet, adaptor_sig))| {
-            verify_cet_adaptor_sig_from_oracle_info(
-                adaptor_sig,
+            adaptor_sig.verify_from_oracle_info(
                 cet,
                 oracle_infos.clone(),
                 pubkey.clone(),
@@ -1104,61 +1344,7 @@ pub fn verify_cet_adaptor_sigs_from_oracle_info(
         })
 }
 
-/// Create CET adaptor signature from oracle info
-pub fn create_cet_adaptor_signature_from_oracle_info(
-    cet: Transaction,
-    oracle_info: OracleInfo,
-    funding_sk: Vec<u8>,
-    funding_script_pubkey: Vec<u8>,
-    total_collateral: u64,
-    msgs: Vec<Vec<u8>>,
-) -> Result<AdaptorSignature, DLCError> {
-    let btc_tx = transaction_to_btc_tx(&cet)?;
-    let sk = SecretKey::from_slice(&funding_sk)
-        .map_err(|_| DLCError::InvalidArgument("Invalid funding secret key".to_string()))?;
-    let funding_script = Script::from_bytes(&funding_script_pubkey);
-
-    // Convert oracle info
-    let oracle_pk = XOnlyPublicKey::from_slice(&oracle_info.public_key)
-        .map_err(|_| DLCError::InvalidPublicKey)?;
-    let nonces: Result<Vec<_>, _> = oracle_info
-        .nonces
-        .iter()
-        .map(|n| XOnlyPublicKey::from_slice(n))
-        .collect();
-    let oracle_nonces = nonces.map_err(|_| DLCError::InvalidPublicKey)?;
-
-    let dlc_oracle_info = DlcOracleInfo {
-        public_key: oracle_pk,
-        nonces: oracle_nonces,
-    };
-
-    // Convert messages
-    let messages: Result<Vec<_>, _> = msgs
-        .iter()
-        .map(|msg| Message::from_digest_slice(msg))
-        .collect();
-    let msg_vec = messages.map_err(|_| DLCError::InvalidArgument("Invalid message".to_string()))?;
-    let nested_msgs = vec![msg_vec]; // Wrap in vector for single oracle
-
-    let secp = get_secp_context();
-    let adaptor_sig = ddk_dlc::create_cet_adaptor_sig_from_oracle_info(
-        secp,
-        &btc_tx,
-        &[dlc_oracle_info],
-        &sk,
-        funding_script,
-        Amount::from_sat(total_collateral),
-        &nested_msgs,
-    )
-    .map_err(DLCError::from)?;
-
-    Ok(AdaptorSignature {
-        signature: adaptor_sig.as_ref().to_vec(),
-        proof: Vec::new(), // EcdsaAdaptorSignature doesn't expose proof directly
-    })
-}
-
+#[uniffi::export]
 pub fn create_cet_adaptor_points_from_oracle_info(
     oracle_info: Vec<OracleInfo>,
     msgs: Vec<Vec<Vec<Vec<u8>>>>,
@@ -1173,11 +1359,15 @@ pub fn create_cet_adaptor_points_from_oracle_info(
                 .iter()
                 .map(|nonce| XOnlyPublicKey::from_slice(nonce))
                 .collect::<Result<Vec<_>, _>>()
-                .map_err(|_| DLCError::InvalidArgument("Invalid nonce pubkey".to_string()))?;
+                .map_err(|_| DLCError::InvalidArgument {
+                    message: "Invalid nonce pubkey".to_string(),
+                })?;
             Ok(DlcOracleInfo { public_key, nonces })
         })
         .collect::<Result<Vec<_>, DLCError>>()
-        .map_err(|_| DLCError::InvalidArgument("Invalid oracle info".to_string()))?;
+        .map_err(|_| DLCError::InvalidArgument {
+            message: "Invalid oracle info".to_string(),
+        })?;
 
     let secp = get_secp_context();
     let mut adaptor_points = Vec::new();
@@ -1191,8 +1381,9 @@ pub fn create_cet_adaptor_points_from_oracle_info(
                 outcome_msgs
                     .iter()
                     .map(|m| {
-                        Message::from_digest_slice(m)
-                            .map_err(|_| DLCError::InvalidArgument("Invalid message".to_string()))
+                        Message::from_digest_slice(m).map_err(|_| DLCError::InvalidArgument {
+                            message: "Invalid message".to_string(),
+                        })
                     })
                     .collect::<Result<Vec<_>, _>>()
             })
@@ -1200,8 +1391,11 @@ pub fn create_cet_adaptor_points_from_oracle_info(
 
         // Get adaptor point for this CET
         let adaptor_point =
-            ddk_dlc::get_adaptor_point_from_oracle_info(secp, &oracle_infos, &cet_msgs)
-                .map_err(|e| DLCError::Secp256k1Error(e.to_string()))?;
+            ddk_dlc::get_adaptor_point_from_oracle_info(secp, &oracle_infos, &cet_msgs).map_err(
+                |e| DLCError::Secp256k1Error {
+                    message: e.to_string(),
+                },
+            )?;
 
         // Convert the adaptor point to bytes
         let adaptor_point_bytes = adaptor_point.serialize().to_vec();
@@ -1211,6 +1405,7 @@ pub fn create_cet_adaptor_points_from_oracle_info(
     Ok(adaptor_points)
 }
 
+#[uniffi::export]
 pub fn extract_ecdsa_signature_from_oracle_signatures(
     oracle_signatures: Vec<Vec<u8>>,
     adaptor_signature: Vec<u8>,
@@ -1230,128 +1425,25 @@ pub fn extract_ecdsa_signature_from_oracle_signatures(
     // Decrypt the adaptor signature to get the final ECDSA signature
     let ecdsa_sig = adaptor_sig
         .decrypt(&adaptor_secret)
-        .map_err(|e| DLCError::Secp256k1Error(e.to_string()))?;
+        .map_err(|e| DLCError::Secp256k1Error {
+            message: e.to_string(),
+        })?;
 
     // Return the DER-encoded signature
     Ok(ecdsa_sig.serialize_der().to_vec())
 }
 
-/// Get all the inputs that go into creating a CET adaptor signature.
-///
-/// This debug function is intentionally always available (not feature-gated)
-/// to enable debugging signature mismatches in production environments where
-/// rebuilding with debug features may not be feasible.
-///
-/// Use this to compare values with external signers (e.g., Fordefi) when
-/// debugging adaptor signature verification failures.
-///
-/// Returns:
-/// - `sighash`: The 32-byte BIP143 sighash message that gets signed
-/// - `adaptor_point`: The 33-byte compressed adaptor public key
-/// - `input_index`: Always 0 for CETs
-/// - `script_pubkey`: The funding script used for sighash calculation
-/// - `value`: The fund output value used for sighash calculation
-/// - `cet_txid`: The CET transaction ID
-/// - `cet_raw`: Raw serialized CET bytes
-pub fn get_cet_adaptor_signature_inputs(
-    cet: Transaction,
-    oracle_info: Vec<OracleInfo>,
-    funding_script_pubkey: Vec<u8>,
-    fund_output_value: u64,
-    msgs: Vec<Vec<Vec<u8>>>,
-) -> Result<CetAdaptorSignatureDebugInfo, DLCError> {
-    let btc_tx = transaction_to_btc_tx(&cet)?;
-    let funding_script = Script::from_bytes(&funding_script_pubkey);
-
-    // Convert oracle info
-    let oracle_infos: Vec<DlcOracleInfo> = oracle_info
-        .iter()
-        .map(|info| {
-            let public_key = XOnlyPublicKey::from_slice(&info.public_key)
-                .map_err(|_| DLCError::InvalidPublicKey)?;
-            let nonces = info
-                .nonces
-                .iter()
-                .map(|nonce| XOnlyPublicKey::from_slice(nonce))
-                .collect::<Result<Vec<_>, _>>()
-                .map_err(|_| DLCError::InvalidArgument("Invalid nonce pubkey".to_string()))?;
-            Ok(DlcOracleInfo { public_key, nonces })
-        })
-        .collect::<Result<Vec<_>, DLCError>>()?;
-
-    // Convert messages
-    let cet_msgs: Vec<Vec<Message>> = msgs
-        .into_iter()
-        .map(|outcome_msgs| {
-            outcome_msgs
-                .iter()
-                .map(|m| {
-                    Message::from_digest_slice(m)
-                        .map_err(|_| DLCError::InvalidArgument("Invalid message".to_string()))
-                })
-                .collect::<Result<Vec<_>, _>>()
-        })
-        .collect::<Result<Vec<_>, _>>()?;
-
-    let secp = get_secp_context();
-
-    // Get the adaptor point
-    let adaptor_point = ddk_dlc::get_adaptor_point_from_oracle_info(secp, &oracle_infos, &cet_msgs)
-        .map_err(|e| DLCError::Secp256k1Error(e.to_string()))?;
-
-    // Get the sighash - this is the actual message being signed
-    let sig_hash = ddk_dlc::util::get_sig_hash_msg(
-        &btc_tx,
-        0, // input_index is always 0 for CETs
-        funding_script,
-        Amount::from_sat(fund_output_value),
-    )
-    .map_err(DLCError::from)?;
-
-    Ok(CetAdaptorSignatureDebugInfo {
-        sighash: sig_hash.as_ref().to_vec(),
-        adaptor_point: adaptor_point.serialize().to_vec(),
-        input_index: 0,
-        script_pubkey: funding_script_pubkey,
-        value: fund_output_value,
-        cet_txid: btc_tx.compute_txid().to_string(),
-        cet_raw: cet.raw_bytes,
-    })
-}
-
-/// Get the sighash for a CET - the actual 32-byte message that gets signed.
-///
-/// This debug function is intentionally always available (not feature-gated)
-/// to enable debugging sighash mismatches in production environments where
-/// rebuilding with debug features may not be feasible.
-///
-/// Use this to compare sighash values with external signers (e.g., Fordefi)
-/// when debugging signature verification failures.
-pub fn get_cet_sighash(
-    cet: Transaction,
-    funding_script_pubkey: Vec<u8>,
-    fund_output_value: u64,
-) -> Result<Vec<u8>, DLCError> {
-    let btc_tx = transaction_to_btc_tx(&cet)?;
-    let funding_script = Script::from_bytes(&funding_script_pubkey);
-
-    let sig_hash = ddk_dlc::util::get_sig_hash_msg(
-        &btc_tx,
-        0, // input_index is always 0 for CETs
-        funding_script,
-        Amount::from_sat(fund_output_value),
-    )
-    .map_err(DLCError::from)?;
-
-    Ok(sig_hash.as_ref().to_vec())
-}
-
+#[uniffi::export]
 pub fn convert_mnemonic_to_seed(
     mnemonic: String,
     passphrase: Option<String>,
 ) -> Result<Vec<u8>, DLCError> {
-    let seed_mnemonic = Mnemonic::parse_in_normalized(Language::English, &mnemonic)
-        .map_err(|_| DLCError::KeyError(ExtendedKey::InvalidMnemonic))?;
+    let seed_mnemonic =
+        Mnemonic::parse_in_normalized(Language::English, &mnemonic).map_err(|_| {
+            DLCError::KeyError {
+                key: ExtendedKey::InvalidMnemonic,
+            }
+        })?;
     let passphrase = passphrase.unwrap_or("".to_string());
     let seed = seed_mnemonic.to_seed(&passphrase);
     Ok(seed.to_vec())
@@ -1359,43 +1451,59 @@ pub fn convert_mnemonic_to_seed(
 
 /// Create master extended private key from 64-byte seed
 /// Returns 78-byte encoded xpriv
+#[uniffi::export]
 pub fn create_extkey_from_seed(seed: Vec<u8>, network: String) -> Result<Vec<u8>, DLCError> {
     if seed.len() != 64 {
-        return Err(DLCError::KeyError(ExtendedKey::InvalidXpriv));
+        return Err(DLCError::KeyError {
+            key: ExtendedKey::InvalidXpriv,
+        });
     }
     let network = Network::from_str(&network).map_err(|_| DLCError::InvalidNetwork)?;
-    let xpriv = Xpriv::new_master(network, &seed)
-        .map_err(|_| DLCError::KeyError(ExtendedKey::InvalidXpriv))?;
+    let xpriv = Xpriv::new_master(network, &seed).map_err(|_| DLCError::KeyError {
+        key: ExtendedKey::InvalidXpriv,
+    })?;
     Ok(xpriv.encode().to_vec())
 }
 
 /// Derive child extended private key from parent extended key
 /// Input: 78-byte encoded xpriv, Output: 78-byte encoded xpriv
+#[uniffi::export]
 pub fn create_extkey_from_parent_path(extkey: Vec<u8>, path: String) -> Result<Vec<u8>, DLCError> {
     if extkey.len() != 78 {
-        return Err(DLCError::KeyError(ExtendedKey::InvalidXpriv));
+        return Err(DLCError::KeyError {
+            key: ExtendedKey::InvalidXpriv,
+        });
     }
 
     let secp = get_secp_context();
-    let xpriv =
-        Xpriv::decode(&extkey).map_err(|_| DLCError::KeyError(ExtendedKey::InvalidXpriv))?;
+    let xpriv = Xpriv::decode(&extkey).map_err(|_| DLCError::KeyError {
+        key: ExtendedKey::InvalidXpriv,
+    })?;
 
     let derivation_path = path
         .into_derivation_path()
-        .map_err(|_| DLCError::KeyError(ExtendedKey::InvalidDerivationPath))?;
+        .map_err(|_| DLCError::KeyError {
+            key: ExtendedKey::InvalidDerivationPath,
+        })?;
 
-    let derived_xpriv = xpriv
-        .derive_priv(secp, &derivation_path)
-        .map_err(|_| DLCError::KeyError(ExtendedKey::InvalidXpriv))?;
+    let derived_xpriv =
+        xpriv
+            .derive_priv(secp, &derivation_path)
+            .map_err(|_| DLCError::KeyError {
+                key: ExtendedKey::InvalidXpriv,
+            })?;
 
     Ok(derived_xpriv.encode().to_vec())
 }
 
 /// Extract public key from extended key (private or public)
 /// Input: 78-byte encoded xpriv/xpub, Output: 33-byte compressed public key
+#[uniffi::export]
 pub fn get_pubkey_from_extkey(extkey: Vec<u8>, network: String) -> Result<Vec<u8>, DLCError> {
     if extkey.len() != 78 {
-        return Err(DLCError::KeyError(ExtendedKey::InvalidXpriv));
+        return Err(DLCError::KeyError {
+            key: ExtendedKey::InvalidXpriv,
+        });
     }
 
     let secp = get_secp_context();
@@ -1412,7 +1520,9 @@ pub fn get_pubkey_from_extkey(extkey: Vec<u8>, network: String) -> Result<Vec<u8
         return Ok(xpub.public_key.serialize().to_vec());
     }
 
-    Err(DLCError::KeyError(ExtendedKey::InvalidXpriv))
+    Err(DLCError::KeyError {
+        key: ExtendedKey::InvalidXpriv,
+    })
 }
 
 /// DEPRECATED: Use create_extkey_from_seed + create_extkey_from_parent_path instead
@@ -1421,6 +1531,7 @@ pub fn get_pubkey_from_extkey(extkey: Vec<u8>, network: String) -> Result<Vec<u8
     since = "0.4.0",
     note = "Use create_extkey_from_seed + create_extkey_from_parent_path"
 )]
+#[uniffi::export]
 pub fn create_xpriv_from_parent_path(
     seed_or_xpriv: Vec<u8>,
     base_derivation_path: String,
@@ -1434,7 +1545,9 @@ pub fn create_xpriv_from_parent_path(
         // This is already an xpriv
         seed_or_xpriv
     } else {
-        return Err(DLCError::KeyError(ExtendedKey::InvalidXpriv));
+        return Err(DLCError::KeyError {
+            key: ExtendedKey::InvalidXpriv,
+        });
     };
 
     // Derive base path from master
@@ -1447,15 +1560,20 @@ pub fn create_xpriv_from_parent_path(
 
 /// Convert extended private key to extended public key
 /// Input: 78-byte encoded xpriv, Output: 78-byte encoded xpub
+#[uniffi::export]
 pub fn get_xpub_from_xpriv(xpriv: Vec<u8>, network: String) -> Result<Vec<u8>, DLCError> {
     if xpriv.len() != 78 {
-        return Err(DLCError::KeyError(ExtendedKey::InvalidXpriv));
+        return Err(DLCError::KeyError {
+            key: ExtendedKey::InvalidXpriv,
+        });
     }
 
     let secp = get_secp_context();
     let _network = Network::from_str(&network).map_err(|_| DLCError::InvalidNetwork)?;
 
-    let xpriv = Xpriv::decode(&xpriv).map_err(|_| DLCError::KeyError(ExtendedKey::InvalidXpriv))?;
+    let xpriv = Xpriv::decode(&xpriv).map_err(|_| DLCError::KeyError {
+        key: ExtendedKey::InvalidXpriv,
+    })?;
 
     let xpub = Xpub::from_priv(secp, &xpriv);
     Ok(xpub.encode().to_vec())
@@ -1602,7 +1720,7 @@ mod tests {
             1,
         );
 
-        let result = get_change_output_and_fees(params.clone(), 4);
+        let result = params.change_output_and_fees(4);
         assert!(result.is_ok());
 
         let change_and_fees = result.unwrap();
@@ -1772,8 +1890,8 @@ mod tests {
             script_pubkey: vec![],
         };
 
-        assert!(is_dust_output(dust_output));
-        assert!(!is_dust_output(non_dust_output));
+        assert!(dust_output.is_dust());
+        assert!(!non_dust_output.is_dust());
     }
 
     #[test]
@@ -1869,7 +1987,10 @@ mod tests {
             0,
             0,
         );
-        assert!(matches!(result, Err(DLCError::InvalidArgument(_))));
+        assert!(matches!(
+            result,
+            Err(DLCError::InvalidArgument { message: _ })
+        ));
     }
 
     fn get_p2wpkh_script_pubkey(secp: &Secp256k1<All>) -> ScriptBuf {
@@ -2079,8 +2200,7 @@ mod tests {
             .map(|s| s.iter().map(|s| s.serialize().to_vec()).collect::<Vec<_>>())
             .collect::<Vec<_>>();
 
-        let sign_res = sign_cet(
-            cets[0].clone(),
+        let sign_res = cets[0].sign_cet(
             cet_sigs[0].signature.clone(),
             oracle_signatures[0].clone(),
             _accept_fund_sk.secret_bytes().to_vec(),
@@ -2112,8 +2232,7 @@ mod tests {
         assert!(cet_sigs
             .iter()
             .enumerate()
-            .all(|(i, x)| verify_cet_adaptor_sig_from_oracle_info(
-                x.clone(),
+            .all(|(i, x)| x.verify_from_oracle_info(
                 cets[i].clone(),
                 oracle_infos.clone(),
                 offer_party_params.fund_pubkey.clone(),
@@ -2287,8 +2406,7 @@ mod tests {
         let fund_output_value = dlc_txs.fund.outputs[0].value;
 
         // Act: Get the sighash
-        let result = get_cet_sighash(
-            cet.clone(),
+        let result = cet.cet_sighash(
             funding_script_pubkey.clone().into_bytes(),
             fund_output_value,
         );
@@ -2363,8 +2481,7 @@ mod tests {
         let msgs = vec![vec![hash.to_vec()]]; // Single oracle, single message
 
         // Act: Get debug info
-        let result = get_cet_adaptor_signature_inputs(
-            cet.clone(),
+        let result = cet.cet_adaptor_signature_inputs(
             oracle_info.clone(),
             funding_script_pubkey.clone().into_bytes(),
             fund_output_value,
@@ -2380,12 +2497,12 @@ mod tests {
 
         // Verify sighash
         assert_eq!(debug_info.sighash.len(), 32, "Sighash should be 32 bytes");
-        let expected_sighash = get_cet_sighash(
-            cet.clone(),
-            funding_script_pubkey.clone().into_bytes(),
-            fund_output_value,
-        )
-        .unwrap();
+        let expected_sighash = cet
+            .cet_sighash(
+                funding_script_pubkey.clone().into_bytes(),
+                fund_output_value,
+            )
+            .unwrap();
         assert_eq!(
             debug_info.sighash, expected_sighash,
             "Sighash should match get_cet_sighash result"
@@ -2443,7 +2560,7 @@ mod tests {
             raw_bytes: vec![0x00], // Invalid serialization
         };
 
-        let result = get_cet_sighash(invalid_tx, vec![0x00, 0x14], 100_000);
+        let result = invalid_tx.cet_sighash(vec![0x00, 0x14], 100_000);
 
         assert!(
             result.is_err(),
@@ -2483,8 +2600,7 @@ mod tests {
 
         let msgs = vec![vec![vec![0u8; 32]]];
 
-        let result = get_cet_adaptor_signature_inputs(
-            cet,
+        let result = cet.cet_adaptor_signature_inputs(
             invalid_oracle_info,
             funding_script_pubkey.into_bytes(),
             100_000,

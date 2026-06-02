@@ -122,7 +122,7 @@ jobs:
         with:
           version: 8
       - name: Install uniffi-bindgen-react-native
-        run: npm install -g uniffi-bindgen-react-native@0.29.3-1
+        run: npm install -g uniffi-bindgen-react-native@0.31.0-3
       - uses: extractions/setup-just@v1
       - name: Generate JSI bindings
         run: just uniffi-jsi
@@ -190,7 +190,7 @@ jobs:
         with:
           version: 8
       - name: Install uniffi-bindgen-react-native
-        run: npm install -g uniffi-bindgen-react-native@0.29.3-1
+        run: npm install -g uniffi-bindgen-react-native@0.31.0-3
       - uses: extractions/setup-just@v1
       - name: Generate JSI bindings
         run: just uniffi-jsi
@@ -209,3 +209,59 @@ jobs:
           cd ddk-rn
           npm config set provenance true
           npm publish --access public
+
+  github-release:
+    name: Create GitHub release
+    needs: [verify-version, publish-ddk-ts, publish-ddk-rn]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download ddk-ts platform binaries
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: ddk-ts-bindings-*
+      - name: Collect release assets
+        id: assets
+        shell: bash
+        run: |
+          mkdir -p release-assets
+          # One artifact dir per target (ddk-ts-bindings-<target>); take the
+          # target from the dir name so binaries never collide, and stamp the
+          # version so the release page is self-describing.
+          version="${{ needs.verify-version.outputs.version }}"
+          for dir in artifacts/ddk-ts-bindings-*; do
+            [ -d "$dir" ] || continue
+            target="${dir##*ddk-ts-bindings-}"
+            node_file=$(find "$dir" -name '*.node' | head -1)
+            [ -n "$node_file" ] && cp "$node_file" "release-assets/ddk-ts-${target}-${version}.node"
+          done
+          ls -la release-assets
+      - name: Resolve release notes
+        id: notes
+        shell: bash
+        run: |
+          version="${{ needs.verify-version.outputs.version }}"
+          notes="releases/${version}-RELEASE.md"
+          if [ -f "$notes" ]; then
+            echo "Using committed notes: $notes"
+            echo "notes-file=$notes" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::$notes not found — falling back to auto-generated notes"
+            echo "notes-file=" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          version="${{ needs.verify-version.outputs.version }}"
+          args=(release create "v${version}" --title "v${version}" --verify-tag)
+          if [ -n "${{ steps.notes.outputs.notes-file }}" ]; then
+            args+=(--notes-file "${{ steps.notes.outputs.notes-file }}")
+          else
+            args+=(--generate-notes)
+          fi
+          gh "${args[@]}" release-assets/*

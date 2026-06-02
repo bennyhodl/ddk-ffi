@@ -41,175 +41,56 @@ When making changes to `src/lib.rs` or `src/ddk_ffi.udl`, you MUST:
 
 ### Release Process
 
-#### Automated Release (Recommended)
-
-5. **Update Rust version only**: Update version in Cargo.toml
-
-   ```bash
-   # Update Rust crate version to match package.json
-   vim ddk-ffi/Cargo.toml  # Change version = "0.1.1" to "0.1.2"
-   ```
-
-6. **Regenerate bindings**: Run `just uniffi` to update version in generated bindings
-
-   ```bash
-   just uniffi
-   # Fix include path as usual
-   sed -i '' 's|#include "/ddk_ffi.hpp"|#include "ddk_ffi.hpp"|' ddk-rn/cpp/bennyblader-ddk-rn.cpp
-   ```
-
-7. **Commit Rust version change**: Commit the Rust version bump
-
-   ```bash
-   git add .
-   git commit -m "chore: sync Rust version with package.json"
-   ```
-
-8. **Create binary archives**: Generate tarballs for GitHub release
-
-   ```bash
-   cd ddk-rn
-   
-   # Create binary archives (android-jni-libs.tar.gz, ios-xcframeworks.tar.gz)
-   pnpm create-archives
-   ```
-
-9. **Automated release with npm publishing**: Use release-it for everything else
-
-   ```bash
-   cd ddk-rn
-
-   # Authenticate with npm (first time only)
-   npm login
-
-   # Run automated release (handles versioning, tagging, GitHub release, npm publish)
-   pnpm release
-   ```
-
-10. **Upload binary archives**: After the GitHub release is created, upload the archives
-
-    ```bash
-    # Upload the generated archives to the GitHub release
-    gh release upload v<version> ../release-archives/android-jni-libs.tar.gz ../release-archives/ios-xcframeworks.tar.gz
-    ```
-
-This will automatically:
-
-- Prompt for version bump in package.json
-- Build the library with react-native-builder-bob
-- Create git tag and GitHub release
-- Publish to npm registry
-- Generate conventional changelog
-
-#### Manual Release (If needed)
-
-Alternatively, you can do it manually:
-
-5. **Update Version Numbers**: Update version in both package manifests
-
-   ```bash
-   # Update Rust crate version
-   vim ddk-ffi/Cargo.toml  # Change version = "0.1.1" to "0.1.2"
-
-   # Update React Native package version
-   vim ddk-rn/package.json  # Change "version": "0.1.1" to "0.1.2"
-   ```
-
-6. **Regenerate bindings**: Run `just uniffi` to update version in generated bindings
-
-   ```bash
-   just uniffi
-   sed -i '' 's|#include "/ddk_ffi.hpp"|#include "ddk_ffi.hpp"|' ddk-rn/cpp/bennyblader-ddk-rn.cpp
-   ```
-
-7. **Build and test package**: Verify the npm package builds correctly
-
-   ```bash
-   cd ddk-rn
-   pnpm prepare  # Build with react-native-builder-bob
-   npm pack --dry-run  # Preview what will be published
-   ```
-
-8. **Commit version changes**: Include version bumps in the release commit
-
-   ```bash
-   git add .
-   git commit -m "chore: bump version to v<version>"
-   ```
-
-9. **Create and push tag**: Create git tag and push to GitHub
-
-   ```bash
-   git tag -a v<version> -m "Release v<version>: <description>"
-   git push origin master
-   git push origin --tags
-   ```
-
-10. **Publish to npm**: Publish the package
-
-    ```bash
-    cd ddk-rn
-    npm publish
-    ```
-
-11. **Create GitHub Release**: Use GitHub CLI to create a release
-    ```bash
-    gh release create v<version> --generate-notes --title "Release v<version>: <title>"
-    ```
-
-### Complete Development Cycle (Automated)
+Releases are cut with one command and finished by CI. The local script only
+*triggers* the release; the cross-platform native builds, the npm publish (with
+provenance), and the GitHub release all happen in
+`.github/workflows/publish.yml`.
 
 ```bash
-# 1. Make changes to Rust code
-vim ddk-ffi/src/lib.rs ddk-ffi/src/ddk_ffi.udl
-
-# 2. Test changes
-cd ddk-ffi && cargo test
-
-# 3. Generate bindings
-just uniffi
-
-# 4. Fix include path
-sed -i '' 's|#include "/ddk_ffi.hpp"|#include "ddk_ffi.hpp"|' ddk-rn/cpp/bennyblader-ddk-rn.cpp
-
-# 5. Commit feature changes
-git add .
-git commit -m "feat: description of changes"
-
-# 6. Update Rust version to match package.json
-vim ddk-ffi/Cargo.toml    # Update version = "0.1.2" (match package.json)
-
-# 7. Regenerate bindings with new version
-just uniffi
-sed -i '' 's|#include "/ddk_ffi.hpp"|#include "ddk_ffi.hpp"|' ddk-rn/cpp/bennyblader-ddk-rn.cpp
-
-# 8. Commit Rust version sync
-git add .
-git commit -m "chore: sync Rust version with package.json"
-
-# 9. Create binary archives
-cd ddk-rn
-pnpm create-archives  # Generate android-jni-libs.tar.gz and ios-xcframeworks.tar.gz
-
-# 10. Automated release with npm publishing
-cd ddk-rn
-npm login  # First time only
-pnpm release  # Handles everything: versioning, tagging, GitHub release, npm publish
-
-# 11. Upload binary archives to GitHub release
-gh release upload v<version> ../release-archives/android-jni-libs.tar.gz ../release-archives/ios-xcframeworks.tar.gz
+# From the repo root, on a clean `master` that is up to date with origin.
+just release            # patch bump  (0.3.38 -> 0.3.39)
+just release --minor    # minor bump  (0.3.38 -> 0.4.0)
+just release --major    # major bump
+just release 0.4.0      # explicit version
+just release --dry      # run every gate, mutate nothing
 ```
 
-### What `pnpm release` does automatically:
+`just release` (→ `scripts/prep-release.js`) does only local, reversible work:
 
-- Prompts for version bump (patch, minor, major)
-- Updates package.json version
-- Builds library with react-native-builder-bob
-- Generates conventional changelog
-- Creates git commit and tag
-- Pushes to GitHub
-- Creates GitHub release
-- Publishes to npm registry
+1. **Gates** — refuses to proceed unless the working tree is clean, you are on
+   `master` and not behind `origin/master`, and all three CI workflows
+   (`ddk-ffi CI`, `ddk-rn CI`, `ddk-ts CI`) are already green for the exact
+   commit being released.
+2. **Release notes** — generates `releases/<version>-RELEASE.md` using the local
+   `claude` CLI (falls back to a git-log template if it isn't available).
+3. **Version bump** — sets the version in `ddk-ts/package.json`,
+   `ddk-rn/package.json`, and `ddk-ffi/Cargo.toml`, which must stay in lockstep.
+4. **Commit, tag, push** — commits the bump + notes, tags `v<version>`, and
+   pushes. The tag push is what triggers `publish.yml`.
+
+`publish.yml` (on the `v*.*.*` tag) then does the irreversible, cross-platform
+work:
+
+- Verifies the tag matches both `package.json` versions.
+- Builds the `ddk-ts` native `.node` binaries on macOS (darwin-arm64) and Ubuntu
+  (linux-x64) runners, and runs the test / parity suites.
+- Publishes `@bennyblader/ddk-ts` and `@bennyblader/ddk-rn` to npm with
+  provenance.
+- Creates the GitHub release from the committed
+  `releases/<version>-RELEASE.md`, attaching the `.node` binaries.
+
+> `ddk-rn` ships its Rust source and builds the native libraries on the
+> consumer's machine via `postinstall`, so there are no prebuilt iOS/Android
+> binaries to attach — only the `ddk-ts` `.node` files are published as release
+> assets.
+
+#### Prerequisites
+
+- A clean `master`, up to date with `origin/master`.
+- `gh` authenticated (`gh auth login`) — used to verify CI is green.
+- The `claude` CLI available for prose release notes (optional; falls back to a
+  template).
+- The `NPM_TOKEN` repository secret configured (used by CI to publish).
 
 ### Why This Matters
 
