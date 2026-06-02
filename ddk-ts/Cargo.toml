@@ -14,8 +14,8 @@ path = "src/lib.rs"
 ddk_ffi = { path = "../ddk-ffi" }
 
 # NAPI-RS dependencies
-napi = { version = "3.0.0", default-features = false, features = ["napi8", "async", "serde-json"] }
-napi-derive = "3.0.0"
+napi = { version = "3.9", default-features = false, features = ["napi9", "async", "serde-json"] }
+napi-derive = "3.5"
 
 # Match the same dependencies as ddk-ffi
 # ddk-dlc = { path = "../../../ernest/dlcdevkit/dlc", features = ["use-serde"] }
@@ -31,7 +31,7 @@ serde_json = "1.0"
 hex = "0.4.3"
 
 [build-dependencies]
-napi-build = "2"
+napi-build = "2.3"
 
 [profile.release]
 lto = true
