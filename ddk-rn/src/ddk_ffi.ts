@@ -11,8 +11,6 @@ import {
 } from './ddk_ffi-ffi';
 import {
   type UniffiByteArray,
-  type UniffiHandle,
-  type UniffiRustCallStatus,
   AbstractFfiConverterByteArray,
   FfiConverterArray,
   FfiConverterBool,
@@ -37,7 +35,7 @@ const uniffiIsDebug =
   typeof process !== 'object' ||
   // @ts-ignore -- The process global might not be defined
   process?.env?.NODE_ENV !== 'production' ||
-  true;
+  false;
 
 // Public interface members begin here.
 
@@ -59,13 +57,7 @@ export function addSignatureToTransaction(
         FfiConverterTypeDLCError
       ),
       /*caller:*/ (callStatus) => {
-        return (() => {
-          console.debug(
-            `-- ubrn_uniffi_ddk_ffi_fn_func_add_signature_to_transaction`
-          );
-          return nativeModule()
-            .ubrn_uniffi_ddk_ffi_fn_func_add_signature_to_transaction;
-        })()(
+        return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_add_signature_to_transaction(
           FfiConverterTypeTransaction.lower(
             tx,
             nativeModule().rustbuffer_alloc
@@ -103,13 +95,7 @@ export function convertMnemonicToSeed(
         FfiConverterTypeDLCError
       ),
       /*caller:*/ (callStatus) => {
-        return (() => {
-          console.debug(
-            `-- ubrn_uniffi_ddk_ffi_fn_func_convert_mnemonic_to_seed`
-          );
-          return nativeModule()
-            .ubrn_uniffi_ddk_ffi_fn_func_convert_mnemonic_to_seed;
-        })()(
+        return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_convert_mnemonic_to_seed(
           FfiConverterString.lower(mnemonic, nativeModule().rustbuffer_alloc),
           FfiConverterOptionalString.lower(
             passphrase,
@@ -144,10 +130,7 @@ export function createCet(
         FfiConverterTypeDLCError
       ),
       /*caller:*/ (callStatus) => {
-        return (() => {
-          console.debug(`-- ubrn_uniffi_ddk_ffi_fn_func_create_cet`);
-          return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_create_cet;
-        })()(
+        return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_create_cet(
           FfiConverterTypeTxOutput.lower(
             localOutput,
             nativeModule().rustbuffer_alloc
@@ -191,13 +174,7 @@ export function createCetAdaptorPointsFromOracleInfo(
         FfiConverterTypeDLCError
       ),
       /*caller:*/ (callStatus) => {
-        return (() => {
-          console.debug(
-            `-- ubrn_uniffi_ddk_ffi_fn_func_create_cet_adaptor_points_from_oracle_info`
-          );
-          return nativeModule()
-            .ubrn_uniffi_ddk_ffi_fn_func_create_cet_adaptor_points_from_oracle_info;
-        })()(
+        return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_create_cet_adaptor_points_from_oracle_info(
           FfiConverterSequenceTypeOracleInfo.lower(
             oracleInfo,
             nativeModule().rustbuffer_alloc
@@ -234,13 +211,7 @@ export function createCetAdaptorSignatureFromOracleInfo(
         FfiConverterTypeDLCError
       ),
       /*caller:*/ (callStatus) => {
-        return (() => {
-          console.debug(
-            `-- ubrn_uniffi_ddk_ffi_fn_func_create_cet_adaptor_signature_from_oracle_info`
-          );
-          return nativeModule()
-            .ubrn_uniffi_ddk_ffi_fn_func_create_cet_adaptor_signature_from_oracle_info;
-        })()(
+        return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_create_cet_adaptor_signature_from_oracle_info(
           FfiConverterTypeTransaction.lower(
             cet,
             nativeModule().rustbuffer_alloc
@@ -293,13 +264,7 @@ export function createCetAdaptorSigsFromOracleInfo(
         FfiConverterTypeDLCError
       ),
       /*caller:*/ (callStatus) => {
-        return (() => {
-          console.debug(
-            `-- ubrn_uniffi_ddk_ffi_fn_func_create_cet_adaptor_sigs_from_oracle_info`
-          );
-          return nativeModule()
-            .ubrn_uniffi_ddk_ffi_fn_func_create_cet_adaptor_sigs_from_oracle_info;
-        })()(
+        return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_create_cet_adaptor_sigs_from_oracle_info(
           FfiConverterSequenceTypeTransaction.lower(
             cets,
             nativeModule().rustbuffer_alloc
@@ -351,13 +316,7 @@ export function createCetAdaptorSigsFromPoints(
         FfiConverterTypeDLCError
       ),
       /*caller:*/ (callStatus) => {
-        return (() => {
-          console.debug(
-            `-- ubrn_uniffi_ddk_ffi_fn_func_create_cet_adaptor_sigs_from_points`
-          );
-          return nativeModule()
-            .ubrn_uniffi_ddk_ffi_fn_func_create_cet_adaptor_sigs_from_points;
-        })()(
+        return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_create_cet_adaptor_sigs_from_points(
           FfiConverterSequenceTypeTransaction.lower(
             cets,
             nativeModule().rustbuffer_alloc
@@ -408,10 +367,7 @@ export function createCets(
         FfiConverterTypeDLCError
       ),
       /*caller:*/ (callStatus) => {
-        return (() => {
-          console.debug(`-- ubrn_uniffi_ddk_ffi_fn_func_create_cets`);
-          return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_create_cets;
-        })()(
+        return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_create_cets(
           FfiConverterString.lower(fundTxId, nativeModule().rustbuffer_alloc),
           FfiConverterUInt32.lower(fundVout, nativeModule().rustbuffer_alloc),
           FfiConverterSequenceUInt8.lower(
@@ -465,13 +421,7 @@ export function createDlcTransactions(
         FfiConverterTypeDLCError
       ),
       /*caller:*/ (callStatus) => {
-        return (() => {
-          console.debug(
-            `-- ubrn_uniffi_ddk_ffi_fn_func_create_dlc_transactions`
-          );
-          return nativeModule()
-            .ubrn_uniffi_ddk_ffi_fn_func_create_dlc_transactions;
-        })()(
+        return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_create_dlc_transactions(
           FfiConverterSequenceTypePayout.lower(
             outcomes,
             nativeModule().rustbuffer_alloc
@@ -525,13 +475,7 @@ export function createExtkeyFromParentPath(
         FfiConverterTypeDLCError
       ),
       /*caller:*/ (callStatus) => {
-        return (() => {
-          console.debug(
-            `-- ubrn_uniffi_ddk_ffi_fn_func_create_extkey_from_parent_path`
-          );
-          return nativeModule()
-            .ubrn_uniffi_ddk_ffi_fn_func_create_extkey_from_parent_path;
-        })()(
+        return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_create_extkey_from_parent_path(
           FfiConverterSequenceUInt8.lower(
             extkey,
             nativeModule().rustbuffer_alloc
@@ -561,13 +505,7 @@ export function createExtkeyFromSeed(
         FfiConverterTypeDLCError
       ),
       /*caller:*/ (callStatus) => {
-        return (() => {
-          console.debug(
-            `-- ubrn_uniffi_ddk_ffi_fn_func_create_extkey_from_seed`
-          );
-          return nativeModule()
-            .ubrn_uniffi_ddk_ffi_fn_func_create_extkey_from_seed;
-        })()(
+        return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_create_extkey_from_seed(
           FfiConverterSequenceUInt8.lower(
             seed,
             nativeModule().rustbuffer_alloc
@@ -597,13 +535,7 @@ export function createFundTxLockingScript(
         FfiConverterTypeDLCError
       ),
       /*caller:*/ (callStatus) => {
-        return (() => {
-          console.debug(
-            `-- ubrn_uniffi_ddk_ffi_fn_func_create_fund_tx_locking_script`
-          );
-          return nativeModule()
-            .ubrn_uniffi_ddk_ffi_fn_func_create_fund_tx_locking_script;
-        })()(
+        return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_create_fund_tx_locking_script(
           FfiConverterSequenceUInt8.lower(
             localFundPubkey,
             nativeModule().rustbuffer_alloc
@@ -641,13 +573,7 @@ export function createRefundTransaction(
         FfiConverterTypeDLCError
       ),
       /*caller:*/ (callStatus) => {
-        return (() => {
-          console.debug(
-            `-- ubrn_uniffi_ddk_ffi_fn_func_create_refund_transaction`
-          );
-          return nativeModule()
-            .ubrn_uniffi_ddk_ffi_fn_func_create_refund_transaction;
-        })()(
+        return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_create_refund_transaction(
           FfiConverterSequenceUInt8.lower(
             localFinalScriptPubkey,
             nativeModule().rustbuffer_alloc
@@ -697,13 +623,7 @@ export function createSplicedDlcTransactions(
         FfiConverterTypeDLCError
       ),
       /*caller:*/ (callStatus) => {
-        return (() => {
-          console.debug(
-            `-- ubrn_uniffi_ddk_ffi_fn_func_create_spliced_dlc_transactions`
-          );
-          return nativeModule()
-            .ubrn_uniffi_ddk_ffi_fn_func_create_spliced_dlc_transactions;
-        })()(
+        return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_create_spliced_dlc_transactions(
           FfiConverterSequenceTypePayout.lower(
             outcomes,
             nativeModule().rustbuffer_alloc
@@ -759,13 +679,7 @@ export function createXprivFromParentPath(
         FfiConverterTypeDLCError
       ),
       /*caller:*/ (callStatus) => {
-        return (() => {
-          console.debug(
-            `-- ubrn_uniffi_ddk_ffi_fn_func_create_xpriv_from_parent_path`
-          );
-          return nativeModule()
-            .ubrn_uniffi_ddk_ffi_fn_func_create_xpriv_from_parent_path;
-        })()(
+        return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_create_xpriv_from_parent_path(
           FfiConverterSequenceUInt8.lower(
             seedOrXpriv,
             nativeModule().rustbuffer_alloc
@@ -800,13 +714,7 @@ export function extractEcdsaSignatureFromOracleSignatures(
         FfiConverterTypeDLCError
       ),
       /*caller:*/ (callStatus) => {
-        return (() => {
-          console.debug(
-            `-- ubrn_uniffi_ddk_ffi_fn_func_extract_ecdsa_signature_from_oracle_signatures`
-          );
-          return nativeModule()
-            .ubrn_uniffi_ddk_ffi_fn_func_extract_ecdsa_signature_from_oracle_signatures;
-        })()(
+        return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_extract_ecdsa_signature_from_oracle_signatures(
           FfiConverterSequenceSequenceUInt8.lower(
             oracleSignatures,
             nativeModule().rustbuffer_alloc
@@ -842,13 +750,7 @@ export function getCetAdaptorSignatureInputs(
         FfiConverterTypeDLCError
       ),
       /*caller:*/ (callStatus) => {
-        return (() => {
-          console.debug(
-            `-- ubrn_uniffi_ddk_ffi_fn_func_get_cet_adaptor_signature_inputs`
-          );
-          return nativeModule()
-            .ubrn_uniffi_ddk_ffi_fn_func_get_cet_adaptor_signature_inputs;
-        })()(
+        return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_get_cet_adaptor_signature_inputs(
           FfiConverterTypeTransaction.lower(
             cet,
             nativeModule().rustbuffer_alloc
@@ -894,10 +796,7 @@ export function getCetSighash(
         FfiConverterTypeDLCError
       ),
       /*caller:*/ (callStatus) => {
-        return (() => {
-          console.debug(`-- ubrn_uniffi_ddk_ffi_fn_func_get_cet_sighash`);
-          return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_get_cet_sighash;
-        })()(
+        return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_get_cet_sighash(
           FfiConverterTypeTransaction.lower(
             cet,
             nativeModule().rustbuffer_alloc
@@ -934,13 +833,7 @@ export function getChangeOutputAndFees(
         FfiConverterTypeDLCError
       ),
       /*caller:*/ (callStatus) => {
-        return (() => {
-          console.debug(
-            `-- ubrn_uniffi_ddk_ffi_fn_func_get_change_output_and_fees`
-          );
-          return nativeModule()
-            .ubrn_uniffi_ddk_ffi_fn_func_get_change_output_and_fees;
-        })()(
+        return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_get_change_output_and_fees(
           FfiConverterTypePartyParams.lower(
             params,
             nativeModule().rustbuffer_alloc
@@ -970,13 +863,7 @@ export function getPubkeyFromExtkey(
         FfiConverterTypeDLCError
       ),
       /*caller:*/ (callStatus) => {
-        return (() => {
-          console.debug(
-            `-- ubrn_uniffi_ddk_ffi_fn_func_get_pubkey_from_extkey`
-          );
-          return nativeModule()
-            .ubrn_uniffi_ddk_ffi_fn_func_get_pubkey_from_extkey;
-        })()(
+        return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_get_pubkey_from_extkey(
           FfiConverterSequenceUInt8.lower(
             extkey,
             nativeModule().rustbuffer_alloc
@@ -1009,13 +896,7 @@ export function getRawFundingTransactionInputSignature(
         FfiConverterTypeDLCError
       ),
       /*caller:*/ (callStatus) => {
-        return (() => {
-          console.debug(
-            `-- ubrn_uniffi_ddk_ffi_fn_func_get_raw_funding_transaction_input_signature`
-          );
-          return nativeModule()
-            .ubrn_uniffi_ddk_ffi_fn_func_get_raw_funding_transaction_input_signature;
-        })()(
+        return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_get_raw_funding_transaction_input_signature(
           FfiConverterTypeTransaction.lower(
             fundingTransaction,
             nativeModule().rustbuffer_alloc
@@ -1039,11 +920,7 @@ export function getTotalInputVsize(inputs: Array<TxInputInfo>): number {
   return FfiConverterUInt32.lift(
     uniffiCaller.rustCall(
       /*caller:*/ (callStatus) => {
-        return (() => {
-          console.debug(`-- ubrn_uniffi_ddk_ffi_fn_func_get_total_input_vsize`);
-          return nativeModule()
-            .ubrn_uniffi_ddk_ffi_fn_func_get_total_input_vsize;
-        })()(
+        return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_get_total_input_vsize(
           FfiConverterSequenceTypeTxInputInfo.lower(
             inputs,
             nativeModule().rustbuffer_alloc
@@ -1072,10 +949,7 @@ export function getXpubFromXpriv(
         FfiConverterTypeDLCError
       ),
       /*caller:*/ (callStatus) => {
-        return (() => {
-          console.debug(`-- ubrn_uniffi_ddk_ffi_fn_func_get_xpub_from_xpriv`);
-          return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_get_xpub_from_xpriv;
-        })()(
+        return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_get_xpub_from_xpriv(
           FfiConverterSequenceUInt8.lower(
             xpriv,
             nativeModule().rustbuffer_alloc
@@ -1093,10 +967,7 @@ export function isDustOutput(output: TxOutput): boolean {
   return FfiConverterBool.lift(
     uniffiCaller.rustCall(
       /*caller:*/ (callStatus) => {
-        return (() => {
-          console.debug(`-- ubrn_uniffi_ddk_ffi_fn_func_is_dust_output`);
-          return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_is_dust_output;
-        })()(
+        return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_is_dust_output(
           FfiConverterTypeTxOutput.lower(
             output,
             nativeModule().rustbuffer_alloc
@@ -1130,10 +1001,7 @@ export function signCet(
         FfiConverterTypeDLCError
       ),
       /*caller:*/ (callStatus) => {
-        return (() => {
-          console.debug(`-- ubrn_uniffi_ddk_ffi_fn_func_sign_cet`);
-          return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_sign_cet;
-        })()(
+        return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_sign_cet(
           FfiConverterTypeTransaction.lower(
             cet,
             nativeModule().rustbuffer_alloc
@@ -1189,13 +1057,7 @@ export function signFundTransactionInput(
         FfiConverterTypeDLCError
       ),
       /*caller:*/ (callStatus) => {
-        return (() => {
-          console.debug(
-            `-- ubrn_uniffi_ddk_ffi_fn_func_sign_fund_transaction_input`
-          );
-          return nativeModule()
-            .ubrn_uniffi_ddk_ffi_fn_func_sign_fund_transaction_input;
-        })()(
+        return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_sign_fund_transaction_input(
           FfiConverterTypeTransaction.lower(
             fundTransaction,
             nativeModule().rustbuffer_alloc
@@ -1233,11 +1095,7 @@ export function signMultiSigInput(
         FfiConverterTypeDLCError
       ),
       /*caller:*/ (callStatus) => {
-        return (() => {
-          console.debug(`-- ubrn_uniffi_ddk_ffi_fn_func_sign_multi_sig_input`);
-          return nativeModule()
-            .ubrn_uniffi_ddk_ffi_fn_func_sign_multi_sig_input;
-        })()(
+        return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_sign_multi_sig_input(
           FfiConverterTypeTransaction.lower(
             tx,
             nativeModule().rustbuffer_alloc
@@ -1274,13 +1132,7 @@ export function verifyCetAdaptorSigFromOracleInfo(
   return FfiConverterBool.lift(
     uniffiCaller.rustCall(
       /*caller:*/ (callStatus) => {
-        return (() => {
-          console.debug(
-            `-- ubrn_uniffi_ddk_ffi_fn_func_verify_cet_adaptor_sig_from_oracle_info`
-          );
-          return nativeModule()
-            .ubrn_uniffi_ddk_ffi_fn_func_verify_cet_adaptor_sig_from_oracle_info;
-        })()(
+        return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_verify_cet_adaptor_sig_from_oracle_info(
           FfiConverterTypeAdaptorSignature.lower(
             adaptorSig,
             nativeModule().rustbuffer_alloc
@@ -1329,13 +1181,7 @@ export function verifyCetAdaptorSigsFromOracleInfo(
   return FfiConverterBool.lift(
     uniffiCaller.rustCall(
       /*caller:*/ (callStatus) => {
-        return (() => {
-          console.debug(
-            `-- ubrn_uniffi_ddk_ffi_fn_func_verify_cet_adaptor_sigs_from_oracle_info`
-          );
-          return nativeModule()
-            .ubrn_uniffi_ddk_ffi_fn_func_verify_cet_adaptor_sigs_from_oracle_info;
-        })()(
+        return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_verify_cet_adaptor_sigs_from_oracle_info(
           FfiConverterSequenceTypeAdaptorSignature.lower(
             adaptorSigs,
             nativeModule().rustbuffer_alloc
@@ -1386,13 +1232,7 @@ export function verifyFundTxSignature(
         FfiConverterTypeDLCError
       ),
       /*caller:*/ (callStatus) => {
-        return (() => {
-          console.debug(
-            `-- ubrn_uniffi_ddk_ffi_fn_func_verify_fund_tx_signature`
-          );
-          return nativeModule()
-            .ubrn_uniffi_ddk_ffi_fn_func_verify_fund_tx_signature;
-        })()(
+        return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_verify_fund_tx_signature(
           FfiConverterTypeTransaction.lower(
             fundTx,
             nativeModule().rustbuffer_alloc
@@ -1429,10 +1269,7 @@ export function version(): string {
   })(
     uniffiCaller.rustCall(
       /*caller:*/ (callStatus) => {
-        return (() => {
-          console.debug(`-- ubrn_uniffi_ddk_ffi_fn_func_version`);
-          return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_version;
-        })()(callStatus);
+        return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_version(callStatus);
       },
       /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString)
     )

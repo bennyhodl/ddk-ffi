@@ -11,8 +11,13 @@ uniffi:
   @echo ""
   @echo "🎉 Uniffi build complete! 🎉"
   @echo "🔥 Run 'just example-ios' to test the build"
-  @echo "⚠️ modify cpp/bennyblader-ddk-rn.cpp to #include 'ddk_ffi.hpp' ⚠️"
 
+# TS-bindings config (e.g. strictTypeChecking) is read from ddk-ffi/uniffi.toml,
+# which ubrn auto-discovers next to the crate's Cargo.toml — the --config flag is
+# intentionally NOT used (ubrn's TS pipeline ignores it). The --ts-dir / --cpp-dir
+# mirror the `bindings:` section of ddk-rn/ubrn.config.yaml, which this low-level
+# command can't read, so the dirs are passed explicitly.
+#
 # Generate the JSI bindings
 uniffi-jsi:
   cd {{justfile_directory()}}/ddk-ffi && uniffi-bindgen-react-native generate jsi bindings \
@@ -29,11 +34,13 @@ uniffi-turbo:
 
 # Build the iOS bindings
 build-ios:
-  cd {{justfile_directory()}}/ddk-rn && uniffi-bindgen-react-native build ios --and-generate
+  cd {{justfile_directory()}}/ddk-rn && uniffi-bindgen-react-native build ios \
+    --config {{justfile_directory()}}/ddk-rn/ubrn.config.yaml --and-generate
 
 # Build the Android bindings
 build-android:
-  cd {{justfile_directory()}}/ddk-rn && uniffi-bindgen-react-native build android --and-generate 
+  cd {{justfile_directory()}}/ddk-rn && uniffi-bindgen-react-native build android \
+    --config {{justfile_directory()}}/ddk-rn/ubrn.config.yaml --and-generate
 
 # Build the example app with the React Native bindings
 example:
