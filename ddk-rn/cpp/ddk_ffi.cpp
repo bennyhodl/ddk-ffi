@@ -206,6 +206,7 @@ extern "C" {
         uint32_t fund_lock_time, 
         uint32_t cet_lock_time, 
         uint64_t fund_output_serial_id, 
+        uint8_t contract_flags, 
         RustCallStatus *uniffi_out_err
     );
     RustBuffer uniffi_ddk_ffi_fn_func_create_extkey_from_parent_path(
@@ -242,6 +243,7 @@ extern "C" {
         uint32_t fund_lock_time, 
         uint32_t cet_lock_time, 
         uint64_t fund_output_serial_id, 
+        uint8_t contract_flags, 
         RustCallStatus *uniffi_out_err
     );
     RustBuffer uniffi_ddk_ffi_fn_func_create_xpriv_from_parent_path(
@@ -2242,7 +2244,7 @@ NativeDdkFfi::NativeDdkFfi(
     props["ubrn_uniffi_ddk_ffi_fn_func_create_dlc_transactions"] = jsi::Function::createFromHostFunction(
         rt,
         jsi::PropNameID::forAscii(rt, "ubrn_uniffi_ddk_ffi_fn_func_create_dlc_transactions"),
-        8,
+        9,
         [this](jsi::Runtime &rt, const jsi::Value &thisVal, const jsi::Value *args, size_t count) -> jsi::Value {
             return this->cpp_uniffi_ddk_ffi_fn_func_create_dlc_transactions(rt, thisVal, args, count);
         }
@@ -2282,7 +2284,7 @@ NativeDdkFfi::NativeDdkFfi(
     props["ubrn_uniffi_ddk_ffi_fn_func_create_spliced_dlc_transactions"] = jsi::Function::createFromHostFunction(
         rt,
         jsi::PropNameID::forAscii(rt, "ubrn_uniffi_ddk_ffi_fn_func_create_spliced_dlc_transactions"),
-        8,
+        9,
         [this](jsi::Runtime &rt, const jsi::Value &thisVal, const jsi::Value *args, size_t count) -> jsi::Value {
             return this->cpp_uniffi_ddk_ffi_fn_func_create_spliced_dlc_transactions(rt, thisVal, args, count);
         }
@@ -2816,7 +2818,7 @@ jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_func_create_cets(jsi::Runtime& rt
 }
 jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_func_create_dlc_transactions(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         RustCallStatus status = uniffi::ddk_ffi::Bridging<RustCallStatus>::rustSuccess(rt);
-        auto value = uniffi_ddk_ffi_fn_func_create_dlc_transactions(uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[1]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[2]), uniffi_jsi::Bridging<uint32_t>::fromJs(rt, callInvoker, args[3]), uniffi_jsi::Bridging<uint64_t>::fromJs(rt, callInvoker, args[4]), uniffi_jsi::Bridging<uint32_t>::fromJs(rt, callInvoker, args[5]), uniffi_jsi::Bridging<uint32_t>::fromJs(rt, callInvoker, args[6]), uniffi_jsi::Bridging<uint64_t>::fromJs(rt, callInvoker, args[7]), 
+        auto value = uniffi_ddk_ffi_fn_func_create_dlc_transactions(uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[1]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[2]), uniffi_jsi::Bridging<uint32_t>::fromJs(rt, callInvoker, args[3]), uniffi_jsi::Bridging<uint64_t>::fromJs(rt, callInvoker, args[4]), uniffi_jsi::Bridging<uint32_t>::fromJs(rt, callInvoker, args[5]), uniffi_jsi::Bridging<uint32_t>::fromJs(rt, callInvoker, args[6]), uniffi_jsi::Bridging<uint64_t>::fromJs(rt, callInvoker, args[7]), uniffi_jsi::Bridging<uint8_t>::fromJs(rt, callInvoker, args[8]), 
             &status
         );
         uniffi::ddk_ffi::Bridging<RustCallStatus>::copyIntoJs(rt, callInvoker, status, args[count - 1]);
@@ -2866,7 +2868,7 @@ jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_func_create_refund_transaction(js
 }
 jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_func_create_spliced_dlc_transactions(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         RustCallStatus status = uniffi::ddk_ffi::Bridging<RustCallStatus>::rustSuccess(rt);
-        auto value = uniffi_ddk_ffi_fn_func_create_spliced_dlc_transactions(uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[1]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[2]), uniffi_jsi::Bridging<uint32_t>::fromJs(rt, callInvoker, args[3]), uniffi_jsi::Bridging<uint64_t>::fromJs(rt, callInvoker, args[4]), uniffi_jsi::Bridging<uint32_t>::fromJs(rt, callInvoker, args[5]), uniffi_jsi::Bridging<uint32_t>::fromJs(rt, callInvoker, args[6]), uniffi_jsi::Bridging<uint64_t>::fromJs(rt, callInvoker, args[7]), 
+        auto value = uniffi_ddk_ffi_fn_func_create_spliced_dlc_transactions(uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[1]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[2]), uniffi_jsi::Bridging<uint32_t>::fromJs(rt, callInvoker, args[3]), uniffi_jsi::Bridging<uint64_t>::fromJs(rt, callInvoker, args[4]), uniffi_jsi::Bridging<uint32_t>::fromJs(rt, callInvoker, args[5]), uniffi_jsi::Bridging<uint32_t>::fromJs(rt, callInvoker, args[6]), uniffi_jsi::Bridging<uint64_t>::fromJs(rt, callInvoker, args[7]), uniffi_jsi::Bridging<uint8_t>::fromJs(rt, callInvoker, args[8]), 
             &status
         );
         uniffi::ddk_ffi::Bridging<RustCallStatus>::copyIntoJs(rt, callInvoker, status, args[count - 1]);

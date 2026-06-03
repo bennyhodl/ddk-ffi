@@ -96,6 +96,7 @@ interface NativeModuleInterface {
     fundLockTime: number,
     cetLockTime: number,
     fundOutputSerialId: bigint,
+    contractFlags: number,
     uniffi_out_err: UniffiRustCallStatus
   ): Uint8Array;
   ubrn_uniffi_ddk_ffi_fn_func_create_extkey_from_parent_path(
@@ -132,6 +133,7 @@ interface NativeModuleInterface {
     fundLockTime: number,
     cetLockTime: number,
     fundOutputSerialId: bigint,
+    contractFlags: number,
     uniffi_out_err: UniffiRustCallStatus
   ): Uint8Array;
   ubrn_uniffi_ddk_ffi_fn_func_create_xpriv_from_parent_path(

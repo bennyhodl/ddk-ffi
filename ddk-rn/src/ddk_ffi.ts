@@ -317,7 +317,8 @@ export function createDlcTransactions(
   feeRate: /*u64*/ bigint,
   fundLockTime: /*u32*/ number,
   cetLockTime: /*u32*/ number,
-  fundOutputSerialId: /*u64*/ bigint
+  fundOutputSerialId: /*u64*/ bigint,
+  contractFlags: /*u8*/ number
 ): DlcTransactions /*throws*/ {
   return FfiConverterTypeDlcTransactions.lift(
     uniffiCaller.rustCallWithError(
@@ -338,6 +339,7 @@ export function createDlcTransactions(
           FfiConverterUInt32.lower(fundLockTime),
           FfiConverterUInt32.lower(cetLockTime),
           FfiConverterUInt64.lower(fundOutputSerialId),
+          FfiConverterUInt8.lower(contractFlags),
           callStatus
         );
       },
@@ -463,7 +465,8 @@ export function createSplicedDlcTransactions(
   feeRate: /*u64*/ bigint,
   fundLockTime: /*u32*/ number,
   cetLockTime: /*u32*/ number,
-  fundOutputSerialId: /*u64*/ bigint
+  fundOutputSerialId: /*u64*/ bigint,
+  contractFlags: /*u8*/ number
 ): DlcTransactions /*throws*/ {
   return FfiConverterTypeDlcTransactions.lift(
     uniffiCaller.rustCallWithError(
@@ -486,6 +489,7 @@ export function createSplicedDlcTransactions(
           FfiConverterUInt32.lower(fundLockTime),
           FfiConverterUInt32.lower(cetLockTime),
           FfiConverterUInt64.lower(fundOutputSerialId),
+          FfiConverterUInt8.lower(contractFlags),
           callStatus
         );
       },
@@ -2387,7 +2391,7 @@ function uniffiEnsureInitialized() {
   }
   if (
     nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_create_dlc_transactions() !==
-    29518
+    51134
   ) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       'uniffi_ddk_ffi_checksum_func_create_dlc_transactions'
@@ -2427,7 +2431,7 @@ function uniffiEnsureInitialized() {
   }
   if (
     nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_create_spliced_dlc_transactions() !==
-    19497
+    31130
   ) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       'uniffi_ddk_ffi_checksum_func_create_spliced_dlc_transactions'
