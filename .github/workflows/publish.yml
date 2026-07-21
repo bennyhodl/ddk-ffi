@@ -55,10 +55,18 @@ jobs:
             target: aarch64-apple-darwin
             short: darwin-arm64
             build: pnpm build:darwin-arm64
+            artifact_path: ddk-ts/dist/ddk-ts.*.node
           - host: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             short: linux-x64-gnu
             build: pnpm build:linux-x64
+            artifact_path: ddk-ts/dist/ddk-ts.*.node
+          - host: ubuntu-latest
+            target: wasm32-wasip1-threads
+            short: wasm32-wasi
+            build: pnpm build:wasm
+            wasi: true
+            artifact_path: ddk-ts/dist/ddk-ts.wasm32-wasi.wasm
     runs-on: ${{ matrix.host }}
     steps:
       - uses: actions/checkout@v4
@@ -71,6 +79,14 @@ jobs:
       - uses: pnpm/action-setup@v2
         with:
           version: 8
+      - name: Setup WASI SDK
+        if: matrix.wasi
+        run: |
+          curl -sL -o /tmp/wasi-sdk.tar.gz \
+            https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-33/wasi-sdk-33.0-x86_64-linux.tar.gz
+          sudo mkdir -p /opt/wasi-sdk
+          sudo tar xzf /tmp/wasi-sdk.tar.gz -C /opt/wasi-sdk --strip-components=1
+          echo "WASI_SDK_PATH=/opt/wasi-sdk" >> "$GITHUB_ENV"
       - name: Install dependencies
         run: cd ddk-ts && pnpm install --no-frozen-lockfile
       - name: Build
@@ -79,7 +95,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ddk-ts-bindings-${{ matrix.target }}
-          path: ddk-ts/dist/${{ env.APP_NAME }}.*.node
+          path: ${{ matrix.artifact_path }}
           if-no-files-found: error
 
   test-ddk-ts:
@@ -162,8 +178,11 @@ jobs:
           pattern: ddk-ts-bindings-*
       - name: Create sub-package directories
         run: cd ddk-ts && npx napi create-npm-dirs
+      # --build-output-dir dist: the wasm32-wasi sibling's JS glue (*.wasi.cjs,
+      # *.wasi-browser.js, wasi-worker*.mjs) is emitted into dist/ by the build
+      # above; the .wasm/.node binaries come from the downloaded artifacts.
       - name: Move binaries into sub-package directories
-        run: cd ddk-ts && npx napi artifacts
+        run: cd ddk-ts && npx napi artifacts --build-output-dir dist
       # Main package must not ship .node binaries; each sibling package carries its own.
       - name: Strip binaries from main package dist/
         run: rm -f ddk-ts/dist/*.node

@@ -3,7 +3,7 @@
 authors = ["benny b <ben@bitcoinbay.foundation>"]
 edition = "2021"
 name = "ddk_ts"
-version = "0.3.42"
+version = "0.3.43"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -14,7 +14,7 @@ path = "src/lib.rs"
 ddk_ffi = { path = "../ddk-ffi" }
 
 # NAPI-RS dependencies
-napi = { version = "3.0.0", default-features = false, features = ["napi8", "async", "serde-json"] }
+napi = { version = "3.0.0", default-features = false, features = ["napi8", "serde-json"] }
 napi-derive = "3.0.0"
 
 # Match the same dependencies as ddk-ffi

@@ -1,9 +1,10 @@
 {
   "name": "@bennyblader/ddk-ts",
-  "version": "0.3.42",
+  "version": "0.3.43",
   "description": "dlcdevkit typescript bindings",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "browser": "dist/browser.js",
   "type": "module",
   "repository": "https://github.com/bennyhodl/ddk-ffi",
   "license": "MIT",
@@ -22,7 +23,8 @@
     "packageName": "@bennyblader/ddk-ts",
     "targets": [
       "aarch64-apple-darwin",
-      "x86_64-unknown-linux-gnu"
+      "x86_64-unknown-linux-gnu",
+      "wasm32-wasip1-threads"
     ]
   },
   "engines": {
@@ -37,6 +39,7 @@
     "build": "napi build --platform --release --js index.js --dts index.d.ts --output-dir dist",
     "build:darwin-arm64": "napi build --platform --release --js index.js --dts index.d.ts --output-dir dist --target aarch64-apple-darwin",
     "build:linux-x64": "napi build --platform --release --js index.js --dts index.d.ts --output-dir dist --target x86_64-unknown-linux-gnu",
+    "build:wasm": "napi build --platform --release --js index.js --dts index.d.ts --output-dir dist --target wasm32-wasip1-threads",
     "build:debug": "napi build --platform --js index.js --dts index.d.ts --output-dir dist",
     "build:all": "napi build --release --js index.js --dts index.d.ts --output-dir dist --target aarch64-apple-darwin --target x86_64-unknown-linux-gnu",
     "prepublishOnly": "napi prepublish -t npm",
@@ -52,13 +55,15 @@
     "version": "napi version"
   },
   "devDependencies": {
-    "@emnapi/core": "^1.4.5",
-    "@emnapi/runtime": "^1.4.5",
+    "@emnapi/core": "^1.11.2",
+    "@emnapi/runtime": "^1.11.2",
     "@napi-rs/cli": "^3.0.3",
+    "@napi-rs/wasm-runtime": "^1.1.6",
     "@tybys/wasm-util": "^0.10.0",
     "@types/node": "^20.0.0",
     "ava": "^6.4.1",
     "chalk": "^5.4.1",
+    "emnapi": "^1.11.2",
     "lint-staged": "^16.1.2",
     "npm-run-all2": "^8.0.4",
     "prettier": "^3.6.2",
@@ -79,7 +84,8 @@
   ],
   "packageManager": "pnpm@10.14.0",
   "optionalDependencies": {
-    "@bennyblader/ddk-ts-darwin-arm64": "0.3.42",
-    "@bennyblader/ddk-ts-linux-x64-gnu": "0.3.42"
+    "@bennyblader/ddk-ts-darwin-arm64": "0.3.43",
+    "@bennyblader/ddk-ts-linux-x64-gnu": "0.3.43",
+    "@bennyblader/ddk-ts-wasm32-wasi": "0.3.43"
   }
 }

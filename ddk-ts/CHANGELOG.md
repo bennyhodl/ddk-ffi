@@ -1,5 +1,10 @@
 # DDK-TS Changelog
 
+## [0.3.43] - 2026-07-21
+- Added `wasm32-wasip1-threads` build target for browser/WASM support (`pnpm build:wasm`)
+- Wired the WASM target into CI and the release/publish pipeline (builds the `@bennyblader/ddk-ts-wasm32-wasi` sibling package)
+- Added `browser` field so bundlers resolve the WASM binding, plus a Vite browser example (`example-browser/`)
+
 ## [0.1.11] - 2025-01-15
 - Updated package configuration
 
