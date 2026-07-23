@@ -1,0 +1,34 @@
+# E2E: launches the ddk-rn example on a real device and asserts it renders a
+# version string read out of Rust. This is the only layer that exercises the
+# real React Native bindings end to end — the Rust logic itself is covered by
+# the ddk-ffi and ddk-ts suites, and neither of those loads the native library
+# the way an app does.
+#
+# Two failures only this can catch:
+#   - the app not starting at all, e.g. SoLoader missing the RN 0.76+ merged-so
+#     name mapping, which kills the process before any JS runs
+#   - the JSI bridge being wired up but returning nothing across the boundary
+appId: ddkrn.example
+---
+# No `clearState`. CI installs the app onto a freshly booted device every run, so
+# there is nothing to clear, and Maestro implements it on iOS by uninstalling the
+# app — visible as an uninstall request in the simulator log of the run that then
+# failed against a blank screen.
+- launchApp
+
+# Generous timeout: this covers the app's cold start, including Hermes loading
+# the embedded JS bundle.
+#
+# extendedWaitUntil, not assertVisible: `timeout` is not a property of an element
+# selector, so `assertVisible: {text: ..., timeout: ...}` is a parse error, not a
+# slow assertion. Maestro's own message lists the 28 selector properties and
+# `timeout` is not among them. assertVisible waits only for the implicit default,
+# so this is also the only form that actually honours the cold-start budget.
+#
+# The text is matched as a regex, and the semver is the point of the assertion:
+# `version()` is a JSI call into Rust, so anything other than a real version —
+# an empty string, `undefined`, a throw — fails here.
+- extendedWaitUntil:
+    visible:
+      text: 'version: [0-9]+\.[0-9]+\.[0-9]+'
+    timeout: 60000

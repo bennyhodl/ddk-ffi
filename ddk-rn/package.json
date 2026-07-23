@@ -155,7 +155,11 @@
   },
   "eslintIgnore": [
     "node_modules/",
-    "lib/"
+    "lib/",
+    "src/ddk_ffi.ts",
+    "src/ddk_ffi-ffi.ts",
+    "src/NativeDdkRn.ts",
+    "src/index.tsx"
   ],
   "prettier": {
     "quoteProps": "consistent",

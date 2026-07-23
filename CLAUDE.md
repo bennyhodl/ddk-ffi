@@ -209,6 +209,13 @@ Rules to preserve:
 - Generation runs prettier over `ddk-rn/src/`, which reformats hand-written files
   living there (e.g. `src/__tests__/contractBindings.test.js`). Committing the
   prettier-formatted version keeps that from churning on every build.
+- Every `.ts`/`.tsx` directly in `ddk-rn/src/` is ubrn-generated (`ddk_ffi.ts`,
+  `ddk_ffi-ffi.ts`, `NativeDdkRn.ts`, `index.tsx`); only `src/__tests__/` is
+  hand-written. Those four are listed in `eslintIgnore` in `ddk-rn/package.json`,
+  because ubrn's output does not satisfy this repo's prettier config and would be
+  reformatted back on the next generation — an unwinnable loop that kept
+  `pnpm lint` permanently red. Don't remove them from that list, and don't
+  "fix" lint errors inside generated files.
 - `uniffi-bindgen-react-native` stays a runtime `dependency` — `android/CMakeLists.txt`
   and `DdkRn.podspec` both need its C++ headers — but nothing at install time
   invokes its binary.
