@@ -16,9 +16,25 @@ crate-type = ["cdylib", "staticlib", "rlib"]
 # Pinned exactly: uniffi-bindgen-react-native 0.31.0-3 requires uniffi_core =0.31.0.
 # A caret range floats to 0.31.x and breaks the generated bindings at typecheck.
 uniffi = { version = "=0.31.0", features = ["cli"] }
-# ddk-dlc = { path = "../../../ernest/dlcdevkit/dlc", features = ["use-serde"] }
-# ddk-dlc = { git = "https://github.com/bennyhodl/dlcdevkit.git", branch = "master", features = ["use-serde"] }
-ddk-dlc = { version = "1.1.1", features = ["use-serde"] }
+# The stateless contract + splice API and ContractKeyProvider live in `ddk`.
+# `default-features = false` disables the `manager` feature so only the
+# lightweight, sync `contract` module is pulled in (no tokio-full / zeromq /
+# esplora) — required for iOS/Android cross-compilation. ddk-dlc must resolve to
+# the SAME version/source `ddk` uses (1.1.x) so secp256k1_zkp / PartyParams
+# types unify across the FFI boundary.
+#
+# All three point at the `stateless-dlc-creation` branch until it lands on
+# dlcdevkit master and is published to crates.io. To develop against a local
+# dlcdevkit checkout, swap these for path deps (e.g. `path = "../../dlcdevkit/ddk"`)
+# — but don't commit that: path deps break CI and every downstream consumer.
+ddk = { git = "https://github.com/bennyhodl/dlcdevkit.git", branch = "stateless-dlc-creation", default-features = false }
+ddk-dlc = { git = "https://github.com/bennyhodl/dlcdevkit.git", branch = "stateless-dlc-creation", features = ["std", "use-serde"] }
+# ddk-messages provides the wire types (OfferDlc/AcceptDlc/SignDlc/ContractInfo/
+# FundingInput) marshalled across the FFI boundary as `Vec<u8>`; lightning
+# provides the Writeable/Readable (TLV) encoding those types use. Both are
+# version-matched to `ddk` so the types unify.
+ddk-messages = { git = "https://github.com/bennyhodl/dlcdevkit.git", branch = "stateless-dlc-creation", features = ["std", "use-serde"] }
+lightning = { version = "0.2", features = ["std"] }
 bitcoin = "0.32.7"
 thiserror = "2.0.12"
 secp256k1-zkp = "0.11.0"

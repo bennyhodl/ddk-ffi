@@ -25,6 +25,11 @@ use std::sync::OnceLock;
 
 uniffi::setup_scaffolding!();
 
+/// Stateless DLC contract API + ContractKeyProvider bindings (backed by `ddk`).
+/// Public so Rust consumers (e.g. the ddk-ts NAPI crate) can wrap the same
+/// surface; uniffi/React-Native generation is unaffected by the visibility.
+pub mod contract;
+
 static SECP_CONTEXT: OnceLock<Secp256k1<All>> = OnceLock::new();
 
 pub fn get_secp_context() -> &'static Secp256k1<All> {
