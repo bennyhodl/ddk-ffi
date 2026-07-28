@@ -276,9 +276,9 @@ jobs:
       # 16KB page alignment. Keep this in sync with what you install locally.
       - name: Build JNI libraries
         run: |
-          export ANDROID_NDK_HOME="$ANDROID_SDK_ROOT/ndk/27.3.13750724"
+          export ANDROID_NDK_HOME="$ANDROID_SDK_ROOT/ndk/27.1.12297006"
           if [ ! -d "$ANDROID_NDK_HOME" ]; then
-            echo "::error::Pinned NDK 27.3.13750724 is not on this runner. Installed:"
+            echo "::error::Pinned NDK 27.1.12297006 is not on this runner. Installed:"
             ls "$ANDROID_SDK_ROOT/ndk"
             exit 1
           fi

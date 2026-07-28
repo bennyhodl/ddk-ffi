@@ -45,16 +45,15 @@ concurrency:
 env:
   # Must match ddk-rn/package.json — see the version-lockstep note in CLAUDE.md.
   UBRN_VERSION: "0.31.0-3"
-  # ddk-rn's native builds are proven on 18.17; ddk-ts on 20. Kept apart rather
-  # than unified so neither toolchain moves without being tested.
-  NODE_VERSION_RN: "18.17"
-  NODE_VERSION_TS: "20"
+  # Tied to the example's React Native release; see the environment table in
+  # CLAUDE.md.
+  NODE_VERSION: "20"
   # pnpm 10: ddk-rn/pnpm-lock.yaml is lockfileVersion 9.0, which pnpm 8 cannot
   # read without rewriting it.
   PNPM_VERSION: "10"
   # Pinned to match publish.yml. ANDROID_NDK_LATEST_HOME tracks whatever the
   # runner image ships and would let CI drift from what releases are built with.
-  NDK_VERSION: "27.3.13750724"
+  NDK_VERSION: "27.1.12297006"
 
 jobs:
   # ==========================================================================
@@ -76,7 +75,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION_TS }}
+          node-version: ${{ env.NODE_VERSION }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
@@ -203,7 +202,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION_RN }}
+          node-version: ${{ env.NODE_VERSION }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
@@ -231,16 +230,23 @@ jobs:
 
       # Two builds need this: cargo-ndk cross-compiles libddk_ffi.so with it, and
       # Gradle uses it for the ddk-rn module's CMake C++ (the example pins the
-      # same version).
+      # same version — see the environment table in CLAUDE.md).
+      #
+      # Installed rather than asserted, because the pin deliberately does not
+      # track the runner image — ANDROID_NDK_LATEST_HOME moves without warning
+      # and would let CI drift from what the example and releases are built with.
+      # Gradle would fetch this itself later, but cargo-ndk runs first.
       - name: Pin the NDK
         if: matrix.platform == 'android'
         run: |
           NDK_HOME="$ANDROID_SDK_ROOT/ndk/$NDK_VERSION"
           if [ ! -d "$NDK_HOME" ]; then
-            echo "::error::Pinned NDK $NDK_VERSION is not on this runner. Installed:"
+            echo "NDK $NDK_VERSION not preinstalled; installing. Present:"
             ls "$ANDROID_SDK_ROOT/ndk" || true
-            exit 1
+            yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" \
+              --install "ndk;$NDK_VERSION" >/dev/null
           fi
+          [ -d "$NDK_HOME" ] || { echo "::error::NDK $NDK_VERSION unavailable"; exit 1; }
           echo "ANDROID_NDK_HOME=$NDK_HOME" >> "$GITHUB_ENV"
 
       # Must precede any native build: the generated android/CMakeLists.txt
@@ -404,7 +410,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION_TS }}
+          node-version: ${{ env.NODE_VERSION }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
@@ -509,13 +515,14 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      # API 34 matches the example's targetSdkVersion. `google_apis` rather than
-      # `default` because Google ships x86_64 `default` images only up to API 28.
+      # API 35 matches the example's targetSdkVersion.
+      # `google_apis` rather than `default` because Google ships x86_64 `default`
+      # images only up to API 28.
       - name: Boot emulator and run Maestro
         if: matrix.platform == 'android'
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 34
+          api-level: 35
           target: google_apis
           arch: x86_64
           profile: pixel_6

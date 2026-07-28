@@ -1,15 +1,17 @@
 buildscript {
     ext {
-        buildToolsVersion = "34.0.0"
-        minSdkVersion = 23
-        compileSdkVersion = 34
-        targetSdkVersion = 34
-        // Pinned to the same NDK the Rust JNI libraries are built with (see
-        // publish.yml / ddk-rn.yml / CLAUDE.md). Gradle uses this for the ddk-rn
-        // module's CMake C++, cargo-ndk uses it for libddk_ffi.so — one version
-        // means CI installs one NDK and the example links what releases ship.
-        ndkVersion = "27.3.13750724"
-        kotlinVersion = "1.9.25"
+        buildToolsVersion = "35.0.0"
+        minSdkVersion = 24
+        compileSdkVersion = 35
+        targetSdkVersion = 35
+        // Every version in this block tracks the React Native release these
+        // bindings are supported against, so the E2E exercises the toolchain
+        // consuming apps build with rather than whatever the example was
+        // generated with. They move as a set — see the environment table in
+        // CLAUDE.md. ci.yml pins cargo-ndk to this same NDK, so Gradle's CMake
+        // C++ and libddk_ffi.so are built by one toolchain.
+        ndkVersion = "27.1.12297006"
+        kotlinVersion = "2.1.20"
     }
     repositories {
         google()

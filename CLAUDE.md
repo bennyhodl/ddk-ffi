@@ -160,13 +160,13 @@ Rules to preserve:
   $NDK_HOME/toolchains/llvm/prebuilt/darwin-x86_64/bin/llvm-readelf -l \
     ddk-rn/android/src/main/jniLibs/arm64-v8a/libddk_ffi.so | grep LOAD
   ```
-- **NDK 27.3.13750724 is pinned**, in `.github/workflows/publish.yml` and locally.
+- **NDK 27.1.12297006 is pinned**, in `.github/workflows/publish.yml` and locally.
   It was `ANDROID_NDK_LATEST_HOME`, which tracks whatever the runner image ships
   (r29 as of this writing) and moves without warning — a release could be built by
   a toolchain nobody tested against. r27 is the runner's own default and the first
   NDK to default to 16KB alignment; r28/r29 raised minimum API levels. Install the
   same one locally with
-  `sdkmanager --sdk_root="$HOME/Library/Android/sdk" --install "ndk;27.3.13750724"`
+  `sdkmanager --sdk_root="$HOME/Library/Android/sdk" --install "ndk;27.1.12297006"`
   so `just build-android` reproduces CI.
 - ubrn regenerates `ddk-rn/android/build.gradle` on every `--and-generate`. It
   drops the `net.java.dev.jna:jna` dependency because JNA is gated on ubrn's
@@ -261,6 +261,52 @@ platform not in the published matrix.
 - Rust tests: `cargo test` (in ddk-ffi/)
 - TypeScript tests: `pnpm test` (in ddk-rn/)
 - Integration testing via example app
+
+### The example app pins a specific React Native environment
+
+`ddk-rn/example` is pinned to the React Native release these bindings are
+supported against, not to whatever the example was generated with, so the E2E
+exercises the toolchain consuming apps actually build with. These values move
+together — bump them as a set, not individually:
+
+| | value | where |
+|---|---|---|
+| react-native | `0.80.0` | `ddk-rn/package.json` (devDep) + `example/package.json` |
+| react | `19.1.0` | both |
+| @react-native-community/cli | `19.0.0` | `ddk-rn/package.json` (+ `-platform-android`/`-ios`) |
+| Node | `20` | `ci.yml` `NODE_VERSION` |
+| compileSdk / targetSdk | `35` | `example/android/build.gradle` |
+| minSdk | `24` | same |
+| buildTools | `35.0.0` | same |
+| Kotlin | `2.1.20` | same |
+| NDK | `27.1.12297006` | same, plus `ci.yml` and `publish.yml` |
+| Gradle wrapper | `8.14.1` | `example/android/gradle/wrapper/` |
+| iOS deployment target | `15.1` | `example/ios/*.xcodeproj` (pods get it from RN) |
+
+Why this matters beyond version hygiene: **RN 0.76+ merged the native libraries
+into a single `libreactnative.so`**, and `ddk-rn/android/CMakeLists.txt` branches
+on it (`if (ReactAndroid_VERSION_MINOR GREATER_EQUAL 76) → REACTNATIVE_MERGED_SO`).
+On the old RN 0.75 example, CI took the `else` branch and therefore never once
+linked ddk-rn the way a current consumer does. Verify after any RN bump — the
+APK should contain `libreactnative.so`, and `libbennyblader-ddk-rn.so` should
+list it under `NEEDED`:
+
+```
+unzip -p app-release.apk lib/x86_64/libbennyblader-ddk-rn.so > /tmp/l.so
+$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/*/bin/llvm-readelf -d /tmp/l.so | grep NEEDED
+```
+
+Gotchas hit doing the 0.75 → 0.80 bump, all likely to recur:
+- RN 0.80 needs **Gradle ≥ 8.11.1**; the wrapper was on 8.8 and AGP refused to load.
+- `@react-native-community/cli` must move with RN. The stale `15.0.0-alpha.2` pin
+  failed bundling with `Invalid platform "android" selected. Available platforms
+  are: "native"` — an unhelpful message for a version mismatch.
+- `@react-native/eslint-config` 0.80 dropped `eslint-plugin-prettier` (it now ships
+  only `eslint-config-prettier`), so `plugins: ["prettier"]` has to be declared in
+  ddk-rn's `eslintConfig` or every file errors with "Definition for rule
+  'prettier/prettier' was not found".
+- RN 0.80's `pod install` writes `RCTNewArchEnabled` into `Info.plist`; new arch is
+  no longer driven only by the `RCT_NEW_ARCH_ENABLED` env var.
 
 ## Code Generation
 
