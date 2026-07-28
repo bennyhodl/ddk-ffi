@@ -42,6 +42,36 @@ jobs:
             exit 1
           fi
 
+          # The Cargo side too. ddk-ffi's version is consumer-visible — its
+          # `version()` binding returns env!("CARGO_PKG_VERSION") — and the
+          # lockfiles record each crate's own version, so a stale one makes the
+          # next `cargo build` dirty the tree and blocks the following release.
+          # Checking only the package.json files is how ddk-ts/Cargo.toml sat at
+          # 0.3.43 through the v0.4.0 release without anything noticing.
+          check_toml() {
+            local file="$1" actual
+            actual=$(grep -m1 '^version = ' "$file" | sed 's/version = "\(.*\)"/\1/')
+            echo "$file: $actual"
+            if [ "$TAG_VERSION" != "$actual" ]; then
+              echo "::error::Tag $TAG_VERSION does not match $file version $actual"
+              exit 1
+            fi
+          }
+          check_lock() {
+            local file="$1" crate="$2" actual
+            actual=$(grep -A1 "^name = \"$crate\"\$" "$file" | grep -m1 '^version = ' | sed 's/version = "\(.*\)"/\1/')
+            echo "$file [$crate]: $actual"
+            if [ "$TAG_VERSION" != "$actual" ]; then
+              echo "::error::Tag $TAG_VERSION does not match $crate in $file ($actual)"
+              exit 1
+            fi
+          }
+          check_toml ddk-ffi/Cargo.toml
+          check_toml ddk-ts/Cargo.toml
+          check_lock ddk-ffi/Cargo.lock ddk_ffi
+          check_lock ddk-ts/Cargo.lock ddk_ts
+          check_lock ddk-ts/Cargo.lock ddk_ffi
+
           echo "version=$TAG_VERSION" >> "$GITHUB_OUTPUT"
 
   build-ddk-ts:
