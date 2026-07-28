@@ -279,15 +279,7 @@ function generateTypeScriptBindings() {
   console.log();
 }
 
-// Step 8: Prepare Rust source for React Native
-function prepareRustSource() {
-  console.log("📦 Preparing Rust source for React Native package...");
-  runCommand("node scripts/prepare-rust-src.js", ddkRnRoot, { silent: true });
-  console.log("   ✅ Rust source prepared");
-  console.log();
-}
-
-// Step 9: Build React Native package
+// Step 8: Build React Native package
 function buildReactNativePackage() {
   console.log("🔨 Building React Native package...");
   runCommand("pnpm prepare", ddkRnRoot, {
@@ -585,7 +577,6 @@ async function main() {
     generateTypeScriptBindings();
 
     // Prepare packages
-    prepareRustSource();
     buildReactNativePackage();
 
     // Create release artifacts

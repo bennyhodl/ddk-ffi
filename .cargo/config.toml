@@ -1,0 +1,29 @@
+# Android 15+ requires every .so in an APK to be 16KB-page aligned.
+#
+# ddk-rn/android/CMakeLists.txt already sets `-Wl,-z,max-page-size=16384`, but
+# only for the C++ library CMake itself builds. Since ddk-rn switched Android to
+# `useSharedLibrary: true`, libddk_ffi.so is a second shared object in the APK
+# and it is produced by cargo, not CMake — so it needs the flag here or it
+# inherits whatever the NDK's linker happens to default to. Only NDK r27+
+# defaults to 16KB; setting it explicitly keeps this independent of which NDK
+# the build host provides.
+#
+# These are per-target `rustflags` rather than the RUSTFLAGS environment
+# variable on purpose: RUSTFLAGS also applies to build scripts, which compile
+# for the host, and a macOS or Linux linker rejects `-z max-page-size`.
+#
+# This file lives at the repo root because cargo discovers config by walking up
+# from the current directory, and ubrn invokes cargo from ddk-rn/ rather than
+# from the crate directory. The root is an ancestor of every build cwd.
+
+[target.aarch64-linux-android]
+rustflags = ["-C", "link-arg=-Wl,-z,max-page-size=16384"]
+
+[target.armv7-linux-androideabi]
+rustflags = ["-C", "link-arg=-Wl,-z,max-page-size=16384"]
+
+[target.i686-linux-android]
+rustflags = ["-C", "link-arg=-Wl,-z,max-page-size=16384"]
+
+[target.x86_64-linux-android]
+rustflags = ["-C", "link-arg=-Wl,-z,max-page-size=16384"]

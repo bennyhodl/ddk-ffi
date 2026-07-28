@@ -122,7 +122,7 @@ function generateBindings() {
     }
 
     console.log(
-      'ℹ️  Native library builds will be done during postinstall on client side'
+      'ℹ️  Native libraries are prebuilt and shipped in the package (see the publish workflow)'
     );
   } catch (error) {
     throw new Error(`Failed to generate bindings: ${error.message}`);
@@ -143,16 +143,6 @@ function runTests() {
   // runCommand('pnpm test', ddkRnRoot, 'Running React Native tests');
 
   console.log('✅ All tests passed');
-}
-
-function prepareRustSource() {
-  console.log('📦 Preparing Rust source for npm package...');
-  runCommand(
-    'node scripts/prepare-rust-src.js',
-    ddkRnRoot,
-    'Copying Rust source into package'
-  );
-  console.log('✅ Rust source prepared');
 }
 
 function buildPackage() {
@@ -220,9 +210,11 @@ function releaseWithPnpm() {
 function main() {
   try {
     if (dryRun) {
-      console.log('🏃 Running in DRY RUN mode - no commits or publishing will occur\n');
+      console.log(
+        '🏃 Running in DRY RUN mode - no commits or publishing will occur\n'
+      );
     }
-    
+
     console.log('🔍 Pre-flight checks...');
 
     // 1. Check git status (skip if dry run)
@@ -248,11 +240,7 @@ function main() {
     // console.log('\n🔧 Generating bindings...');
     // generateBindings();
 
-    // 6. Prepare Rust source for npm package
-    console.log('\n📦 Preparing Rust source...');
-    prepareRustSource();
-
-    // 7. Build package
+    // 6. Build package
     console.log('\n🔨 Building package...');
     buildPackage();
 
@@ -297,10 +285,10 @@ function main() {
       '   - Turbo module files (NativeDdkRn.ts, index.tsx, bennyblader-ddk-rn.cpp/h)'
     );
     console.log(
-      '   - Complete Rust source (ddk-ffi directory)'
+      '   - Prebuilt native libraries (iOS XCFramework, Android jniLibs)'
     );
     console.log(
-      '   Native libraries will be built during postinstall on the client side.'
+      '   Consumers compile nothing on install; the Rust source is not shipped.'
     );
   } catch (error) {
     console.error('\n❌ Release failed:', error.message);

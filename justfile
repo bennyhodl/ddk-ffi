@@ -57,15 +57,56 @@ uniffi-turbo:
     --config {{justfile_directory()}}/ddk-rn/ubrn.config.yaml \
     --native-bindings
 
-# Build the iOS XCFramework
+# These artifacts SHIP INSIDE THE NPM PACKAGE (see the `files` array in
+# ddk-rn/package.json), so their size is a download every consumer pays.
+#
+# `--release` applies to both platforms and must stay: a debug static archive is
+# ~320MB per slice against ~44MB release, and omitting it is what produced the
+# 915MB xcframework.
+#
+# Stripping applies to iOS ONLY. iOS must link a static archive (a React Native
+# requirement), which keeps every object file whether referenced or not, so
+# `strip -S` is the only lever on its size. Android instead links a shared
+# library, where the linker already drops unreferenced code — and stripping it
+# would break ubrn's codegen. See build-android below.
+#
+# Build the iOS XCFramework (release, stripped)
 build-ios:
   cd {{justfile_directory()}}/ddk-rn && uniffi-bindgen-react-native build ios \
-    --config {{justfile_directory()}}/ddk-rn/ubrn.config.yaml --and-generate
+    --config {{justfile_directory()}}/ddk-rn/ubrn.config.yaml --release --and-generate
+  just strip-ios
+  just binary-sizes
 
+# Strip debug symbols from every slice of the built XCFramework (macOS only)
+strip-ios:
+  find {{justfile_directory()}}/ddk-rn/ios/DdkRn.xcframework -name '*.a' -exec strip -S {} \;
+
+# Android deliberately has NO strip step. It links Rust as a shared library
+# (`android.useSharedLibrary: true`), and ubrn breaks turbo-module and native
+# bindings generation if that library is stripped. Linking already discards
+# unreferenced code, so the .so is ~a tenth of the equivalent static archive
+# without stripping anything.
+#
+# `targets` is a comma-separated ABI list (arm64-v8a,armeabi-v7a,x86,x86_64)
+# overriding ubrn.config.yaml. Leave it empty for a release — the package needs
+# all four. PR CI passes a single ABI to keep the build short; it is checking
+# that the library still compiles and links, not producing a shippable artifact.
+#
 # Build the Android JNI libraries (not part of `just build`; needs the NDK)
-build-android:
+build-android targets="":
   cd {{justfile_directory()}}/ddk-rn && uniffi-bindgen-react-native build android \
-    --config {{justfile_directory()}}/ddk-rn/ubrn.config.yaml --and-generate
+    --config {{justfile_directory()}}/ddk-rn/ubrn.config.yaml --release --and-generate \
+    {{ if targets == "" { "" } else { "--targets " + targets } }}
+  just binary-sizes
+
+# Report the size of every binary destined for the npm package
+binary-sizes:
+  #!/usr/bin/env bash
+  cd {{justfile_directory()}}/ddk-rn
+  echo "── binaries shipped in the npm package ──"
+  [ -d ios/DdkRn.xcframework ] && du -sh ios/DdkRn.xcframework && du -sh ios/DdkRn.xcframework/*/ || true
+  [ -d android/src/main/jniLibs ] && du -sh android/src/main/jniLibs && du -sh android/src/main/jniLibs/*/ || true
+  echo "────────────────────────────────────────"
 
 # ====================
 # Example app
@@ -101,10 +142,6 @@ clean:
 # Release the React Native bindings
 rn-release:
   cd {{justfile_directory()}}/ddk-rn && node scripts/release.js
-
-# Create binary archives for the React Native bindings
-rn-release-archives:
-  cd {{justfile_directory()}}/ddk-rn && node scripts/create-binary-archives.js
 
 # ====================
 # TypeScript (Node.js) Bindings

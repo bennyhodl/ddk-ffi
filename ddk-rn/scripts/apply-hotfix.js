@@ -28,7 +28,6 @@ function applyHotFix() {
   console.log('🔧 Applying post-build hot fixes...');
 
   const cppFile = path.join(ddkRnRoot, 'cpp', 'bennyblader-ddk-rn.cpp');
-  const podspecFile = path.join(ddkRnRoot, 'DdkRn.podspec');
 
   // Fix 1: C++ include path
   if (fs.existsSync(cppFile)) {
@@ -45,41 +44,24 @@ function applyHotFix() {
     }
   }
 
-  // Fix 2: Add back xcconfig LIBRARY_SEARCH_PATHS to podspec (gets removed by uniffi build)
-  if (fs.existsSync(podspecFile)) {
-    let podspecContent = fs.readFileSync(podspecFile, 'utf8');
-
-    // Check if xcconfig is missing
-    if (
-      !podspecContent.includes('s.xcconfig = {') &&
-      !podspecContent.includes('LIBRARY_SEARCH_PATHS')
-    ) {
-      // Find the line with s.vendored_frameworks and add xcconfig after it
-      const vendoredFrameworksLine =
-        's.vendored_frameworks = "ios/DdkRn.xcframework"';
-      if (podspecContent.includes(vendoredFrameworksLine)) {
-        const xconfigBlock = `  s.xcconfig = {
-    'LIBRARY_SEARCH_PATHS' => '$(SRCROOT)/../node_modules/@bennyblader/ddk-rn/ios/DdkRn.xcframework/ios-arm64-simulator $(SRCROOT)/../node_modules/@bennyblader/ddk-rn/ios/DdkRn.xcframework/ios-arm64 $(SRCROOT)/../node_modules/@bennyblader/ddk-rn/ios/DdkRn.xcframework/ios-x86_64-simulator $(SRCROOT)/../node_modules/@bennyblader/ddk-rn/ios/DdkRn.xcframework/ios-x86_64'
-  }`;
-
-        podspecContent = podspecContent.replace(
-          vendoredFrameworksLine,
-          vendoredFrameworksLine + '\n' + xconfigBlock
-        );
-
-        fs.writeFileSync(podspecFile, podspecContent);
-        console.log(
-          '   ✅ Added back xcconfig LIBRARY_SEARCH_PATHS to DdkRn.podspec'
-        );
-      } else {
-        console.log(
-          '   ⚠️  Could not find vendored_frameworks line in podspec'
-        );
-      }
-    } else {
-      console.log('   ✅ DdkRn.podspec already has xcconfig');
-    }
-  }
+  // Fix 2 (REMOVED): this used to inject an `s.xcconfig` LIBRARY_SEARCH_PATHS
+  // block into DdkRn.podspec pointing at four XCFramework slices. It is gone
+  // deliberately — do not reinstate it:
+  //
+  //   * `s.vendored_frameworks = "ios/DdkRn.xcframework"` is the supported
+  //     CocoaPods mechanism for an XCFramework. CocoaPods selects the right
+  //     slice and sets the search paths itself, so the block was redundant.
+  //   * Two of the four paths it injected (`ios-x86_64-simulator`, `ios-x86_64`)
+  //     never matched a real slice. A 3-target build produced a merged
+  //     `ios-arm64_x86_64-simulator`, and the framework now builds only
+  //     `ios-arm64` and `ios-arm64-simulator`.
+  //   * It hardcoded `$(SRCROOT)/../node_modules/@bennyblader/ddk-rn/...`,
+  //     which does not exist under pnpm's layout — the package manager this
+  //     project uses.
+  //
+  // It existed because the XCFramework used to be built on the consumer's
+  // machine during postinstall. Now that binaries ship prebuilt in the package,
+  // there is nothing to patch around.
 
   console.log('   ✅ Hot fixes applied and files unstaged');
   console.log();

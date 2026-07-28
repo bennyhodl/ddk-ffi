@@ -10,6 +10,20 @@ npm install @bennyblader/ddk-rn
 pnpm add @bennyblader/ddk-rn
 ```
 
+That's the whole install. The package ships prebuilt native binaries — the iOS
+XCFramework and the Android JNI libraries — so nothing is compiled on your
+machine and no Rust toolchain, Android NDK, or extra download is required.
+`pod install` and Gradle pick the binaries up from `node_modules` directly.
+
+Prebuilt platform coverage:
+
+| Platform | Architectures |
+|----------|---------------|
+| iOS      | `arm64` device, `arm64` simulator |
+| Android  | `arm64-v8a`, `armeabi-v7a`, `x86`, `x86_64` |
+
+The Intel Mac simulator (`x86_64`) is not included.
+
 ## Quick Start
 
 ```typescript

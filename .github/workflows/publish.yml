@@ -194,13 +194,109 @@ jobs:
           npm config set provenance true
           npm publish --access public
 
-  publish-ddk-rn:
-    name: Publish @bennyblader/ddk-rn
-    needs: [test-ddk-rn]
+  # ddk-rn ships PREBUILT native binaries so that `npm install` never compiles
+  # anything on a consumer's machine. That requires two build hosts: the iOS
+  # XCFramework needs `xcodebuild -create-xcframework`, which only exists on
+  # macOS, while the Android JNI archives need the NDK. Each uploads its
+  # binaries as an artifact; publish-ddk-rn assembles them into one package.
+  build-ddk-rn-ios:
+    name: Build ddk-rn iOS XCFramework
+    needs: [verify-version]
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18.17'
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 10
+      - name: Install uniffi-bindgen-react-native
+        run: npm install -g uniffi-bindgen-react-native@0.31.0-3
+      - uses: extractions/setup-just@v1
+      - name: Install ddk-rn dependencies
+        run: cd ddk-rn && pnpm install
+      - name: Generate JSI bindings
+        run: just uniffi-jsi
+      - name: Generate TurboModule bindings
+        run: just uniffi-turbo
+      # Release + stripped; see the comment above `build-ios` in the justfile.
+      - name: Build XCFramework
+        run: just build-ios
+      - name: Upload XCFramework
+        uses: actions/upload-artifact@v4
+        with:
+          name: ddk-rn-ios-xcframework
+          path: ddk-rn/ios/DdkRn.xcframework
+          if-no-files-found: error
+      # The bindings are regenerated here by `--and-generate`, so publish takes
+      # them from this job rather than regenerating a third time.
+      - name: Upload generated bindings
+        uses: actions/upload-artifact@v4
+        with:
+          name: ddk-rn-generated-bindings
+          path: |
+            ddk-rn/src
+            ddk-rn/cpp
+          if-no-files-found: error
+
+  build-ddk-rn-android:
+    name: Build ddk-rn Android JNI libraries
+    needs: [verify-version]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18.17'
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 10
+      - name: Install uniffi-bindgen-react-native
+        run: npm install -g uniffi-bindgen-react-native@0.31.0-3
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk
+      - uses: extractions/setup-just@v1
+      - name: Install ddk-rn dependencies
+        run: cd ddk-rn && pnpm install
+      # ubrn shells out to `cargo ndk`, which resolves the toolchain from
+      # ANDROID_NDK_HOME.
+      #
+      # Pinned rather than taken from ANDROID_NDK_LATEST_HOME: that variable
+      # tracks whatever the runner image ships (r29 at time of writing) and
+      # moves without warning, so a release could be built by a toolchain
+      # nobody tested against. r27 is the runner's own default, is what
+      # ANDROID_NDK_ROOT points at, and is the first release to default to
+      # 16KB page alignment. Keep this in sync with what you install locally.
+      - name: Build JNI libraries
+        run: |
+          export ANDROID_NDK_HOME="$ANDROID_SDK_ROOT/ndk/27.3.13750724"
+          if [ ! -d "$ANDROID_NDK_HOME" ]; then
+            echo "::error::Pinned NDK 27.3.13750724 is not on this runner. Installed:"
+            ls "$ANDROID_SDK_ROOT/ndk"
+            exit 1
+          fi
+          echo "Using NDK at $ANDROID_NDK_HOME"
+          just build-android
+      - name: Upload JNI libraries
+        uses: actions/upload-artifact@v4
+        with:
+          name: ddk-rn-android-jnilibs
+          path: ddk-rn/android/src/main/jniLibs
+          if-no-files-found: error
+
+  publish-ddk-rn:
+    name: Publish @bennyblader/ddk-rn
+    needs: [test-ddk-rn, build-ddk-rn-ios, build-ddk-rn-android]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '18.17'
@@ -208,19 +304,56 @@ jobs:
       - uses: pnpm/action-setup@v2
         with:
           version: 10
-      - name: Install uniffi-bindgen-react-native
-        run: npm install -g uniffi-bindgen-react-native@0.31.0-3
-      - uses: extractions/setup-just@v1
-      - name: Generate JSI bindings
-        run: just uniffi-jsi
-      - name: Generate TurboModule bindings
-        run: just uniffi-turbo
-      - name: Copy Rust source into package
-        run: cd ddk-rn && node scripts/prepare-rust-src.js
+      # No Rust toolchain and no ubrn here: every native artifact and every
+      # generated binding arrives as an artifact from the two build jobs.
+      - name: Download generated bindings
+        uses: actions/download-artifact@v4
+        with:
+          name: ddk-rn-generated-bindings
+          path: ddk-rn
+      - name: Download iOS XCFramework
+        uses: actions/download-artifact@v4
+        with:
+          name: ddk-rn-ios-xcframework
+          path: ddk-rn/ios/DdkRn.xcframework
+      - name: Download Android JNI libraries
+        uses: actions/download-artifact@v4
+        with:
+          name: ddk-rn-android-jnilibs
+          path: ddk-rn/android/src/main/jniLibs
       - name: Install ddk-rn dependencies
         run: cd ddk-rn && pnpm install
       - name: Build
         run: cd ddk-rn && pnpm prepare
+      # Fail loudly rather than publishing a package that would make consumers
+      # compile Rust — the exact failure mode this pipeline exists to prevent.
+      - name: Verify binaries are in the tarball
+        run: |
+          cd ddk-rn
+          npm pack --dry-run 2>&1 | tee /tmp/pack.txt
+          # The simulator slice is named for the archs it contains
+          # (ios-arm64-simulator, ios-arm64_x86_64-simulator, ...), so match the
+          # suffix rather than pinning a name that changes with the target list.
+          check() {
+            if ! grep -qE "$1" /tmp/pack.txt; then
+              echo "::error::Missing $2 from the npm tarball"
+              exit 1
+            fi
+          }
+          check 'ios/DdkRn\.xcframework/ios-arm64/libddk_ffi\.a' 'iOS device slice'
+          check 'ios/DdkRn\.xcframework/ios-[^/]*simulator/libddk_ffi\.a' 'iOS simulator slice'
+          # .so, not .a — Android links a shared library. A static archive here
+          # would still build, but silently multiply the package size ~10x.
+          check 'android/src/main/jniLibs/arm64-v8a/libddk_ffi\.so' 'Android arm64-v8a shared library'
+          if grep -q 'jniLibs/[^/]*/libddk_ffi\.a' /tmp/pack.txt; then
+            echo "::error::Android shipped a static archive; expected a shared library (android.useSharedLibrary)"
+            exit 1
+          fi
+          if grep -qE 'ddk-ffi/(src|Cargo)' /tmp/pack.txt; then
+            echo "::error::Rust source leaked into the tarball"
+            exit 1
+          fi
+          echo "✅ prebuilt binaries present, no Rust source"
       - name: Publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
