@@ -54,6 +54,12 @@ env:
   # Pinned to match publish.yml. ANDROID_NDK_LATEST_HOME tracks whatever the
   # runner image ships and would let CI drift from what releases are built with.
   NDK_VERSION: "27.1.12297006"
+  # `curl | bash` installs whatever is newest, which is the same "moves without
+  # warning" problem as the NDK. It is not only about flow behaviour: Maestro
+  # reworded its schema error between 1.x ("Failed to parse file") and 2.x
+  # ("Unknown Property"), which silently changed what the flow check could
+  # detect. Bump deliberately, and re-run `just e2e-flows` locally when you do.
+  MAESTRO_VERSION: "2.7.0"
 
 jobs:
   # ==========================================================================
@@ -160,6 +166,30 @@ jobs:
 
       - name: jest (ddk-rn)
         run: cd ddk-rn && pnpm test
+
+      # ---- Maestro flows ---------------------------------------------------
+      # Parses every flow and runs none of them, so it needs no device and no
+      # app — which is the point: a flow with a schema error is otherwise
+      # indistinguishable from a healthy one until the e2e stage installs an app,
+      # i.e. after a full macOS build. A `timeout:` on `assertVisible` (not a
+      # selector property) cost exactly that. The script self-tests against a
+      # known-bad flow, so it cannot silently degrade into passing everything.
+      #
+      # Maestro is a JVM app; the check job installs no Java otherwise.
+      - name: Setup Java (for Maestro)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Validate Maestro flows
+        env:
+          MAESTRO_VERSION: ${{ env.MAESTRO_VERSION }}
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          export PATH="$HOME/.maestro/bin:$PATH"
+          maestro -v
+          ./scripts/check-maestro-flows.sh ddk-rn/example/.maestro
 
   # ==========================================================================
   # STAGE 2a — build the React Native bindings and a runnable example app.
@@ -486,9 +516,12 @@ jobs:
           path: artifact
 
       - name: Install Maestro
+        env:
+          MAESTRO_VERSION: ${{ env.MAESTRO_VERSION }}
         run: |
           curl -Ls "https://get.maestro.mobile.dev" | bash
           echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+          "$HOME/.maestro/bin/maestro" -v
 
       # ---- iOS -------------------------------------------------------------
       - name: Boot simulator and run Maestro
@@ -498,11 +531,39 @@ jobs:
         run: |
           set -euo pipefail
           tar xzf artifact/DdkRnExample.app.tar.gz -C artifact
-          xcrun simctl boot "$SIMULATOR_NAME" || true
-          xcrun simctl bootstatus "$SIMULATOR_NAME" -b
-          xcrun simctl install booted artifact/DdkRnExample.app
+
+          # Everything below addresses one simulator, by UDID. `booted` is NOT
+          # unambiguous — the runner can have more than one simulator up, and
+          # simctl and Maestro then pick independently. That is a real failure,
+          # not a precaution: simctl installed onto CAE6A0BF… while Maestro drove
+          # 287A7916…, and the flow died on `launchApp` with
+          # "Simulator device failed to launch ddkrn.example
+          #  (FBSOpenApplicationServiceErrorDomain, code=4)"
+          # with no crash log, because the app simply was not on that device.
+          # The trailing " (" keeps "iPhone 15" from matching "iPhone 15 Pro".
+          UDID=$(xcrun simctl list devices available \
+            | grep -E "^[[:space:]]+${SIMULATOR_NAME} \(" \
+            | head -1 \
+            | sed -E 's/.*\(([0-9A-Fa-f-]{36})\).*/\1/')
+          [ -n "$UDID" ] || {
+            echo "::error::no available simulator named '$SIMULATOR_NAME'"
+            xcrun simctl list devices available
+            exit 1
+          }
+          echo "Using $SIMULATOR_NAME ($UDID)"
+
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl install "$UDID" artifact/DdkRnExample.app
+
+          # Assert the install landed on the device Maestro will drive, so a
+          # missing app fails here with a clear message instead of surfacing as
+          # an opaque launch error several minutes later.
+          xcrun simctl get_app_container "$UDID" ddkrn.example >/dev/null \
+            || { echo "::error::ddkrn.example is not installed on $UDID"; exit 1; }
+
           cd ddk-rn/example
-          maestro test .maestro/
+          maestro --udid "$UDID" test .maestro/
 
       # ---- Android ---------------------------------------------------------
       # Without this the emulator falls back to software CPU emulation and the
@@ -529,15 +590,15 @@ jobs:
           ram-size: 4096M
           disable-animations: true
           emulator-options: -no-window -no-snapshot -noaudio -no-boot-anim -gpu swiftshader_indirect -camera-back none
-          script: |
-            set -euo pipefail
-            adb install -r artifact/app-release.apk
-            cd ddk-rn/example
-            maestro test .maestro/
-
-      - name: Capture logcat on failure
-        if: failure() && matrix.platform == 'android'
-        run: adb logcat -d > "$RUNNER_TEMP/logcat.txt" || true
+          # ONE line, deliberately. This action does not run `script:` as a
+          # script — it splits the input on newlines and runs each line as its
+          # own `sh -c`, so nothing carries across lines: `set -eu` applies to a
+          # shell that immediately exits, a `cd` is discarded, and a variable is
+          # gone by the next line. Multi-line versions of this failed twice, most
+          # recently with "no emulator in adb devices" straight after a
+          # successful install. Everything lives in the script file; see the
+          # comment at the top of it before changing this.
+          script: ./scripts/e2e-android.sh
 
       - name: Upload Maestro debug artifacts on failure
         if: failure()

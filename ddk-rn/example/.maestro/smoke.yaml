@@ -25,10 +25,16 @@ appId: ddkrn.example
 # `timeout` is not among them. assertVisible waits only for the implicit default,
 # so this is also the only form that actually honours the cold-start budget.
 #
-# The text is matched as a regex, and the semver is the point of the assertion:
-# `version()` is a JSI call into Rust, so anything other than a real version —
-# an empty string, `undefined`, a throw — fails here.
+# The semver is the point of the assertion: `version()` is a JSI call into Rust,
+# so anything other than a real version — an empty string, `undefined`, a throw —
+# fails here.
+#
+# The leading `.*` is required, not decorative. Maestro matches `text` as a regex
+# against the element's ENTIRE text, not as a substring search, so a pattern that
+# describes only part of the text never matches. The element here reads
+# "@bennyhodl/ddk-rn version: 0.4.0", and the same pattern without `.*` failed on
+# both platforms against exactly that string.
 - extendedWaitUntil:
     visible:
-      text: 'version: [0-9]+\.[0-9]+\.[0-9]+'
+      text: '.*version: [0-9]+\.[0-9]+\.[0-9]+'
     timeout: 60000

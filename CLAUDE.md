@@ -262,6 +262,81 @@ platform not in the published matrix.
 - TypeScript tests: `pnpm test` (in ddk-rn/)
 - Integration testing via example app
 
+### Run the Maestro E2E locally before pushing
+
+CI's `e2e` stage installs an app an earlier stage built and runs `maestro test`
+— nothing more. The `just e2e-*` recipes are those same steps locally, split so
+the expensive one can be skipped:
+
+| command | needs | time |
+|---|---|---|
+| `just e2e-flows` | nothing — no device, no app | ~15s |
+| `just e2e-ios-test` | the app already installed | ~10s |
+| `just e2e-ios` | full: build + install + run | ~5-10m |
+
+While editing a flow, stay in `e2e-ios-test`; only rebuild when the app itself
+changes (JS, Rust, or the generated bindings).
+
+**Validate flows even when you cannot run them.** Maestro has no `validate` or
+`--dry-run` mode, so `scripts/check-maestro-flows.sh` (used by both `just
+e2e-flows` and the CI `check` job) leans on two behaviours:
+
+- `--include-tags` with a tag no flow declares parses every flow and runs none.
+  That is what makes it safe with a simulator booted — a bare `maestro test`
+  would execute the suite.
+- A schema error prints `Failed to parse file`. **The exit code cannot be used**:
+  Maestro exits 1 both for a parse error and for "no flows matched", which is
+  the normal outcome here.
+
+Because the signal is a string match, the script first proves itself against a
+flow known to be invalid and fails loudly if that stops being detected —
+otherwise a Maestro upgrade could silently turn the gate into a no-op. That is
+not hypothetical: **Maestro reworded the error between majors** (1.x "Failed to
+parse file", 2.x "Unknown Property"), the canary caught it on the first CI run,
+and the matcher now accepts both.
+
+**Maestro is pinned** via `MAESTRO_VERSION` in `ci.yml`. `curl | bash` installs
+whatever is newest, which is the same "moves without warning" problem as the NDK
+— and here it silently changes what the flow check can detect. Match it locally
+with `MAESTRO_VERSION=<version> curl -Ls https://get.maestro.mobile.dev | bash`;
+`maestro -v` is printed in CI so a mismatch is visible in the log.
+
+This exists because `timeout:` on `assertVisible` is a *parse* error, not a slow
+assertion: `timeout` is not one of the element selector's 28 properties (only
+`scrollUntilVisible` and `extendedWaitUntil` take it, as a sibling of the
+selector). It passed review, passed every build stage, and only failed on a
+macOS runner ~25 minutes in. Use `extendedWaitUntil` to wait with a timeout.
+
+**`text:` is a full match, not a substring search.** Maestro matches the regex
+against the element's entire text, so `text: 'version: [0-9]+\.[0-9]+\.[0-9]+'`
+does *not* match an element reading `@bennyhodl/ddk-rn version: 0.4.0`. Prefix
+with `.*` when matching part of a string. This cost a full CI round trip on both
+platforms, and note what the flow check **cannot** do about it: the flow parses
+fine, so `check-maestro-flows.sh` passes it. Only a device can tell you a
+selector matches nothing — the gate covers syntax, not semantics. When a flow
+fails on a selector, read the screenshot and `screen-hierarchy/*.json` under the
+`maestro-debug-*` artifact before assuming the app is broken; they show exactly
+what was on screen and what text Maestro could see.
+
+**A busy emulator can steal the foreground.** In the same run, Android sat in a
+60s `extendedWaitUntil` (because of the matcher bug above) and the Pixel Launcher
+ANR'd mid-wait — its "isn't responding" dialog covered the app, so the final
+hierarchy contains the launcher rather than the app. logcat showed the app itself
+had launched cleanly (`Displayed ddkrn.example/.MainActivity`) and
+`libbennyblader-ddk-rn.so` loaded fine. Treat a launcher ANR as emulator
+contention right after boot, not as an app failure — but it only got the chance
+because the flow was waiting on an assertion that could never pass.
+
+Android needs a one-time `just e2e-android-setup` (~1.5GB). Two things to know:
+
+- It installs `cmdline-tools` into the SDK and calls `avdmanager` from there.
+  A Homebrew `sdkmanager`/`avdmanager` hard-codes its own SDK root and ignores
+  `ANDROID_HOME`, so it reports `Valid system image paths are: null` and refuses
+  to create the AVD.
+- The local emulator is **arm64-v8a** where CI uses **x86_64** — each must match
+  its host or it runs under full CPU emulation. So a local Android run proves
+  the flow and the bindings, not the exact artifact CI ships.
+
 ### The example app pins a specific React Native environment
 
 `ddk-rn/example` is pinned to the React Native release these bindings are
@@ -307,6 +382,15 @@ Gotchas hit doing the 0.75 → 0.80 bump, all likely to recur:
   'prettier/prettier' was not found".
 - RN 0.80's `pod install` writes `RCTNewArchEnabled` into `Info.plist`; new arch is
   no longer driven only by the `RCT_NEW_ARCH_ENABLED` env var.
+- **`SoLoader.init(this, false)` must become
+  `SoLoader.init(this, OpenSourceMergedSoMapping)`** in the example's
+  `MainApplication.kt`. The merged `.so` is only half the 0.76 change: the old
+  two-arg call leaves SoLoader without the name mapping, so RN's own
+  `System.loadLibrary("react_featureflagsjni")` looks for a library that no
+  longer ships and the app dies on launch with `UnsatisfiedLinkError` before any
+  JS runs. **The readelf `NEEDED` check above does not catch this** — the native
+  linkage is correct either way; the failure is on the Java side. Only launching
+  the app finds it, which is what `just e2e-android` is for.
 
 ## Code Generation
 
