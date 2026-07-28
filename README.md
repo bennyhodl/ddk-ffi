@@ -334,13 +334,14 @@ View the [compatibility verification script](./ddk-ts/scripts/verify-parity.cjs)
 just ts-build          # Build for current platform
 just ts-build-all      # Build for all platforms
 just ts-test           # Run tests
-just ts-release 0.2.0  # Release new version
 
 # React Native
 just uniffi            # Generate all bindings
 just build-ios         # Build iOS
 just build-android     # Build Android
-just release           # Release new version
+
+# Release both packages (bumps versions, tags, pushes; CI publishes)
+just release 0.2.0
 
 # Clean everything
 just clean

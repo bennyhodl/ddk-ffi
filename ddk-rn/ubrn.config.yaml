@@ -9,13 +9,30 @@ bindings:
 android:
   directory: android
   packageName: com.ddkrn
+  # Link Rust as a shared library rather than a static archive. These binaries
+  # ship in the npm package, and a static archive carries every object file
+  # whether or not anything references it: ~37MB per ABI, ~150MB across the four.
+  # A linked .so is roughly a tenth of that (measured on iOS: 37MB archive vs
+  # 3.7MB linked cdylib).
+  #
+  # Two constraints come with this and are both satisfied:
+  #   * ddk-ffi's crate-type must include `cdylib` — it does.
+  #   * The library must NOT be stripped, or ubrn's turbo-module and native
+  #     bindings generation breaks. ddk-ffi declares no [profile.release], so
+  #     cargo's default `strip = "none"` applies; do not add one. There is
+  #     deliberately no strip step for Android in the justfile.
+  useSharedLibrary: true
 
 ios:
   directory: ios
+  # Each target adds a ~39MB (release, stripped) static archive to the npm
+  # package. x86_64-apple-ios — the Intel Mac simulator slice — is deliberately
+  # omitted: Apple Silicon has been the only Mac sold since 2023, and the slice
+  # costs every consumer a full extra archive. Re-add it here if an Intel Mac
+  # simulator ever needs supporting.
   targets:
     - aarch64-apple-ios
     - aarch64-apple-ios-sim
-    - x86_64-apple-ios
   frameworkName: ios/DdkRn
 
 turboModule:

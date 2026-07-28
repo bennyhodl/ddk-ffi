@@ -22,76 +22,49 @@ This document outlines the key development practices and workflow for the ddk-ff
 
 ### Before Every Commit/Tag
 
-When making changes to `src/lib.rs` or `src/ddk_ffi.udl`, you MUST:
+When making changes to `ddk-ffi/src/lib.rs`, you MUST:
 
 1. **Generate bindings**: Run `just uniffi` to regenerate all language bindings
-2. **Fix include path**: Manually fix the include path in `ddk-rn/cpp/bennyblader-ddk-rn.cpp`:
-   ```cpp
-   // Change this:
-   #include "/ddk_ffi.hpp"
-   // To this:
-   #include "ddk_ffi.hpp"
-   ```
-3. **Test build**: Verify the generated bindings compile correctly
-4. **Commit together**: Include both Rust changes AND generated bindings in the same commit
+2. **Test build**: Verify the generated bindings compile correctly
+3. **Commit together**: Include both Rust changes AND generated bindings in the same commit
    ```bash
    git add .  # Add all changes to the current directory
    git commit -m "feat: description of changes"
    ```
 
+> There is no `.udl` file — the interface is defined by UniFFI proc-macros in
+> `lib.rs`, which is the single source of truth. The `#include "/ddk_ffi.hpp"`
+> fix that used to be required here is also gone; uniffi 0.31 emits the correct
+> include.
+
 ### Release Process
 
-#### Automated Release (Recommended)
+Releases are published by CI, never from a developer machine. No single host can
+build everything the repo ships: `ddk-rn`'s XCFramework needs macOS, its JNI
+libraries need a Linux host with the Android NDK, and `ddk-ts` builds a separate
+napi binary per platform.
 
-5. **Update Rust version only**: Update version in Cargo.toml
+With a clean working tree:
 
-   ```bash
-   # Update Rust crate version to match package.json
-   vim ddk-ffi/Cargo.toml  # Change version = "0.1.1" to "0.1.2"
-   ```
+```bash
+just release 0.2.0
+```
 
-6. **Regenerate bindings**: Run `just uniffi` to update version in generated bindings
+That runs `scripts/prep-release.js`, which sets the version in
+`ddk-ts/package.json`, `ddk-rn/package.json` and `ddk-ffi/Cargo.toml`, commits,
+tags `v0.2.0`, and pushes the branch and the tag.
 
-   ```bash
-   just uniffi
-   # Fix include path as usual
-   sed -i '' 's|#include "/ddk_ffi.hpp"|#include "ddk_ffi.hpp"|' ddk-rn/cpp/bennyblader-ddk-rn.cpp
-   ```
+Pushing the tag triggers [`.github/workflows/publish.yml`](.github/workflows/publish.yml):
 
-7. **Commit Rust version change**: Commit the Rust version bump
+1. `verify-version` fails the run unless the tag matches both `package.json` versions
+2. `build-ddk-rn-ios` builds the XCFramework on `macos-latest`
+3. `build-ddk-rn-android` builds the JNI libraries on `ubuntu-latest` with a pinned NDK
+4. `build-ddk-ts` builds each napi platform binary
+5. The publish jobs assemble the artifacts, verify the binaries are in the tarball, and `npm publish`
 
-   ```bash
-   git add .
-   git commit -m "chore: sync Rust version with package.json"
-   ```
-
-8. **Create binary archives**: Generate tarballs for GitHub release
-
-   ```bash
-   cd ddk-rn
-   
-   # Create binary archives (android-jni-libs.tar.gz, ios-xcframeworks.tar.gz)
-   pnpm create-archives
-   ```
-
-9. **Automated release with npm publishing**: Use release-it for everything else
-
-   ```bash
-   cd ddk-rn
-
-   # Authenticate with npm (first time only)
-   npm login
-
-   # Run automated release (handles versioning, tagging, GitHub release, npm publish)
-   pnpm release
-   ```
-
-10. **Upload binary archives**: After the GitHub release is created, upload the archives
-
-    ```bash
-    # Upload the generated archives to the GitHub release
-    gh release upload v<version> ../release-archives/android-jni-libs.tar.gz ../release-archives/ios-xcframeworks.tar.gz
-    ```
+There is nothing to upload by hand — no binary archives, no GitHub release assets.
+The npm tarball carries the prebuilt binaries, which is what makes consumer
+installs free of any Rust toolchain.
 
 This will automatically:
 
@@ -161,7 +134,7 @@ Alternatively, you can do it manually:
 
 ```bash
 # 1. Make changes to Rust code
-vim ddk-ffi/src/lib.rs ddk-ffi/src/ddk_ffi.udl
+vim ddk-ffi/src/lib.rs
 
 # 2. Test changes
 cd ddk-ffi && cargo test
@@ -169,47 +142,23 @@ cd ddk-ffi && cargo test
 # 3. Generate bindings
 just uniffi
 
-# 4. Fix include path
-sed -i '' 's|#include "/ddk_ffi.hpp"|#include "ddk_ffi.hpp"|' ddk-rn/cpp/bennyblader-ddk-rn.cpp
-
-# 5. Commit feature changes
+# 4. Commit feature changes together with the regenerated bindings
 git add .
 git commit -m "feat: description of changes"
 
-# 6. Update Rust version to match package.json
-vim ddk-ffi/Cargo.toml    # Update version = "0.1.2" (match package.json)
-
-# 7. Regenerate bindings with new version
-just uniffi
-sed -i '' 's|#include "/ddk_ffi.hpp"|#include "ddk_ffi.hpp"|' ddk-rn/cpp/bennyblader-ddk-rn.cpp
-
-# 8. Commit Rust version sync
-git add .
-git commit -m "chore: sync Rust version with package.json"
-
-# 9. Create binary archives
-cd ddk-rn
-pnpm create-archives  # Generate android-jni-libs.tar.gz and ios-xcframeworks.tar.gz
-
-# 10. Automated release with npm publishing
-cd ddk-rn
-npm login  # First time only
-pnpm release  # Handles everything: versioning, tagging, GitHub release, npm publish
-
-# 11. Upload binary archives to GitHub release
-gh release upload v<version> ../release-archives/android-jni-libs.tar.gz ../release-archives/ios-xcframeworks.tar.gz
+# 5. Release — bumps all three versions, commits, tags and pushes
+just release 0.1.2
 ```
 
-### What `pnpm release` does automatically:
+### What `just release` does automatically:
 
-- Prompts for version bump (patch, minor, major)
-- Updates package.json version
-- Builds library with react-native-builder-bob
-- Generates conventional changelog
-- Creates git commit and tag
-- Pushes to GitHub
-- Creates GitHub release
-- Publishes to npm registry
+- Refuses to run unless the working tree is clean
+- Sets the version in `ddk-ts/package.json`, `ddk-rn/package.json` and `ddk-ffi/Cargo.toml`
+- Creates the git commit and the `v<version>` tag
+- Pushes the branch and the tag
+
+Everything after that is CI's job: building the native binaries on the hosts that
+can build them, verifying the tarball, and publishing to npm.
 
 ### Why This Matters
 
@@ -219,12 +168,11 @@ gh release upload v<version> ../release-archives/android-jni-libs.tar.gz ../rele
 
 ## Development Workflow
 
-1. **Make Rust changes** in `src/lib.rs` or `src/ddk_ffi.udl`
+1. **Make Rust changes** in `ddk-ffi/src/lib.rs`
 2. **Run tests**: `cargo test` to verify Rust functionality
 3. **Generate bindings**: `just uniffi` to update all language bindings
-4. **Fix include path** in generated C++ file
-5. **Test bindings**: Verify iOS/Android/TypeScript bindings compile
-6. **Commit everything**: Include Rust + generated bindings in single commit
+4. **Test bindings**: Verify iOS/Android/TypeScript bindings compile
+5. **Commit everything**: Include Rust + generated bindings in single commit
 
 ## Code Standards
 
@@ -292,6 +240,6 @@ Before you can publish to npm, you need:
 
 ## Memory
 
-- **CRITICAL**: Always run `just uniffi` and fix the include path before committing changes to `.udl` or `.rs` files
+- **CRITICAL**: Always run `just uniffi` before committing changes to `.rs` files, and commit the regenerated bindings alongside them
 - **PRINCIPLE**: This is a pure wrapper - delegate to rust-dlc, never reimplement
-- **RELEASES**: Use `pnpm release` for automated npm publishing with proper versioning
+- **RELEASES**: Use `just release <version>` to tag and push; CI publishes both packages. Never `npm publish` by hand — only CI can build every platform's binaries

@@ -1,18 +1,20 @@
-# uniffi.toml
+# uniffi-bindgen-react-native config for the generated TypeScript bindings.
+#
+# Auto-discovered next to this crate's Cargo.toml by ubrn's TS pipeline, which
+# ignores the `--config` CLI flag — so this file applies to every generation
+# path (`just uniffi-jsi`, `generate jsi turbo-module`, `build ios/android
+# --and-generate`). Only the [bindings.typescript] table is read by uniffi 0.31.
+#
+# Available keys (camelCase; unknown keys are rejected):
+#   logLevel           = "none" | "debug" | "verbose"   # console logging in generated code
+#   strictObjectTypes  = true | false
+#   strictTypeChecking = true | false   # omit `@ts-nocheck` so tsc checks generated code
+#   strictByteArrays   = true | false   # Uint8Array instead of ArrayBuffer for Vec<u8>
+#   consoleImport      = "<module>"
+#   [bindings.typescript.customTypes.<Name>]   # custom type lift/lower config
+#
+# Note: strictTypeChecking is left off — ubrn 0.31's generated TS does not pass
+# this project's strict tsconfig, which is why ubrn defaults `@ts-nocheck` on.
+
 [bindings.typescript]
-logLevel = "verbose"
-
-[bindings.cpp]
-
-[turbo_module]
-# The name of your Turbo Module as it appears in React Native
-name = "Ddk"
-# The iOS framework name
-ios_framework = "Ddk"
-# The Android package name
-android_package = "dev.bennyblader.ddk"
-
-[namespace.ddk_ffi]
-# Configuration specific to your ddk_ffi namespace
-# This tells the generator how to handle this particular namespace
-js_module_name = "Ddk"
+logLevel = "none"

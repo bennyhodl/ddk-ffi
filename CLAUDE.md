@@ -15,10 +15,15 @@ The project consists of two main components:
 
 The architecture follows this flow:
 
-1. Rust code defines structs, functions, and errors in `ddk-ffi/src/lib.rs`
-2. UniFFI interface is declared in `ddk-ffi/src/ddk_ffi.udl`
-3. Bindings are generated for TypeScript (JSI), C++, iOS (Swift/Objective-C), and Android (Kotlin/JNI)
-4. React Native consumes the generated TypeScript API
+1. Rust code defines records, functions, methods, and errors in `ddk-ffi/src/lib.rs`,
+   annotated with UniFFI proc-macros (`#[derive(uniffi::Record)]`,
+   `#[derive(uniffi::Error)]`/`Enum`, `#[uniffi::export]`). The crate calls
+   `uniffi::setup_scaffolding!()` — there is no `.udl` file (it was fully migrated
+   to proc-macros; the Rust source is the single source of truth).
+2. Bindings are generated from the compiled library (NOT from a UDL) for TypeScript
+   (JSI), C++, iOS (Swift/Objective-C), and Android (Kotlin/JNI). Library-based
+   generation is required so proc-macro definitions are visible.
+3. React Native consumes the generated TypeScript API
 
 ## Build System & Commands
 
@@ -27,7 +32,7 @@ This project uses `just` as the primary build orchestrator. All build commands s
 ### Core Build Commands
 
 - `just uniffi`: Complete build pipeline (generates all bindings + builds iOS/Android)
-- `just uniffi-jsi`: Generate TypeScript and C++ JSI bindings from UDL
+- `just uniffi-jsi`: Build the crate and generate TypeScript + C++ JSI bindings from the compiled library
 - `just uniffi-turbo`: Generate React Native TurboModule specifications
 - `just build-ios`: Build iOS static libraries and create XCFramework
 - `just build-android`: Build Android native libraries (JNI)
@@ -53,18 +58,17 @@ This project uses `just` as the primary build orchestrator. All build commands s
 
 ## Development Workflow
 
-1. **Modify Rust Code**: Edit `ddk-ffi/src/lib.rs` with new functions/structs
-2. **Update Interface**: Add corresponding definitions to `ddk-ffi/src/ddk_ffi.udl`
-3. **Generate Bindings**: Run `just uniffi` to regenerate all language bindings
-4. **Manual Fix**: Fix the include path in `ddk-rn/cpp/bennyblader-ddk-rn.cpp` from `#include "/ddk_ffi.hpp"` to `#include "ddk_ffi.hpp"`
-5. **Test Changes**: Use example app or run tests
+1. **Modify Rust Code**: Edit `ddk-ffi/src/lib.rs`. Annotate new types with
+   `#[derive(uniffi::Record)]` / `#[derive(uniffi::Enum)]` / `#[derive(uniffi::Error)]`,
+   and exported functions/methods with `#[uniffi::export]`. No `.udl` to update.
+2. **Generate Bindings**: Run `just uniffi` to regenerate all language bindings
+3. **Test Changes**: Use example app or run tests
 
 ## Key Files & Locations
 
 ### Rust FFI Layer
 
-- `ddk-ffi/src/lib.rs`: Core Rust implementation
-- `ddk-ffi/src/ddk_ffi.udl`: UniFFI interface definitions
+- `ddk-ffi/src/lib.rs`: Core Rust implementation + UniFFI proc-macro annotations (single source of truth; no `.udl`)
 - `ddk-ffi/Cargo.toml`: Rust project configuration
 
 ### React Native Layer
@@ -84,22 +88,129 @@ This project uses `just` as the primary build orchestrator. All build commands s
 
 ## Known Issues
 
-### Manual Post-Build Fix Required
+### UniFFI / ubrn version lockstep
 
-After running `just uniffi`, manually fix the include path:
+The `uniffi` crate (`ddk-ffi/Cargo.toml`), the `uniffi-bindgen-react-native` dependency
+(`ddk-rn/package.json`), and the **globally installed** `uniffi-bindgen-react-native`
+binary must all be the same release. The `just uniffi-*` recipes call the bare
+`uniffi-bindgen-react-native` on `$PATH`, which resolves to the global pnpm install —
+not `ddk-rn/node_modules`. A version skew shows up as TypeScript errors like
+"Expected 2 arguments, but got 1" on every generated `.lower()` call.
 
-```cpp
-// In ddk-rn/cpp/bennyblader-ddk-rn.cpp, change:
-#include "/ddk_ffi.hpp"
-// To:
-#include "ddk_ffi.hpp"
-```
+ubrn pins an exact `uniffi_core` version (e.g. ubrn `0.31.0-3` requires `uniffi_core =0.31.0`),
+so pin the Rust crate to that exact patch. Update the global binary with
+`pnpm add -g uniffi-bindgen-react-native@<version>`.
+
+> Note: as of uniffi 0.31, the old manual fix for `#include "/ddk_ffi.hpp"` is no longer
+> needed — the generator emits the correct `#include "ddk_ffi.hpp"`.
 
 ### Dependencies
 
-- Requires `uniffi-bindgen-react-native` globally installed
+- Requires `uniffi-bindgen-react-native` globally installed (version must match `ddk-rn/package.json`)
 - Uses pnpm as package manager (not npm/yarn)
 - React Native new architecture enabled by default
+
+## Distribution: ddk-rn ships PREBUILT binaries
+
+Consumers must never compile Rust. `@bennyblader/ddk-rn` ships the iOS XCFramework
+and the Android JNI archives inside the npm tarball; `npm install` unpacks them and
+does nothing else. There is deliberately **no `postinstall` script**.
+
+This matters because invoking the ubrn CLI is far more expensive than it looks:
+`node_modules/uniffi-bindgen-react-native/bin/cli.cjs` is a shim that runs
+`cargo run --manifest-path .../crates/ubrn_cli/Cargo.toml`, so *any* CLI call
+compiles the bindgen itself from Rust source (~889MB target dir) before it does
+any work. A `postinstall` that called it — which is what this package used to do —
+cost consumers that build plus a full debug build of `ddk-ffi` for every iOS
+target, needed a Rust toolchain, and silently produced no Android libraries at all
+unless the consumer had the NDK.
+
+Rules to preserve:
+
+- **Never add a `postinstall`** to `ddk-rn/package.json`, and never call the ubrn
+  CLI from any consumer-facing lifecycle script.
+- The `files` array in `ddk-rn/package.json` is an allowlist that must keep
+  `ios/DdkRn.xcframework` and `android/src/main/jniLibs`. It intentionally
+  contains no `!**/*.a` / `!**/*.xcframework` / `!**/jniLibs` excludes — those
+  are what forced the source-build model. The root `.gitignore` ignores these
+  binaries, but it does not apply here: npm only consults ignore files inside the
+  package directory, and `ddk-rn/` has none. Verify with `npm pack --dry-run`.
+- The Rust source (`ddk-ffi/`) is **not** shipped in the package.
+- Always build with `--release`; a debug static archive is ~320MB per slice
+  against ~44MB release, and it ships to every consumer. `just build-ios` and
+  `just build-android` apply the right flags; use them rather than calling ubrn
+  directly.
+- The two platforms link differently, and the difference is load-bearing:
+  - **iOS** must link a *static* archive (a React Native requirement), so every
+    object file ships whether referenced or not. `strip -S` is the only lever on
+    its size — `just build-ios` applies it.
+  - **Android** links a *shared* library (`android.useSharedLibrary: true`), so
+    the linker drops unreferenced code and the `.so` is roughly a tenth of the
+    equivalent archive. It must **not** be stripped — that breaks ubrn's
+    turbo-module and native-bindings generation — so there is deliberately no
+    strip step for Android, and `ddk-ffi` must declare no `[profile.release]`
+    `strip` setting.
+- `/.cargo/config.toml` passes `-Wl,-z,max-page-size=16384` to the Android
+  targets. Android 15+ requires every `.so` in an APK to be 16KB-page aligned;
+  `android/CMakeLists.txt` sets this only for the C++ library it builds, and
+  `libddk_ffi.so` comes from cargo instead. Do not convert this to a `RUSTFLAGS`
+  env var — that would also hit host build scripts, whose linker rejects the flag.
+  Verify with the NDK's own readelf — every LOAD segment must show align `0x4000`:
+  ```
+  $NDK_HOME/toolchains/llvm/prebuilt/darwin-x86_64/bin/llvm-readelf -l \
+    ddk-rn/android/src/main/jniLibs/arm64-v8a/libddk_ffi.so | grep LOAD
+  ```
+- **NDK 27.3.13750724 is pinned**, in `.github/workflows/publish.yml` and locally.
+  It was `ANDROID_NDK_LATEST_HOME`, which tracks whatever the runner image ships
+  (r29 as of this writing) and moves without warning — a release could be built by
+  a toolchain nobody tested against. r27 is the runner's own default and the first
+  NDK to default to 16KB alignment; r28/r29 raised minimum API levels. Install the
+  same one locally with
+  `sdkmanager --sdk_root="$HOME/Library/Android/sdk" --install "ndk;27.3.13750724"`
+  so `just build-android` reproduces CI.
+- ubrn regenerates `ddk-rn/android/build.gradle` on every `--and-generate`. It
+  drops the `net.java.dev.jna:jna` dependency because JNA is gated on ubrn's
+  `--native-bindings` flag, which defaults to false and which nothing here passes;
+  the JSI path does not use JNA. Do not re-add it by hand.
+- `uniffi-bindgen-react-native` stays a runtime `dependency` — `android/CMakeLists.txt`
+  and `DdkRn.podspec` both need its C++ headers — but nothing at install time
+  invokes its binary.
+
+Publishing needs two hosts, so `.github/workflows/publish.yml` splits the work:
+`build-ddk-rn-ios` on `macos-latest` (only macOS has `xcodebuild -create-xcframework`),
+`build-ddk-rn-android` on `ubuntu-latest` (needs the NDK), then `publish-ddk-rn`
+assembles both artifacts and verifies the binaries are in the tarball before
+publishing.
+
+### Releasing
+
+`just release <version>` (→ `scripts/prep-release.js`) is the only release path.
+It sets the version in `ddk-ts/package.json`, `ddk-rn/package.json` and
+`ddk-ffi/Cargo.toml`, commits, tags `v<version>` and pushes. Pushing the tag is
+what publishes. There is deliberately no local publish path — no single host can
+build every platform this repo ships — and `ddk-rn`'s `prepublishOnly` runs
+`scripts/verify-package.js` to refuse a hand-run `npm publish` that would ship
+without binaries.
+
+Update `ddk-rn/CHANGELOG.md`'s `[Unreleased]` section **before** releasing:
+`prep-release.js` refuses a dirty tree, so it cannot be part of the release
+commit. That section is also the highest-signal input to the release notes.
+
+The `github-release` job runs after both publishes and creates the GitHub release
+via `scripts/release-notes.js`, which summarises the commit range with the
+Anthropic API (needs an `ANTHROPIC_API_KEY` repo secret; override the model with
+`RELEASE_NOTES_MODEL`). It degrades rather than fails — no key, an API error, or
+an empty response falls back to a plain commit list, and then to
+`gh release create --generate-notes`. Keep it that way: by the time this job runs
+the npm publish is irreversible, so notes must never turn a successful release
+red. Run it locally against any tag with
+`node scripts/release-notes.js <version>`.
+
+### ddk-ts
+
+`ddk-ts` also compiles nothing on install: it ships prebuilt napi platform
+packages via `optionalDependencies`, with a WASI build as the fallback for any
+platform not in the published matrix.
 
 ## Testing
 

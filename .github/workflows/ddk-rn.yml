@@ -25,7 +25,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
         with:
-          version: 8
+          version: 10
 
       - name: Cache cargo
         uses: actions/cache@v3
@@ -38,7 +38,7 @@ jobs:
 
       - name: Install uniffi-bindgen-react-native
         run: |
-          npm install -g uniffi-bindgen-react-native@0.29.3-1
+          npm install -g uniffi-bindgen-react-native@0.31.0-3
 
       - name: Install just
         uses: extractions/setup-just@v1
@@ -75,3 +75,94 @@ jobs:
         run: |
           cd ddk-rn
           pnpm test
+
+  # The Android library is only otherwise built during a tagged release, where a
+  # failure is discovered after npm publish has already happened. This builds it
+  # on every PR so breakage surfaces here instead.
+  #
+  # One ABI, not four: this checks that the crate still compiles and links for
+  # Android and that the page-alignment flag survives. Releases build all four
+  # (publish.yml calls `just build-android` with no argument).
+  build-android:
+    name: Build Android JNI library (arm64)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18.17"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 10
+
+      - name: Cache cargo
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ddk-ffi/target
+          key: ${{ runner.os }}-cargo-android-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install uniffi-bindgen-react-native
+        run: npm install -g uniffi-bindgen-react-native@0.31.0-3
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk
+
+      - name: Install just
+        uses: extractions/setup-just@v1
+
+      - name: Install ddk-rn dependencies
+        run: cd ddk-rn && pnpm install
+
+      # Pinned to match publish.yml. ANDROID_NDK_LATEST_HOME tracks the runner
+      # image and would let CI drift away from what releases are built with.
+      - name: Build
+        run: |
+          export ANDROID_NDK_HOME="$ANDROID_SDK_ROOT/ndk/27.3.13750724"
+          if [ ! -d "$ANDROID_NDK_HOME" ]; then
+            echo "::error::Pinned NDK 27.3.13750724 is not on this runner. Installed:"
+            ls "$ANDROID_SDK_ROOT/ndk"
+            exit 1
+          fi
+          just build-android arm64-v8a
+
+      # Android 15+ rejects a .so whose LOAD segments are not 16KB aligned. The
+      # flag comes from /.cargo/config.toml, which is easy to lose in a merge and
+      # produces no build error when it goes missing.
+      - name: Verify 16KB page alignment and that the library is not stripped
+        run: |
+          SO=ddk-rn/android/src/main/jniLibs/arm64-v8a/libddk_ffi.so
+          READELF="$ANDROID_SDK_ROOT/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+
+          if [ ! -f "$SO" ]; then
+            echo "::error::$SO was not produced"; exit 1
+          fi
+
+          ALIGNMENTS=$("$READELF" -l "$SO" | awk '/LOAD/ {print $NF}' | sort -u)
+          echo "LOAD alignments: $ALIGNMENTS"
+          if [ "$ALIGNMENTS" != "0x4000" ]; then
+            echo "::error::Expected every LOAD segment aligned to 0x4000 (16KB), got: $ALIGNMENTS"
+            echo "Check that /.cargo/config.toml still passes -Wl,-z,max-page-size=16384"
+            exit 1
+          fi
+
+          # Stripping breaks ubrn's turbo-module and native-bindings generation,
+          # so ddk-ffi must declare no [profile.release] strip setting.
+          if ! "$READELF" -S "$SO" | grep -q '\.symtab'; then
+            echo "::error::libddk_ffi.so is stripped; ubrn codegen needs its symbol table"
+            exit 1
+          fi
+
+          echo "✅ 16KB aligned, symbol table intact"

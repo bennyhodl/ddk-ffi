@@ -27,7 +27,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
         with:
-          version: 8
+          version: 10
 
       - name: Cache cargo
         uses: actions/cache@v3
@@ -47,7 +47,7 @@ jobs:
       - name: Install Dependencies
         run: |
           cd ddk-ts
-          pnpm install --no-frozen-lockfile
+          pnpm install --frozen-lockfile
 
       - name: Build for Darwin ARM64
         run: |
@@ -86,7 +86,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
         with:
-          version: 8
+          version: 10
 
       - name: Cache cargo
         uses: actions/cache@v3
@@ -106,7 +106,7 @@ jobs:
       - name: Install Dependencies
         run: |
           cd ddk-ts
-          pnpm install --no-frozen-lockfile
+          pnpm install --frozen-lockfile
 
       - name: Build for Linux x64
         run: |
@@ -147,7 +147,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
         with:
-          version: 8
+          version: 10
 
       - name: Setup WASI SDK
         run: |
@@ -175,7 +175,7 @@ jobs:
       - name: Install Dependencies
         run: |
           cd ddk-ts
-          pnpm install --no-frozen-lockfile
+          pnpm install --frozen-lockfile
 
       - name: Build for WASM
         run: |
@@ -209,7 +209,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
         with:
-          version: 8
+          version: 10
 
       - name: Cache cargo
         uses: actions/cache@v3
@@ -229,7 +229,7 @@ jobs:
       - name: Install Dependencies
         run: |
           cd ddk-ts
-          pnpm install --no-frozen-lockfile
+          pnpm install --frozen-lockfile
 
       - name: Build for Tests
         run: |
