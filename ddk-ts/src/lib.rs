@@ -1,4 +1,16 @@
 #![deny(clippy::all)]
+// Mirrors the same two allows in ddk-ffi/src/lib.rs, for the same reasons.
+//
+// too_many_arguments: these are FFI entry points whose signatures are dictated by
+// ddk_ffi's — `create_dlc_transactions` and friends take 8-9 parameters there, and
+// grouping them into a struct here would break parity with the ddk-rn surface that
+// scripts/verify-parity.cjs enforces.
+//
+// deprecated: `create_xpriv_from_parent_path` is still wrapped deliberately, to
+// keep the Node bindings at parity with ddk_ffi's exported surface while that
+// function remains exported. It goes when ddk_ffi drops it.
+#![allow(clippy::too_many_arguments)]
+#![allow(deprecated)]
 
 pub mod conversions;
 mod error;
@@ -558,7 +570,7 @@ pub fn create_cet_adaptor_points_from_oracle_info(
 
   let result = points
     .into_iter()
-    .map(|point| Buffer::from(point))
+    .map(Buffer::from)
     .collect::<Vec<Buffer>>();
 
   Ok(result)
