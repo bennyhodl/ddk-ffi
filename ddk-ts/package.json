@@ -1,6 +1,6 @@
 {
   "name": "@bennyblader/ddk-ts",
-  "version": "0.3.43",
+  "version": "0.4.0",
   "description": "dlcdevkit typescript bindings",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
