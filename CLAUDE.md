@@ -15,10 +15,15 @@ The project consists of two main components:
 
 The architecture follows this flow:
 
-1. Rust code defines structs, functions, and errors in `ddk-ffi/src/lib.rs`
-2. UniFFI interface is declared in `ddk-ffi/src/ddk_ffi.udl`
-3. Bindings are generated for TypeScript (JSI), C++, iOS (Swift/Objective-C), and Android (Kotlin/JNI)
-4. React Native consumes the generated TypeScript API
+1. Rust code defines records, functions, methods, and errors in `ddk-ffi/src/lib.rs`,
+   annotated with UniFFI proc-macros (`#[derive(uniffi::Record)]`,
+   `#[derive(uniffi::Error)]`/`Enum`, `#[uniffi::export]`). The crate calls
+   `uniffi::setup_scaffolding!()` — there is no `.udl` file (it was fully migrated
+   to proc-macros; the Rust source is the single source of truth).
+2. Bindings are generated from the compiled library (NOT from a UDL) for TypeScript
+   (JSI), C++, iOS (Swift/Objective-C), and Android (Kotlin/JNI). Library-based
+   generation is required so proc-macro definitions are visible.
+3. React Native consumes the generated TypeScript API
 
 ## Build System & Commands
 
@@ -27,7 +32,7 @@ This project uses `just` as the primary build orchestrator. All build commands s
 ### Core Build Commands
 
 - `just uniffi`: Complete build pipeline (generates all bindings + builds iOS/Android)
-- `just uniffi-jsi`: Generate TypeScript and C++ JSI bindings from UDL
+- `just uniffi-jsi`: Build the crate and generate TypeScript + C++ JSI bindings from the compiled library
 - `just uniffi-turbo`: Generate React Native TurboModule specifications
 - `just build-ios`: Build iOS static libraries and create XCFramework
 - `just build-android`: Build Android native libraries (JNI)
@@ -53,18 +58,17 @@ This project uses `just` as the primary build orchestrator. All build commands s
 
 ## Development Workflow
 
-1. **Modify Rust Code**: Edit `ddk-ffi/src/lib.rs` with new functions/structs
-2. **Update Interface**: Add corresponding definitions to `ddk-ffi/src/ddk_ffi.udl`
-3. **Generate Bindings**: Run `just uniffi` to regenerate all language bindings
-4. **Manual Fix**: Fix the include path in `ddk-rn/cpp/bennyblader-ddk-rn.cpp` from `#include "/ddk_ffi.hpp"` to `#include "ddk_ffi.hpp"`
-5. **Test Changes**: Use example app or run tests
+1. **Modify Rust Code**: Edit `ddk-ffi/src/lib.rs`. Annotate new types with
+   `#[derive(uniffi::Record)]` / `#[derive(uniffi::Enum)]` / `#[derive(uniffi::Error)]`,
+   and exported functions/methods with `#[uniffi::export]`. No `.udl` to update.
+2. **Generate Bindings**: Run `just uniffi` to regenerate all language bindings
+3. **Test Changes**: Use example app or run tests
 
 ## Key Files & Locations
 
 ### Rust FFI Layer
 
-- `ddk-ffi/src/lib.rs`: Core Rust implementation
-- `ddk-ffi/src/ddk_ffi.udl`: UniFFI interface definitions
+- `ddk-ffi/src/lib.rs`: Core Rust implementation + UniFFI proc-macro annotations (single source of truth; no `.udl`)
 - `ddk-ffi/Cargo.toml`: Rust project configuration
 
 ### React Native Layer
@@ -84,20 +88,25 @@ This project uses `just` as the primary build orchestrator. All build commands s
 
 ## Known Issues
 
-### Manual Post-Build Fix Required
+### UniFFI / ubrn version lockstep
 
-After running `just uniffi`, manually fix the include path:
+The `uniffi` crate (`ddk-ffi/Cargo.toml`), the `uniffi-bindgen-react-native` dependency
+(`ddk-rn/package.json`), and the **globally installed** `uniffi-bindgen-react-native`
+binary must all be the same release. The `just uniffi-*` recipes call the bare
+`uniffi-bindgen-react-native` on `$PATH`, which resolves to the global pnpm install —
+not `ddk-rn/node_modules`. A version skew shows up as TypeScript errors like
+"Expected 2 arguments, but got 1" on every generated `.lower()` call.
 
-```cpp
-// In ddk-rn/cpp/bennyblader-ddk-rn.cpp, change:
-#include "/ddk_ffi.hpp"
-// To:
-#include "ddk_ffi.hpp"
-```
+ubrn pins an exact `uniffi_core` version (e.g. ubrn `0.31.0-3` requires `uniffi_core =0.31.0`),
+so pin the Rust crate to that exact patch. Update the global binary with
+`pnpm add -g uniffi-bindgen-react-native@<version>`.
+
+> Note: as of uniffi 0.31, the old manual fix for `#include "/ddk_ffi.hpp"` is no longer
+> needed — the generator emits the correct `#include "ddk_ffi.hpp"`.
 
 ### Dependencies
 
-- Requires `uniffi-bindgen-react-native` globally installed
+- Requires `uniffi-bindgen-react-native` globally installed (version must match `ddk-rn/package.json`)
 - Uses pnpm as package manager (not npm/yarn)
 - React Native new architecture enabled by default
 

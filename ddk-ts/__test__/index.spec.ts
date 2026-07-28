@@ -192,13 +192,13 @@ describe('DDK TypeScript Bindings', () => {
       'createCet',
       'createCets',
       'createRefundTransaction',
-      'isDustOutput',
-      'getChangeOutputAndFees',
+      'isDust',
+      'changeOutputAndFees',
       'getTotalInputVsize',
-      'verifyFundTxSignature',
-      'getRawFundingTransactionInputSignature',
-      'signFundTransactionInput',
-      'createCetAdaptorSignatureFromOracleInfo',
+      'verifyFundSignature',
+      'rawFundingInputSignature',
+      'signFundInput',
+      'cetAdaptorSignatureFromOracleInfo',
       'createCetAdaptorPointsFromOracleInfo',
     ]
 
@@ -283,7 +283,7 @@ describe('DDK TypeScript Bindings', () => {
     expect(true).toBe(true)
   })
 
-  test('isDustOutput correctly identifies dust', () => {
+  test('isDust correctly identifies dust', () => {
     const dustOutput = {
       value: 500n,
       scriptPubkey: Buffer.alloc(22),
@@ -294,15 +294,15 @@ describe('DDK TypeScript Bindings', () => {
       scriptPubkey: Buffer.alloc(22),
     }
 
-    expect(ddk.isDustOutput(dustOutput)).toBe(true)
-    expect(ddk.isDustOutput(nonDustOutput)).toBe(false)
+    expect(ddk.isDust(dustOutput)).toBe(true)
+    expect(ddk.isDust(nonDustOutput)).toBe(false)
 
     // Edge case: exactly at dust limit (1000 sats)
     const edgeOutput = {
       value: 1000n,
       scriptPubkey: Buffer.alloc(22),
     }
-    expect(ddk.isDustOutput(edgeOutput)).toBe(false)
+    expect(ddk.isDust(edgeOutput)).toBe(false)
   })
 
   test('getTotalInputVsize calculates correct size', () => {
@@ -397,10 +397,10 @@ describe('DDK TypeScript Bindings', () => {
     expect(Array.isArray(refund.outputs)).toBe(true)
   })
 
-  test('getChangeOutputAndFees calculates fees correctly', () => {
+  test('changeOutputAndFees calculates fees correctly', () => {
     const { partyParams } = createTestData()
 
-    const result = ddk.getChangeOutputAndFees(
+    const result = ddk.changeOutputAndFees(
       partyParams,
       4n, // feeRate
     )
@@ -425,13 +425,13 @@ describe('DDK TypeScript Bindings', () => {
     const mockPrivkey = Buffer.alloc(32, 0x01)
 
     // Test that the function exists and has the right signature
-    expect(typeof ddk.getRawFundingTransactionInputSignature).toBe('function')
-    expect(typeof ddk.signFundTransactionInput).toBe('function')
-    expect(typeof ddk.verifyFundTxSignature).toBe('function')
+    expect(typeof ddk.rawFundingInputSignature).toBe('function')
+    expect(typeof ddk.signFundInput).toBe('function')
+    expect(typeof ddk.verifyFundSignature).toBe('function')
 
     // These would throw with invalid data, but we're testing the API exists
     expect(() => {
-      ddk.getRawFundingTransactionInputSignature(
+      ddk.rawFundingInputSignature(
         mockTx,
         mockPrivkey,
         '0000000000000000000000000000000000000000000000000000000000000000',
@@ -441,7 +441,7 @@ describe('DDK TypeScript Bindings', () => {
     }).toThrow()
   })
 
-  test('createCetAdaptorSignatureFromOracleInfo has correct API', () => {
+  test('cetAdaptorSignatureFromOracleInfo has correct API', () => {
     const mockTx = {
       version: 2,
       lockTime: 0,
@@ -456,11 +456,11 @@ describe('DDK TypeScript Bindings', () => {
     }
 
     // Test that the function exists
-    expect(typeof ddk.createCetAdaptorSignatureFromOracleInfo).toBe('function')
+    expect(typeof ddk.cetAdaptorSignatureFromOracleInfo).toBe('function')
 
     // This would throw with invalid data, but we're testing the API exists
     expect(() => {
-      ddk.createCetAdaptorSignatureFromOracleInfo(
+      ddk.cetAdaptorSignatureFromOracleInfo(
         mockTx,
         oracleInfo,
         Buffer.alloc(32), // fundingSk

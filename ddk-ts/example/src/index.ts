@@ -1,7 +1,7 @@
 import {
   version,
   createFundTxLockingScript,
-  isDustOutput,
+  isDust,
   getTotalInputVsize,
   createDlcTransactions,
   createCets,
@@ -49,8 +49,8 @@ const nonDustOutput: TxOutput = {
   scriptPubkey: Buffer.alloc(22, 0),
 }
 
-console.log(`   Is 500 sats dust? ${isDustOutput(dustOutput)}`)
-console.log(`   Is 5000 sats dust? ${isDustOutput(nonDustOutput)}\n`)
+console.log(`   Is 500 sats dust? ${isDust(dustOutput)}`)
+console.log(`   Is 5000 sats dust? ${isDust(nonDustOutput)}\n`)
 
 // Test total input vsize calculation with typed inputs
 console.log('Testing input vsize calculation:')

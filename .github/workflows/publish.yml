@@ -78,7 +78,7 @@ jobs:
           node-version: '20'
       - uses: pnpm/action-setup@v2
         with:
-          version: 8
+          version: 10
       - name: Setup WASI SDK
         if: matrix.wasi
         run: |
@@ -88,7 +88,7 @@ jobs:
           sudo tar xzf /tmp/wasi-sdk.tar.gz -C /opt/wasi-sdk --strip-components=1
           echo "WASI_SDK_PATH=/opt/wasi-sdk" >> "$GITHUB_ENV"
       - name: Install dependencies
-        run: cd ddk-ts && pnpm install --no-frozen-lockfile
+        run: cd ddk-ts && pnpm install --frozen-lockfile
       - name: Build
         run: cd ddk-ts && ${{ matrix.build }}
       - name: Upload binary artifact
@@ -112,9 +112,9 @@ jobs:
           node-version: '20'
       - uses: pnpm/action-setup@v2
         with:
-          version: 8
+          version: 10
       - name: Install dependencies
-        run: cd ddk-ts && pnpm install --no-frozen-lockfile
+        run: cd ddk-ts && pnpm install --frozen-lockfile
       - name: Build
         run: cd ddk-ts && pnpm build:linux-x64
       - name: Test
@@ -136,9 +136,9 @@ jobs:
           node-version: '18.17'
       - uses: pnpm/action-setup@v2
         with:
-          version: 8
+          version: 10
       - name: Install uniffi-bindgen-react-native
-        run: npm install -g uniffi-bindgen-react-native@0.29.3-1
+        run: npm install -g uniffi-bindgen-react-native@0.31.0-3
       - uses: extractions/setup-just@v1
       - name: Generate JSI bindings
         run: just uniffi-jsi
@@ -166,9 +166,9 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
       - uses: pnpm/action-setup@v2
         with:
-          version: 8
+          version: 10
       - name: Install dependencies
-        run: cd ddk-ts && pnpm install --no-frozen-lockfile
+        run: cd ddk-ts && pnpm install --frozen-lockfile
       - name: Build main package (dist/index.js + dist/index.d.ts)
         run: cd ddk-ts && pnpm build:linux-x64
       - name: Download platform binaries
@@ -207,9 +207,9 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
       - uses: pnpm/action-setup@v2
         with:
-          version: 8
+          version: 10
       - name: Install uniffi-bindgen-react-native
-        run: npm install -g uniffi-bindgen-react-native@0.29.3-1
+        run: npm install -g uniffi-bindgen-react-native@0.31.0-3
       - uses: extractions/setup-just@v1
       - name: Generate JSI bindings
         run: just uniffi-jsi

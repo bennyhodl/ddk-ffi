@@ -27,7 +27,12 @@ Desktop.ini
 # Rust/Cargo
 # ====================
 target/
+# Both crates ship compiled native artifacts (xcframework, .node, jniLibs), so
+# their lockfiles are committed for reproducible builds. Stray copies (e.g. a
+# stale ddk-rn/ddk-ffi) stay ignored.
 Cargo.lock
+!/ddk-ffi/Cargo.lock
+!/ddk-ts/Cargo.lock
 **/*.rs.bk
 *.pdb
 
