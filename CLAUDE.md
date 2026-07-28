@@ -182,6 +182,30 @@ Publishing needs two hosts, so `.github/workflows/publish.yml` splits the work:
 assembles both artifacts and verifies the binaries are in the tarball before
 publishing.
 
+### Releasing
+
+`just release <version>` (→ `scripts/prep-release.js`) is the only release path.
+It sets the version in `ddk-ts/package.json`, `ddk-rn/package.json` and
+`ddk-ffi/Cargo.toml`, commits, tags `v<version>` and pushes. Pushing the tag is
+what publishes. There is deliberately no local publish path — no single host can
+build every platform this repo ships — and `ddk-rn`'s `prepublishOnly` runs
+`scripts/verify-package.js` to refuse a hand-run `npm publish` that would ship
+without binaries.
+
+Update `ddk-rn/CHANGELOG.md`'s `[Unreleased]` section **before** releasing:
+`prep-release.js` refuses a dirty tree, so it cannot be part of the release
+commit. That section is also the highest-signal input to the release notes.
+
+The `github-release` job runs after both publishes and creates the GitHub release
+via `scripts/release-notes.js`, which summarises the commit range with the
+Anthropic API (needs an `ANTHROPIC_API_KEY` repo secret; override the model with
+`RELEASE_NOTES_MODEL`). It degrades rather than fails — no key, an API error, or
+an empty response falls back to a plain commit list, and then to
+`gh release create --generate-notes`. Keep it that way: by the time this job runs
+the npm publish is irreversible, so notes must never turn a successful release
+red. Run it locally against any tag with
+`node scripts/release-notes.js <version>`.
+
 ### ddk-ts
 
 `ddk-ts` also compiles nothing on install: it ships prebuilt napi platform

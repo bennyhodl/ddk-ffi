@@ -5,6 +5,8 @@
 - Upgraded napi-rs: `@napi-rs/cli` `^3.7.0`, `napi` `3.9` with the `napi9` feature, `napi-derive` `3.5`, `napi-build` `2.3`; `engines.node` set to `>= 18`
 - **Breaking:** renamed 10 NAPI functions to match ddk-ffi's record-method names so the two bindings stay in parity: `isDustOutput`→`isDust`, `getChangeOutputAndFees`→`changeOutputAndFees`, `verifyCetAdaptorSigFromOracleInfo`→`verifyFromOracleInfo`, `addSignatureToTransaction`→`addSignature`, `verifyFundTxSignature`→`verifyFundSignature`, `getRawFundingTransactionInputSignature`→`rawFundingInputSignature`, `signFundTransactionInput`→`signFundInput`, `createCetAdaptorSignatureFromOracleInfo`→`cetAdaptorSignatureFromOracleInfo`, `getCetAdaptorSignatureInputs`→`cetAdaptorSignatureInputs`, `getCetSighash`→`cetSighash`
 - Parity scripts now read ddk-ffi's proc-macro exports from `lib.rs` (the `.udl` was removed)
+- Releases are now cut with `just release <version>`, which tags and pushes; CI publishes both packages together. `just ts-release` is gone — it never worked (a justfile recipe body saved to disk with its `{{...}}` templating unexpanded, invoked via `node`)
+- GitHub releases are now created automatically with AI-generated release notes
 
 ## [0.3.43] - 2026-07-21
 - Added `wasm32-wasip1-threads` build target for browser/WASM support (`pnpm build:wasm`)

@@ -65,8 +65,8 @@ just ts-test
 # Development setup (build + example setup)
 just ts-dev
 
-# Release new version to npm
-just ts-release <version>
+# Release new version (bumps both packages, tags, pushes; CI publishes)
+just release <version>
 ```
 
 ### Project Structure
@@ -113,21 +113,23 @@ pnpm verify:types  # Verify TypeScript types
 
 ### Release Process
 
-To release a new version:
+`ddk-ts` and `ddk-rn` are versioned and released together:
 
 ```bash
-just ts-release 0.2.0
+just release 0.2.0
 ```
 
 This will:
 
-1. Check working directory is clean
-2. Update version in package.json
-3. Build for all supported platforms
-4. Run tests
-5. Commit and tag as `ddk-ts-v0.2.0`
-6. Push to GitHub
-7. Publish to npm
+1. Check the working directory is clean
+2. Set the version in `ddk-ts/package.json`, `ddk-rn/package.json` and `ddk-ffi/Cargo.toml`
+3. Commit, tag as `v0.2.0` and push
+
+Publishing happens in CI. Pushing the tag triggers
+[`.github/workflows/publish.yml`](../.github/workflows/publish.yml), which builds
+each napi platform binary on its own runner, verifies parity and types, and
+publishes. Nothing is published from a developer machine — no single host can
+build every platform this repo ships.
 
 ### API Compatibility
 

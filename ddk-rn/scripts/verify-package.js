@@ -8,12 +8,12 @@
  * in a way that only shows up later as a CMake or linker error in someone
  * else's app.
  *
- * It is wired as `prepublishOnly` rather than called from a release script
- * because that is the one hook every publish path goes through: `npm publish`,
- * release-it (`just rn-release`), and scripts/unified-release.js (`just
- * release`). The local scripts are the ones that need it most — unified-release
- * skips the iOS build off macOS and swallows Android build failures, so it can
- * reach `npm publish` with binaries missing.
+ * Publishing is meant to happen only from .github/workflows/publish.yml, which
+ * builds the iOS XCFramework on macOS and the Android JNI libraries on Linux and
+ * checks the tarball itself. This is the backstop for a hand-run `npm publish`
+ * from a working tree that never built either — the one path no workflow can
+ * gate. It hangs off `prepublishOnly` because that hook fires on every publish
+ * regardless of how it was invoked.
  */
 
 const { execSync } = require('child_process');

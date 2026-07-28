@@ -361,3 +361,43 @@ jobs:
           cd ddk-rn
           npm config set provenance true
           npm publish --access public
+
+  # Runs only after both packages are on npm, so the notes never describe a
+  # release that did not happen. Deliberately cannot fail the workflow: the
+  # publish is already irreversible by this point, and prose is not worth a red
+  # run. scripts/release-notes.js falls back to a plain commit list if
+  # ANTHROPIC_API_KEY is missing or the API call fails.
+  github-release:
+    name: Create GitHub release
+    needs: [publish-ddk-ts, publish-ddk-rn]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # release-notes.js diffs against the previous tag
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Generate release notes
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          node scripts/release-notes.js "$VERSION" > /tmp/notes.md || true
+          if [ ! -s /tmp/notes.md ]; then
+            echo "::warning::Release notes came out empty; falling back to GitHub's generator"
+            rm -f /tmp/notes.md
+          fi
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -f /tmp/notes.md ]; then
+            gh release create "${{ github.ref_name }}" \
+              --title "${{ github.ref_name }}" --notes-file /tmp/notes.md
+          else
+            gh release create "${{ github.ref_name }}" \
+              --title "${{ github.ref_name }}" --generate-notes
+          fi

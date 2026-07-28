@@ -139,10 +139,6 @@ clean:
   cd {{justfile_directory()}}/ddk-ts && rm -rf node_modules dist target pnpm-lock.yaml
   cd {{justfile_directory()}}/ddk-ts/example && rm -rf node_modules dist
 
-# Release the React Native bindings
-rn-release:
-  cd {{justfile_directory()}}/ddk-rn && node scripts/release.js
-
 # ====================
 # TypeScript (Node.js) Bindings
 # ====================
@@ -164,14 +160,16 @@ ts-example:
 ts-test:
     cd {{justfile_directory()}}/ddk-ts && pnpm test
 
-# Release TypeScript package to npm
-ts-release version:
-    cd {{justfile_directory()}}/ddk-ts && node scripts/release.sh {{version}}
-
 # ====================
-# Unified Release
+# Release
 # ====================
 
-# Unified release for both React Native and TypeScript packages
+# Publishing happens in CI, not here. Neither package can be built correctly on
+# one machine any more: ddk-rn ships prebuilt binaries that need a macOS host for
+# the XCFramework and a Linux host with the NDK for the JNI libraries, and ddk-ts
+# ships per-platform napi builds. This recipe therefore only bumps versions and
+# pushes a tag; .github/workflows/publish.yml does the rest.
+
+# Bump ddk-ts, ddk-rn and ddk-ffi to <version>, commit, tag v<version> and push (CI publishes)
 release version:
-    node {{justfile_directory()}}/scripts/unified-release.js {{version}}
+    node {{justfile_directory()}}/scripts/prep-release.js {{version}}
