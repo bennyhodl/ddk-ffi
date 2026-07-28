@@ -7,6 +7,11 @@ settings:
 overrides:
   '@types/react': ^18.2.44
 
+patchedDependencies:
+  uniffi-bindgen-react-native@0.31.0-3:
+    hash: 53974ea656337ff2a02b8dc39dc4719d5ae3fd793c6bec3b2720075df98d61d9
+    path: patches/uniffi-bindgen-react-native@0.31.0-3.patch
+
 importers:
 
   .:
@@ -19,7 +24,7 @@ importers:
         version: 0.31.0-3
       uniffi-bindgen-react-native:
         specifier: 0.31.0-3
-        version: 0.31.0-3
+        version: 0.31.0-3(patch_hash=53974ea656337ff2a02b8dc39dc4719d5ae3fd793c6bec3b2720075df98d61d9)
     devDependencies:
       '@commitlint/config-conventional':
         specifier: ^17.0.2
@@ -10007,7 +10012,7 @@ snapshots:
 
   unicode-property-aliases-ecmascript@2.2.0: {}
 
-  uniffi-bindgen-react-native@0.31.0-3: {}
+  uniffi-bindgen-react-native@0.31.0-3(patch_hash=53974ea656337ff2a02b8dc39dc4719d5ae3fd793c6bec3b2720075df98d61d9): {}
 
   universalify@0.1.2: {}
 

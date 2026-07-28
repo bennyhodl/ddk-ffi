@@ -92,6 +92,13 @@ strip-ios:
 # all four. PR CI passes a single ABI to keep the build short; it is checking
 # that the library still compiles and links, not producing a shippable artifact.
 #
+# WARNING: passing `targets` also rewrites `abiFilters` in the COMMITTED
+# ddk-rn/android/build.gradle to just those ABIs, and wipes jniLibs/ for the
+# others. That is fine in CI (nothing is committed there) but locally it leaves
+# a modified build.gradle that must NOT be committed — a single-ABI build.gradle
+# would ship an app that only runs on one architecture. Check `git status` after
+# running this with an argument, and `git checkout ddk-rn/android/build.gradle`.
+#
 # Build the Android JNI libraries (not part of `just build`; needs the NDK)
 build-android targets="":
   cd {{justfile_directory()}}/ddk-rn && uniffi-bindgen-react-native build android \

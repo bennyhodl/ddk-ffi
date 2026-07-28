@@ -172,6 +172,43 @@ Rules to preserve:
   drops the `net.java.dev.jna:jna` dependency because JNA is gated on ubrn's
   `--native-bindings` flag, which defaults to false and which nothing here passes;
   the JSI path does not use JNA. Do not re-add it by hand.
+- **The Android C++ build needs a pnpm patch on ubrn — upstream bug, fixed but
+  unreleased.** The generated `ddk-rn/android/CMakeLists.txt` resolves the ubrn
+  package with `require.resolve('uniffi-bindgen-react-native/package.json')`, but
+  ubrn's own `package.json` has an `exports` map that never exposes
+  `./package.json`, so that throws `ERR_PACKAGE_PATH_NOT_EXPORTED`. CMake's
+  `execute_process` ignores the failure, the include dir silently becomes
+  `/cpp/includes`, and the build dies with `'UniffiCallInvoker.h' file not found`.
+
+  Fixed here by `ddk-rn/patches/uniffi-bindgen-react-native@0.31.0-3.patch`,
+  which adds that one export — identical to the upstream fix. It is wired up in
+  `ddk-rn/pnpm-workspace.yaml` under `patchedDependencies` (pnpm 10 keeps it
+  there rather than in `package.json`, so nothing leaks into the published
+  package), and `pnpm install` re-applies it automatically. Don't hand-edit
+  `CMakeLists.txt`: ubrn rewrites it on every `--and-generate`.
+
+  Upstream is `jhugman/uniffi-bindgen-react-native#404`, fixed on `main` by
+  commit `2b57645` ("Export package.json subpath (#407)", 2026-07-15) but **not
+  in any published release** — `0.31.0-3` (2026-05-28) is still `latest`. We are
+  tracking the release request in **#421**. Check with
+  `npm view uniffi-bindgen-react-native dist-tags`; when a release carries the
+  fix, bump the pin (all three places — see the version-lockstep note above) and
+  delete the patch plus its `patchedDependencies` entry.
+
+  **Known limitation:** a pnpm patch only applies to this repo. ddk-rn pins ubrn
+  `0.31.0-3` in `dependencies` and ships `android/CMakeLists.txt` in its `files`
+  allowlist, so a consumer building an Android app against the published package
+  hits the original error. Accepted deliberately (2026-07-28) — there are no
+  external Android consumers today, and it resolves itself when ubrn releases.
+- **`just build-android <abi>` rewrites the committed `build.gradle`.** Passing a
+  target list narrows `abiFilters` to just those ABIs and wipes `jniLibs/` for the
+  rest. Harmless in CI (nothing is committed there), but locally it leaves a
+  modified `build.gradle` that must never be committed — a single-ABI
+  `build.gradle` ships an app that only runs on one architecture. After running it
+  with an argument: `git checkout ddk-rn/android/build.gradle`.
+- Generation runs prettier over `ddk-rn/src/`, which reformats hand-written files
+  living there (e.g. `src/__tests__/contractBindings.test.js`). Committing the
+  prettier-formatted version keeps that from churning on every build.
 - `uniffi-bindgen-react-native` stays a runtime `dependency` — `android/CMakeLists.txt`
   and `DdkRn.podspec` both need its C++ headers — but nothing at install time
   invokes its binary.
