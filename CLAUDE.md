@@ -160,18 +160,62 @@ Rules to preserve:
   $NDK_HOME/toolchains/llvm/prebuilt/darwin-x86_64/bin/llvm-readelf -l \
     ddk-rn/android/src/main/jniLibs/arm64-v8a/libddk_ffi.so | grep LOAD
   ```
-- **NDK 27.3.13750724 is pinned**, in `.github/workflows/publish.yml` and locally.
+- **NDK 27.1.12297006 is pinned**, in `.github/workflows/publish.yml` and locally.
   It was `ANDROID_NDK_LATEST_HOME`, which tracks whatever the runner image ships
   (r29 as of this writing) and moves without warning — a release could be built by
   a toolchain nobody tested against. r27 is the runner's own default and the first
   NDK to default to 16KB alignment; r28/r29 raised minimum API levels. Install the
   same one locally with
-  `sdkmanager --sdk_root="$HOME/Library/Android/sdk" --install "ndk;27.3.13750724"`
+  `sdkmanager --sdk_root="$HOME/Library/Android/sdk" --install "ndk;27.1.12297006"`
   so `just build-android` reproduces CI.
 - ubrn regenerates `ddk-rn/android/build.gradle` on every `--and-generate`. It
   drops the `net.java.dev.jna:jna` dependency because JNA is gated on ubrn's
   `--native-bindings` flag, which defaults to false and which nothing here passes;
   the JSI path does not use JNA. Do not re-add it by hand.
+- **The Android C++ build needs a pnpm patch on ubrn — upstream bug, fixed but
+  unreleased.** The generated `ddk-rn/android/CMakeLists.txt` resolves the ubrn
+  package with `require.resolve('uniffi-bindgen-react-native/package.json')`, but
+  ubrn's own `package.json` has an `exports` map that never exposes
+  `./package.json`, so that throws `ERR_PACKAGE_PATH_NOT_EXPORTED`. CMake's
+  `execute_process` ignores the failure, the include dir silently becomes
+  `/cpp/includes`, and the build dies with `'UniffiCallInvoker.h' file not found`.
+
+  Fixed here by `ddk-rn/patches/uniffi-bindgen-react-native@0.31.0-3.patch`,
+  which adds that one export — identical to the upstream fix. It is wired up in
+  `ddk-rn/pnpm-workspace.yaml` under `patchedDependencies` (pnpm 10 keeps it
+  there rather than in `package.json`, so nothing leaks into the published
+  package), and `pnpm install` re-applies it automatically. Don't hand-edit
+  `CMakeLists.txt`: ubrn rewrites it on every `--and-generate`.
+
+  Upstream is `jhugman/uniffi-bindgen-react-native#404`, fixed on `main` by
+  commit `2b57645` ("Export package.json subpath (#407)", 2026-07-15) but **not
+  in any published release** — `0.31.0-3` (2026-05-28) is still `latest`. We are
+  tracking the release request in **#421**. Check with
+  `npm view uniffi-bindgen-react-native dist-tags`; when a release carries the
+  fix, bump the pin (all three places — see the version-lockstep note above) and
+  delete the patch plus its `patchedDependencies` entry.
+
+  **Known limitation:** a pnpm patch only applies to this repo. ddk-rn pins ubrn
+  `0.31.0-3` in `dependencies` and ships `android/CMakeLists.txt` in its `files`
+  allowlist, so a consumer building an Android app against the published package
+  hits the original error. Accepted deliberately (2026-07-28) — there are no
+  external Android consumers today, and it resolves itself when ubrn releases.
+- **`just build-android <abi>` rewrites the committed `build.gradle`.** Passing a
+  target list narrows `abiFilters` to just those ABIs and wipes `jniLibs/` for the
+  rest. Harmless in CI (nothing is committed there), but locally it leaves a
+  modified `build.gradle` that must never be committed — a single-ABI
+  `build.gradle` ships an app that only runs on one architecture. After running it
+  with an argument: `git checkout ddk-rn/android/build.gradle`.
+- Generation runs prettier over `ddk-rn/src/`, which reformats hand-written files
+  living there (e.g. `src/__tests__/contractBindings.test.js`). Committing the
+  prettier-formatted version keeps that from churning on every build.
+- Every `.ts`/`.tsx` directly in `ddk-rn/src/` is ubrn-generated (`ddk_ffi.ts`,
+  `ddk_ffi-ffi.ts`, `NativeDdkRn.ts`, `index.tsx`); only `src/__tests__/` is
+  hand-written. Those four are listed in `eslintIgnore` in `ddk-rn/package.json`,
+  because ubrn's output does not satisfy this repo's prettier config and would be
+  reformatted back on the next generation — an unwinnable loop that kept
+  `pnpm lint` permanently red. Don't remove them from that list, and don't
+  "fix" lint errors inside generated files.
 - `uniffi-bindgen-react-native` stays a runtime `dependency` — `android/CMakeLists.txt`
   and `DdkRn.podspec` both need its C++ headers — but nothing at install time
   invokes its binary.
@@ -217,6 +261,136 @@ platform not in the published matrix.
 - Rust tests: `cargo test` (in ddk-ffi/)
 - TypeScript tests: `pnpm test` (in ddk-rn/)
 - Integration testing via example app
+
+### Run the Maestro E2E locally before pushing
+
+CI's `e2e` stage installs an app an earlier stage built and runs `maestro test`
+— nothing more. The `just e2e-*` recipes are those same steps locally, split so
+the expensive one can be skipped:
+
+| command | needs | time |
+|---|---|---|
+| `just e2e-flows` | nothing — no device, no app | ~15s |
+| `just e2e-ios-test` | the app already installed | ~10s |
+| `just e2e-ios` | full: build + install + run | ~5-10m |
+
+While editing a flow, stay in `e2e-ios-test`; only rebuild when the app itself
+changes (JS, Rust, or the generated bindings).
+
+**Validate flows even when you cannot run them.** Maestro has no `validate` or
+`--dry-run` mode, so `scripts/check-maestro-flows.sh` (used by both `just
+e2e-flows` and the CI `check` job) leans on two behaviours:
+
+- `--include-tags` with a tag no flow declares parses every flow and runs none.
+  That is what makes it safe with a simulator booted — a bare `maestro test`
+  would execute the suite.
+- A schema error prints `Failed to parse file`. **The exit code cannot be used**:
+  Maestro exits 1 both for a parse error and for "no flows matched", which is
+  the normal outcome here.
+
+Because the signal is a string match, the script first proves itself against a
+flow known to be invalid and fails loudly if that stops being detected —
+otherwise a Maestro upgrade could silently turn the gate into a no-op. That is
+not hypothetical: **Maestro reworded the error between majors** (1.x "Failed to
+parse file", 2.x "Unknown Property"), the canary caught it on the first CI run,
+and the matcher now accepts both.
+
+**Maestro is pinned** via `MAESTRO_VERSION` in `ci.yml`. `curl | bash` installs
+whatever is newest, which is the same "moves without warning" problem as the NDK
+— and here it silently changes what the flow check can detect. Match it locally
+with `MAESTRO_VERSION=<version> curl -Ls https://get.maestro.mobile.dev | bash`;
+`maestro -v` is printed in CI so a mismatch is visible in the log.
+
+This exists because `timeout:` on `assertVisible` is a *parse* error, not a slow
+assertion: `timeout` is not one of the element selector's 28 properties (only
+`scrollUntilVisible` and `extendedWaitUntil` take it, as a sibling of the
+selector). It passed review, passed every build stage, and only failed on a
+macOS runner ~25 minutes in. Use `extendedWaitUntil` to wait with a timeout.
+
+**`text:` is a full match, not a substring search.** Maestro matches the regex
+against the element's entire text, so `text: 'version: [0-9]+\.[0-9]+\.[0-9]+'`
+does *not* match an element reading `@bennyhodl/ddk-rn version: 0.4.0`. Prefix
+with `.*` when matching part of a string. This cost a full CI round trip on both
+platforms, and note what the flow check **cannot** do about it: the flow parses
+fine, so `check-maestro-flows.sh` passes it. Only a device can tell you a
+selector matches nothing — the gate covers syntax, not semantics. When a flow
+fails on a selector, read the screenshot and `screen-hierarchy/*.json` under the
+`maestro-debug-*` artifact before assuming the app is broken; they show exactly
+what was on screen and what text Maestro could see.
+
+**A busy emulator can steal the foreground.** In the same run, Android sat in a
+60s `extendedWaitUntil` (because of the matcher bug above) and the Pixel Launcher
+ANR'd mid-wait — its "isn't responding" dialog covered the app, so the final
+hierarchy contains the launcher rather than the app. logcat showed the app itself
+had launched cleanly (`Displayed ddkrn.example/.MainActivity`) and
+`libbennyblader-ddk-rn.so` loaded fine. Treat a launcher ANR as emulator
+contention right after boot, not as an app failure — but it only got the chance
+because the flow was waiting on an assertion that could never pass.
+
+Android needs a one-time `just e2e-android-setup` (~1.5GB). Two things to know:
+
+- It installs `cmdline-tools` into the SDK and calls `avdmanager` from there.
+  A Homebrew `sdkmanager`/`avdmanager` hard-codes its own SDK root and ignores
+  `ANDROID_HOME`, so it reports `Valid system image paths are: null` and refuses
+  to create the AVD.
+- The local emulator is **arm64-v8a** where CI uses **x86_64** — each must match
+  its host or it runs under full CPU emulation. So a local Android run proves
+  the flow and the bindings, not the exact artifact CI ships.
+
+### The example app pins a specific React Native environment
+
+`ddk-rn/example` is pinned to the React Native release these bindings are
+supported against, not to whatever the example was generated with, so the E2E
+exercises the toolchain consuming apps actually build with. These values move
+together — bump them as a set, not individually:
+
+| | value | where |
+|---|---|---|
+| react-native | `0.80.0` | `ddk-rn/package.json` (devDep) + `example/package.json` |
+| react | `19.1.0` | both |
+| @react-native-community/cli | `19.0.0` | `ddk-rn/package.json` (+ `-platform-android`/`-ios`) |
+| Node | `20` | `ci.yml` `NODE_VERSION` |
+| compileSdk / targetSdk | `35` | `example/android/build.gradle` |
+| minSdk | `24` | same |
+| buildTools | `35.0.0` | same |
+| Kotlin | `2.1.20` | same |
+| NDK | `27.1.12297006` | same, plus `ci.yml` and `publish.yml` |
+| Gradle wrapper | `8.14.1` | `example/android/gradle/wrapper/` |
+| iOS deployment target | `15.1` | `example/ios/*.xcodeproj` (pods get it from RN) |
+
+Why this matters beyond version hygiene: **RN 0.76+ merged the native libraries
+into a single `libreactnative.so`**, and `ddk-rn/android/CMakeLists.txt` branches
+on it (`if (ReactAndroid_VERSION_MINOR GREATER_EQUAL 76) → REACTNATIVE_MERGED_SO`).
+On the old RN 0.75 example, CI took the `else` branch and therefore never once
+linked ddk-rn the way a current consumer does. Verify after any RN bump — the
+APK should contain `libreactnative.so`, and `libbennyblader-ddk-rn.so` should
+list it under `NEEDED`:
+
+```
+unzip -p app-release.apk lib/x86_64/libbennyblader-ddk-rn.so > /tmp/l.so
+$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/*/bin/llvm-readelf -d /tmp/l.so | grep NEEDED
+```
+
+Gotchas hit doing the 0.75 → 0.80 bump, all likely to recur:
+- RN 0.80 needs **Gradle ≥ 8.11.1**; the wrapper was on 8.8 and AGP refused to load.
+- `@react-native-community/cli` must move with RN. The stale `15.0.0-alpha.2` pin
+  failed bundling with `Invalid platform "android" selected. Available platforms
+  are: "native"` — an unhelpful message for a version mismatch.
+- `@react-native/eslint-config` 0.80 dropped `eslint-plugin-prettier` (it now ships
+  only `eslint-config-prettier`), so `plugins: ["prettier"]` has to be declared in
+  ddk-rn's `eslintConfig` or every file errors with "Definition for rule
+  'prettier/prettier' was not found".
+- RN 0.80's `pod install` writes `RCTNewArchEnabled` into `Info.plist`; new arch is
+  no longer driven only by the `RCT_NEW_ARCH_ENABLED` env var.
+- **`SoLoader.init(this, false)` must become
+  `SoLoader.init(this, OpenSourceMergedSoMapping)`** in the example's
+  `MainApplication.kt`. The merged `.so` is only half the 0.76 change: the old
+  two-arg call leaves SoLoader without the name mapping, so RN's own
+  `System.loadLibrary("react_featureflagsjni")` looks for a library that no
+  longer ships and the app dies on launch with `UnsatisfiedLinkError` before any
+  JS runs. **The readelf `NEEDED` check above does not catch this** — the native
+  linkage is correct either way; the failure is on the Java side. Only launching
+  the app finds it, which is what `just e2e-android` is for.
 
 ## Code Generation
 

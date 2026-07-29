@@ -35,12 +35,14 @@ DDK-TS uses NAPI-RS to create native Node.js bindings from Rust code:
 ## Building
 
 ### Local Development
+
 ```bash
 pnpm build        # Build for current platform
 pnpm build:debug  # Build with debug symbols
 ```
 
 ### Multi-platform Build
+
 ```bash
 pnpm build:all              # Build for all supported platforms
 pnpm build:darwin-arm64     # macOS Apple Silicon
@@ -74,12 +76,14 @@ npm publish
 ## Platform Support
 
 Currently supported platforms:
+
 - `darwin-arm64`: macOS Apple Silicon
 - `linux-x64-gnu`: Linux x64 with GNU libc
 
 ## Example Usage
 
 See `example/` directory for usage examples:
+
 ```bash
 cd example
 pnpm install

@@ -1,6 +1,17 @@
 target
 .yarn
 index.js
+
+# Build output, not source. `napi build` writes dist/ (the .node/.wasm binaries
+# plus generated index.js/index.d.ts and the wasi glue), and Vite writes
+# example-browser/dist. Both are gitignored, so prettier was reformatting files
+# that are regenerated on every build — and reporting them as failures.
+dist
+example-browser/dist
+
+# Lockfile: pnpm owns the formatting.
+pnpm-lock.yaml
+
 package-template.wasi-browser.js
 package-template.wasi.cjs
 wasi-worker-browser.mjs

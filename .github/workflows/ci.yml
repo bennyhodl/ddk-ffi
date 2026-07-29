@@ -1,0 +1,611 @@
+name: CI
+
+# One pipeline for the whole repo, three stages, each gating the next:
+#
+#   check  →  build-rn   (ios, android)     →  e2e (ios, android)
+#          →  build-ts   (darwin, linux, wasm)
+#
+# `check` is the single quality gate and it covers ALL THREE packages —
+# cargo check/fmt/clippy/test for ddk-ffi and ddk-ts, prettier, eslint, tsc,
+# jest, vitest, and the bindings feature-parity scripts. It runs on one Linux
+# runner, so a formatting slip or a failing unit test costs one cheap job and
+# never reaches a macOS runner or an emulator.
+#
+# The build stage only builds. The e2e stage only tests: it downloads the app
+# that `build-rn` already produced and drives it with Maestro. It re-runs no
+# formatting, no linting, no unit tests and — importantly — no compilation.
+#
+# That last part is why the apps are built in RELEASE. React Native only embeds
+# the JS bundle in release (iOS AppDelegate is `#if DEBUG` → Metro, `#else` →
+# main.jsbundle; Android keys off BuildConfig.DEBUG), so a release app is
+# self-contained and the e2e jobs need no Metro dev server and no `adb reverse`.
+# Debug builds broke the first version of this: Metro was started with
+# `(pnpm start &)` in its own step, GitHub tore down that step's process group
+# before Maestro ran, and the app came up blank against a dev server that never
+# served a single request.
+#
+# This replaces ddk-ffi.yml, ddk-ts.yml, ddk-rn.yml, feature-parity.yml and
+# ddk-rn-e2e.yml, which ran as five independent workflows with no ordering
+# between them. publish.yml is separate and tag-driven.
+
+on:
+  push:
+    branches: [master]
+  # No branch filter. `branches: ["*"]` silently skips PRs into any branch whose
+  # name contains a slash, because `*` does not match `/` in GitHub's glob
+  # syntax — that is not hypothetical, it skipped every workflow in this repo on
+  # PR #20, which targets chore/upgrade-uniffi-0.31.
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Must match ddk-rn/package.json — see the version-lockstep note in CLAUDE.md.
+  UBRN_VERSION: "0.31.0-3"
+  # Tied to the example's React Native release; see the environment table in
+  # CLAUDE.md.
+  NODE_VERSION: "20"
+  # pnpm 10: ddk-rn/pnpm-lock.yaml is lockfileVersion 9.0, which pnpm 8 cannot
+  # read without rewriting it.
+  PNPM_VERSION: "10"
+  # Pinned to match publish.yml. ANDROID_NDK_LATEST_HOME tracks whatever the
+  # runner image ships and would let CI drift from what releases are built with.
+  NDK_VERSION: "27.1.12297006"
+  # `curl | bash` installs whatever is newest, which is the same "moves without
+  # warning" problem as the NDK. It is not only about flow behaviour: Maestro
+  # reworded its schema error between 1.x ("Failed to parse file") and 2.x
+  # ("Unknown Property"), which silently changed what the flow check could
+  # detect. Bump deliberately, and re-run `just e2e-flows` locally when you do.
+  MAESTRO_VERSION: "2.7.0"
+
+jobs:
+  # ==========================================================================
+  # STAGE 1 — the gate. Everything cheap, for every package, in one job.
+  # Nothing below runs unless this is green.
+  # ==========================================================================
+  check:
+    name: Check (fmt, clippy, lint, tests, parity)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust (+ rustfmt, clippy)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Cache cargo
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ddk-ffi/target
+            ddk-ts/target
+          key: ${{ runner.os }}-check-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      # ---- Rust: ddk-ffi and ddk-ts ----------------------------------------
+      - name: cargo check
+        run: |
+          cd ddk-ffi && cargo check --all-features
+          cd ../ddk-ts && cargo check
+
+      - name: cargo fmt
+        run: |
+          cd ddk-ffi && cargo fmt -- --check
+          cd ../ddk-ts && cargo fmt -- --check
+
+      - name: cargo clippy
+        run: |
+          cd ddk-ffi && cargo clippy --all-features -- -D warnings
+          cd ../ddk-ts && cargo clippy -- -D warnings
+
+      - name: cargo test
+        run: |
+          cd ddk-ffi && cargo test --all-features
+          cd ../ddk-ts && cargo test
+
+      # ---- ddk-ts (Node) ---------------------------------------------------
+      - name: Install ddk-ts deps
+        run: cd ddk-ts && pnpm install --frozen-lockfile
+
+      # format:check:prettier rather than format:check — the latter also runs
+      # `cargo fmt -- --check`, already covered above.
+      - name: prettier (ddk-ts)
+        run: cd ddk-ts && pnpm format:check:prettier
+
+      # Debug, not release: vitest imports dist/index.js, so the napi addon has
+      # to exist, but this is a gate — the release builds happen in stage 2.
+      - name: Build ddk-ts for tests (debug)
+        run: cd ddk-ts && pnpm build:debug
+
+      - name: vitest (ddk-ts)
+        run: cd ddk-ts && pnpm test
+
+      # Source analysis, no build needed: these compare ddk-ffi's proc-macro
+      # exports against the hand-written NAPI surface, which drift apart easily
+      # because nothing auto-generates ddk-ts.
+      - name: Bindings feature parity
+        run: |
+          cd ddk-ts
+          pnpm verify:parity
+          pnpm verify:types
+
+      # ---- ddk-rn (React Native) -------------------------------------------
+      # The pnpm workspace covers `.` and `example`, and this is also what
+      # applies patches/uniffi-bindgen-react-native@*.patch.
+      - name: Install ddk-rn deps
+        run: cd ddk-rn && pnpm install
+
+      # typecheck resolves @bennyblader/ddk-rn through lib/, so the package has
+      # to be built first.
+      - name: Build ddk-rn package (bob)
+        run: cd ddk-rn && pnpm prepare
+
+      - name: eslint (ddk-rn)
+        run: cd ddk-rn && pnpm lint
+
+      # ddk-rn/tsconfig.json has rootDir "." and no include list, so this one
+      # invocation covers the example's sources too.
+      - name: tsc (ddk-rn)
+        run: cd ddk-rn && pnpm typecheck
+
+      - name: jest (ddk-rn)
+        run: cd ddk-rn && pnpm test
+
+      # ---- Maestro flows ---------------------------------------------------
+      # Parses every flow and runs none of them, so it needs no device and no
+      # app — which is the point: a flow with a schema error is otherwise
+      # indistinguishable from a healthy one until the e2e stage installs an app,
+      # i.e. after a full macOS build. A `timeout:` on `assertVisible` (not a
+      # selector property) cost exactly that. The script self-tests against a
+      # known-bad flow, so it cannot silently degrade into passing everything.
+      #
+      # Maestro is a JVM app; the check job installs no Java otherwise.
+      - name: Setup Java (for Maestro)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Validate Maestro flows
+        env:
+          MAESTRO_VERSION: ${{ env.MAESTRO_VERSION }}
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          export PATH="$HOME/.maestro/bin:$PATH"
+          maestro -v
+          ./scripts/check-maestro-flows.sh ddk-rn/example/.maestro
+
+  # ==========================================================================
+  # STAGE 2a — build the React Native bindings and a runnable example app.
+  # Uploads the app for the e2e stage.
+  # ==========================================================================
+  build-rn:
+    name: Build ddk-rn (${{ matrix.platform }})
+    needs: check
+    strategy:
+      # One platform failing shouldn't hide the other's result.
+      fail-fast: false
+      matrix:
+        include:
+          - platform: ios
+            runner: macos-14
+            rust-targets: aarch64-apple-ios,aarch64-apple-ios-sim
+          - platform: android
+            runner: ubuntu-latest
+            # x86_64 only: the emulator must match the runner's architecture —
+            # an arm64 system image on an x86_64 host runs under full CPU
+            # emulation and is far too slow for CI.
+            rust-targets: x86_64-linux-android
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust (+ ${{ matrix.platform }} targets)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust-targets }}
+
+      - name: Setup Java
+        if: matrix.platform == 'android'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Install just
+        uses: extractions/setup-just@v1
+
+      - name: Cache cargo
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ddk-ffi/target
+          key: ${{ runner.os }}-build-rn-${{ matrix.platform }}-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install uniffi-bindgen-react-native (matches ddk-rn pin)
+        run: npm install -g uniffi-bindgen-react-native@${{ env.UBRN_VERSION }}
+
+      - name: Install cargo-ndk
+        if: matrix.platform == 'android'
+        run: cargo install cargo-ndk
+
+      # Two builds need this: cargo-ndk cross-compiles libddk_ffi.so with it, and
+      # Gradle uses it for the ddk-rn module's CMake C++ (the example pins the
+      # same version — see the environment table in CLAUDE.md).
+      #
+      # Installed rather than asserted, because the pin deliberately does not
+      # track the runner image — ANDROID_NDK_LATEST_HOME moves without warning
+      # and would let CI drift from what the example and releases are built with.
+      # Gradle would fetch this itself later, but cargo-ndk runs first.
+      - name: Pin the NDK
+        if: matrix.platform == 'android'
+        run: |
+          NDK_HOME="$ANDROID_SDK_ROOT/ndk/$NDK_VERSION"
+          if [ ! -d "$NDK_HOME" ]; then
+            echo "NDK $NDK_VERSION not preinstalled; installing. Present:"
+            ls "$ANDROID_SDK_ROOT/ndk" || true
+            yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" \
+              --install "ndk;$NDK_VERSION" >/dev/null
+          fi
+          [ -d "$NDK_HOME" ] || { echo "::error::NDK $NDK_VERSION unavailable"; exit 1; }
+          echo "ANDROID_NDK_HOME=$NDK_HOME" >> "$GITHUB_ENV"
+
+      # Must precede any native build: the generated android/CMakeLists.txt
+      # resolves ubrn via require.resolve('uniffi-bindgen-react-native/package.json'),
+      # which only works because pnpm applies patches/uniffi-bindgen-react-native@*.patch
+      # on install. Without it the Android C++ build fails with
+      # "'UniffiCallInvoker.h' file not found". See CLAUDE.md.
+      - name: Install RN deps (applies the ubrn patch) + build package
+        run: |
+          cd ddk-rn
+          pnpm install
+          pnpm prepare
+
+      # Both regenerate the bindings (--and-generate), so this is also the check
+      # that ddk-ffi's proc-macros still produce valid bindings.
+      - name: Build XCFramework + bindings
+        if: matrix.platform == 'ios'
+        run: just build-ios
+
+      - name: Build JNI library (x86_64) + bindings
+        if: matrix.platform == 'android'
+        run: just build-android x86_64
+
+      - name: Verify bindings were generated
+        run: |
+          for f in ddk-rn/cpp/ddk_ffi.hpp ddk-rn/src/ddk_ffi.ts; do
+            [ -f "$f" ] || { echo "::error::$f was not generated"; exit 1; }
+          done
+          echo "✅ bindings generated"
+
+      # Android 15+ rejects a .so whose LOAD segments are not 16KB aligned. The
+      # flag comes from /.cargo/config.toml, which is easy to lose in a merge and
+      # produces no build error when it goes missing.
+      - name: Verify 16KB alignment and that the library is not stripped
+        if: matrix.platform == 'android'
+        run: |
+          # Only x86_64 is built here (the emulator's ABI), but releases ship all
+          # four and each gets the flag from its own stanza in /.cargo/config.toml.
+          # Checking the built .so proves the file is picked up at all; this grep
+          # proves no individual target lost its stanza — the exact way this
+          # regresses without producing a build error.
+          for T in aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android; do
+            grep -A2 "^\[target\.$T\]" .cargo/config.toml | grep -q 'max-page-size=16384' \
+              || { echo "::error::/.cargo/config.toml is missing the 16KB page-size flag for $T"; exit 1; }
+          done
+          echo "✅ all four Android targets declare max-page-size=16384"
+
+          SO=ddk-rn/android/src/main/jniLibs/x86_64/libddk_ffi.so
+          READELF="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+          [ -f "$SO" ] || { echo "::error::$SO was not produced"; exit 1; }
+
+          ALIGNMENTS=$("$READELF" -l "$SO" | awk '/LOAD/ {print $NF}' | sort -u)
+          echo "LOAD alignments: $ALIGNMENTS"
+          if [ "$ALIGNMENTS" != "0x4000" ]; then
+            echo "::error::Expected every LOAD segment aligned to 0x4000 (16KB), got: $ALIGNMENTS"
+            echo "Check that /.cargo/config.toml still passes -Wl,-z,max-page-size=16384"
+            exit 1
+          fi
+
+          # Stripping breaks ubrn's turbo-module and native-bindings generation,
+          # so ddk-ffi must declare no [profile.release] strip setting.
+          "$READELF" -S "$SO" | grep -q '\.symtab' \
+            || { echo "::error::libddk_ffi.so is stripped; ubrn codegen needs its symbol table"; exit 1; }
+          echo "✅ 16KB aligned, symbol table intact"
+
+      - name: pod install
+        if: matrix.platform == 'ios'
+        run: cd ddk-rn/example/ios && pod install
+
+      # Release, not Debug: only a release build embeds the JS bundle, which is
+      # what lets the e2e stage run without Metro. Signing is disabled — this is
+      # only ever installed on a simulator.
+      - name: Build example app (iOS simulator, Release)
+        if: matrix.platform == 'ios'
+        run: |
+          cd ddk-rn/example/ios
+          xcodebuild \
+            -workspace DdkRnExample.xcworkspace \
+            -scheme DdkRnExample \
+            -configuration Release \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO ARCHS=arm64 ONLY_ACTIVE_ARCH=YES \
+            build
+
+      # Release for the embedded bundle. Needs no secrets: the example's release
+      # buildType signs with the committed debug keystore and proguard is off.
+      - name: Build example APK (x86_64, Release)
+        if: matrix.platform == 'android'
+        run: |
+          cd ddk-rn/example/android
+          ./gradlew assembleRelease \
+            -PreactNativeArchitectures=x86_64 \
+            --no-daemon --console=plain
+
+      # tar, not a bare upload: actions/upload-artifact does not preserve the
+      # executable bit, which would leave the .app unlaunchable.
+      - name: Package the app
+        run: |
+          mkdir -p artifact
+          if [ "${{ matrix.platform }}" = "ios" ]; then
+            APP=$(find ddk-rn/example/ios/build/Build/Products -name 'DdkRnExample.app' -type d | head -1)
+            [ -n "$APP" ] || { echo "::error::No .app produced"; exit 1; }
+            tar czf artifact/DdkRnExample.app.tar.gz -C "$(dirname "$APP")" "$(basename "$APP")"
+          else
+            APK=ddk-rn/example/android/app/build/outputs/apk/release/app-release.apk
+            [ -f "$APK" ] || { echo "::error::No APK produced"; exit 1; }
+            # Fails loudly here rather than as a blank screen on the emulator.
+            unzip -l "$APK" | grep -q 'assets/index.android.bundle' \
+              || { echo "::error::APK has no embedded JS bundle"; exit 1; }
+            cp "$APK" artifact/
+          fi
+          ls -la artifact/
+
+      - name: Upload the app
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-${{ matrix.platform }}
+          path: artifact/
+          retention-days: 3
+          if-no-files-found: error
+
+  # ==========================================================================
+  # STAGE 2b — build the Node/WASM bindings for every published platform.
+  # Runs alongside build-rn; nothing downstream consumes it, but a release
+  # cannot ship a platform that does not build.
+  # ==========================================================================
+  build-ts:
+    name: Build ddk-ts (${{ matrix.target }})
+    needs: check
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: darwin-arm64
+            runner: macos-latest
+            rust-target: aarch64-apple-darwin
+            script: build:darwin-arm64
+            verify: ddk-ts/dist/index.js
+          - target: linux-x64
+            runner: ubuntu-latest
+            rust-target: x86_64-unknown-linux-gnu
+            script: build:linux-x64
+            verify: ddk-ts/dist/index.js
+          - target: wasm
+            runner: ubuntu-latest
+            rust-target: wasm32-wasip1-threads
+            script: build:wasm
+            verify: ddk-ts/dist/ddk-ts.wasm32-wasi.wasm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust (+ ${{ matrix.rust-target }})
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust-target }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup WASI SDK
+        if: matrix.target == 'wasm'
+        run: |
+          curl -sL -o /tmp/wasi-sdk.tar.gz \
+            https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-33/wasi-sdk-33.0-x86_64-linux.tar.gz
+          sudo mkdir -p /opt/wasi-sdk
+          sudo tar xzf /tmp/wasi-sdk.tar.gz -C /opt/wasi-sdk --strip-components=1
+          echo "WASI_SDK_PATH=/opt/wasi-sdk" >> "$GITHUB_ENV"
+
+      - name: Cache cargo
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ddk-ts/target
+          key: ${{ runner.os }}-build-ts-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install deps
+        run: cd ddk-ts && pnpm install --frozen-lockfile
+
+      - name: Build
+        run: cd ddk-ts && pnpm ${{ matrix.script }}
+
+      - name: Verify build output
+        run: |
+          [ -f "${{ matrix.verify }}" ] || { echo "::error::${{ matrix.verify }} not generated"; exit 1; }
+          if [ "${{ matrix.target }}" != "wasm" ]; then
+            [ -f ddk-ts/dist/index.d.ts ] || { echo "::error::index.d.ts not generated"; exit 1; }
+          fi
+          echo "✅ ${{ matrix.target }} build successful"
+
+      - name: Upload the build
+        uses: actions/upload-artifact@v4
+        with:
+          name: ddk-ts-${{ matrix.target }}
+          path: ddk-ts/dist/
+          retention-days: 3
+          if-no-files-found: error
+
+  # ==========================================================================
+  # STAGE 3 — device tests only. Downloads the app built above and runs it.
+  # No compilation, no linting, no unit tests: all of that already passed.
+  # ==========================================================================
+  e2e:
+    name: E2E (${{ matrix.platform }})
+    needs: build-rn
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: ios
+            runner: macos-14
+          - platform: android
+            runner: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    steps:
+      # Only for the .maestro/ flows. No toolchain is installed in this
+      # job — no Rust, no Node, no pnpm, no just — because nothing is built.
+      - uses: actions/checkout@v4
+
+      - name: Download the app
+        uses: actions/download-artifact@v4
+        with:
+          name: app-${{ matrix.platform }}
+          path: artifact
+
+      - name: Install Maestro
+        env:
+          MAESTRO_VERSION: ${{ env.MAESTRO_VERSION }}
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+          "$HOME/.maestro/bin/maestro" -v
+
+      # ---- iOS -------------------------------------------------------------
+      - name: Boot simulator and run Maestro
+        if: matrix.platform == 'ios'
+        env:
+          SIMULATOR_NAME: "iPhone 15"
+        run: |
+          set -euo pipefail
+          tar xzf artifact/DdkRnExample.app.tar.gz -C artifact
+
+          # Everything below addresses one simulator, by UDID. `booted` is NOT
+          # unambiguous — the runner can have more than one simulator up, and
+          # simctl and Maestro then pick independently. That is a real failure,
+          # not a precaution: simctl installed onto CAE6A0BF… while Maestro drove
+          # 287A7916…, and the flow died on `launchApp` with
+          # "Simulator device failed to launch ddkrn.example
+          #  (FBSOpenApplicationServiceErrorDomain, code=4)"
+          # with no crash log, because the app simply was not on that device.
+          # The trailing " (" keeps "iPhone 15" from matching "iPhone 15 Pro".
+          UDID=$(xcrun simctl list devices available \
+            | grep -E "^[[:space:]]+${SIMULATOR_NAME} \(" \
+            | head -1 \
+            | sed -E 's/.*\(([0-9A-Fa-f-]{36})\).*/\1/')
+          [ -n "$UDID" ] || {
+            echo "::error::no available simulator named '$SIMULATOR_NAME'"
+            xcrun simctl list devices available
+            exit 1
+          }
+          echo "Using $SIMULATOR_NAME ($UDID)"
+
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl install "$UDID" artifact/DdkRnExample.app
+
+          # Assert the install landed on the device Maestro will drive, so a
+          # missing app fails here with a clear message instead of surfacing as
+          # an opaque launch error several minutes later.
+          xcrun simctl get_app_container "$UDID" ddkrn.example >/dev/null \
+            || { echo "::error::ddkrn.example is not installed on $UDID"; exit 1; }
+
+          cd ddk-rn/example
+          maestro --udid "$UDID" test .maestro/
+
+      # ---- Android ---------------------------------------------------------
+      # Without this the emulator falls back to software CPU emulation and the
+      # job times out. ubuntu-latest exposes /dev/kvm but not to the runner user.
+      - name: Enable KVM
+        if: matrix.platform == 'android'
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      # API 35 matches the example's targetSdkVersion.
+      # `google_apis` rather than `default` because Google ships x86_64 `default`
+      # images only up to API 28.
+      - name: Boot emulator and run Maestro
+        if: matrix.platform == 'android'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          ram-size: 4096M
+          disable-animations: true
+          emulator-options: -no-window -no-snapshot -noaudio -no-boot-anim -gpu swiftshader_indirect -camera-back none
+          # ONE line, deliberately. This action does not run `script:` as a
+          # script — it splits the input on newlines and runs each line as its
+          # own `sh -c`, so nothing carries across lines: `set -eu` applies to a
+          # shell that immediately exits, a `cd` is discarded, and a variable is
+          # gone by the next line. Multi-line versions of this failed twice, most
+          # recently with "no emulator in adb devices" straight after a
+          # successful install. Everything lives in the script file; see the
+          # comment at the top of it before changing this.
+          script: ./scripts/e2e-android.sh
+
+      - name: Upload Maestro debug artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-debug-${{ matrix.platform }}
+          path: |
+            ~/.maestro/tests/
+            ${{ runner.temp }}/logcat.txt
+          if-no-files-found: ignore

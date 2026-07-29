@@ -1,6 +1,9 @@
 # DDK-RN Changelog
 
 ## [Unreleased]
+- **Fixed the example app crashing on launch on Android.** RN 0.76+ merges the native libraries into one `libreactnative.so`, and the example still called the pre-0.76 `SoLoader.init(this, false)`, leaving SoLoader without the name mapping — RN's own `System.loadLibrary("react_featureflagsjni")` then failed with `UnsatisfiedLinkError` before any JS ran. Now uses `OpenSourceMergedSoMapping`
+- **Added an on-device E2E stage.** CI installs the built example app on an iOS simulator and an Android emulator and drives it with Maestro. This is the only layer that exercises the real JSI bindings, and the only one that can catch an app that never finishes launching
+- Added local E2E recipes (`just e2e-flows`, `just e2e-ios`, `just e2e-android`) so a flow can be verified in ~10s instead of a round trip through CI, plus a device-free flow parser check that also gates the CI `check` job
 - **Fixed: `@ubjs/core` was missing from `dependencies`.** The generated bindings import it at runtime, so consumers hit `Unable to resolve @ubjs/core` (a blank screen under Metro) on every published version that had it missing. `tsc` and jest do not catch it — the package resolves locally via tsconfig `paths`
 - **`npm install` no longer compiles anything.** The package now ships the prebuilt iOS XCFramework and Android JNI libraries; the `postinstall` script that built them on the consumer's machine is gone, along with the Rust toolchain requirement and the ~15-30 minute install
 - Native libraries are now built with `--release` — the XCFramework drops from 915MB to 84MB (iOS slices are additionally stripped)
@@ -14,7 +17,7 @@
 - **Breaking:** `DLCError` is now a structured error — `InvalidArgument`/`Secp256k1Error` carry a typed `message`, and `KeyError` carries the nested `ExtendedKey` enum (previously every variant was a flat string)
 - Silenced per-call debug logging (uniffi.toml `logLevel = "none"`)
 - Migrated the entire interface from UDL to UniFFI proc-macros (`#[derive(uniffi::Record)]`/`Enum`/`Error`, `#[uniffi::export]`, `setup_scaffolding!()`); deleted `ddk_ffi.udl`. The generated API is unchanged — Rust is now the single source of truth
-- Pinned the Android NDK to r27.3.13750724 in CI instead of tracking the runner image's latest, so the toolchain a release is built with cannot change without a commit
+- Pinned the Android NDK to r27.1.12297006 in CI instead of tracking the runner image's latest, so the toolchain a release is built with cannot change without a commit
 - Consolidated five release paths into one: `just release <version>` bumps, tags and pushes, and CI publishes. Removed `scripts/unified-release.js`, `ddk-rn/scripts/release.js`, `ddk-ts/scripts/release.sh`, `apply-hotfix.js` and `release-it`
 - Added a `prepublishOnly` guard that refuses to publish a tarball missing its prebuilt binaries
 - GitHub releases are now created automatically with AI-generated release notes

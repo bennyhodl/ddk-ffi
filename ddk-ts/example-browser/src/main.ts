@@ -20,5 +20,5 @@ try {
 } catch (err) {
   versionEl.textContent = 'failed'
   versionEl.className = 'err'
-  log(`❌ ${err instanceof Error ? err.stack ?? err.message : String(err)}`)
+  log(`❌ ${err instanceof Error ? (err.stack ?? err.message) : String(err)}`)
 }

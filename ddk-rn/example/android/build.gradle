@@ -1,11 +1,17 @@
 buildscript {
     ext {
-        buildToolsVersion = "34.0.0"
-        minSdkVersion = 23
-        compileSdkVersion = 34
-        targetSdkVersion = 34
-        ndkVersion = "26.1.10909125"
-        kotlinVersion = "1.9.25"
+        buildToolsVersion = "35.0.0"
+        minSdkVersion = 24
+        compileSdkVersion = 35
+        targetSdkVersion = 35
+        // Every version in this block tracks the React Native release these
+        // bindings are supported against, so the E2E exercises the toolchain
+        // consuming apps build with rather than whatever the example was
+        // generated with. They move as a set — see the environment table in
+        // CLAUDE.md. ci.yml pins cargo-ndk to this same NDK, so Gradle's CMake
+        // C++ and libddk_ffi.so are built by one toolchain.
+        ndkVersion = "27.1.12297006"
+        kotlinVersion = "2.1.20"
     }
     repositories {
         google()

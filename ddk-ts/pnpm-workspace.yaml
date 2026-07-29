@@ -1,4 +1,4 @@
 packages:
-  - "."
-  - "example"
-  - "example-browser"
+  - '.'
+  - 'example'
+  - 'example-browser'
