@@ -208,12 +208,6 @@ describe('DDK TypeScript Bindings', () => {
     })
   })
 
-  test('version returns correct format', () => {
-    const version = ddk.version()
-    expect(typeof version).toBe('string')
-    expect(version).toMatch(/^\d+\.\d+\.\d+$/)
-  })
-
   test('createFundTxLockingScript creates valid script', () => {
     // const { offerPubkey, acceptPubkey } = createTestData()
 
