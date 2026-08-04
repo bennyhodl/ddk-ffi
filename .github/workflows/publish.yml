@@ -216,11 +216,23 @@ jobs:
       # Main package must not ship .node binaries; each sibling package carries its own.
       - name: Strip binaries from main package dist/
         run: rm -f ddk-ts/dist/*.node
+      # NPM_CONFIG_TAG rather than `npm publish --tag`: napi's prepublishOnly
+      # publishes each platform sibling with a bare `npm publish` of its own
+      # (@napi-rs/cli, src/api/pre-publish.ts), which takes no tag argument but
+      # does inherit the environment. Setting the config env var covers the
+      # siblings and the main package in one place.
+      #
+      # Without it every publish lands on `latest` — npm does not infer a tag
+      # from a prerelease version — so a `v1.0.0-rc1` tag would make the RC the
+      # default install for everyone.
       - name: Publish (siblings via prepublishOnly, then main)
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           cd ddk-ts
+          VERSION="${GITHUB_REF_NAME#v}"
+          case "$VERSION" in *-*) export NPM_CONFIG_TAG=next ;; *) export NPM_CONFIG_TAG=latest ;; esac
+          echo "Publishing $VERSION to dist-tag $NPM_CONFIG_TAG"
           npm config set provenance true
           npm publish --access public
 
@@ -384,11 +396,16 @@ jobs:
             exit 1
           fi
           echo "✅ prebuilt binaries present, no Rust source"
+      # See the note on the ddk-ts publish step: a prerelease version must not
+      # take over the `latest` dist-tag.
       - name: Publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           cd ddk-rn
+          VERSION="${GITHUB_REF_NAME#v}"
+          case "$VERSION" in *-*) export NPM_CONFIG_TAG=next ;; *) export NPM_CONFIG_TAG=latest ;; esac
+          echo "Publishing $VERSION to dist-tag $NPM_CONFIG_TAG"
           npm config set provenance true
           npm publish --access public
 

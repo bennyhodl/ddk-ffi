@@ -236,6 +236,18 @@ build every platform this repo ships — and `ddk-rn`'s `prepublishOnly` runs
 `scripts/verify-package.js` to refuse a hand-run `npm publish` that would ship
 without binaries.
 
+**Prereleases go to the `next` dist-tag.** `just release 1.0.0-rc1` works end to
+end — `prep-release.js` accepts `X.Y.Z[-tag]`, the workflow's `v*.*.*` trigger
+matches, and `verify-version` is plain string equality — but npm does **not**
+infer a dist-tag from a prerelease version, so a bare `npm publish` would make
+the RC the default install for anyone running `npm install @bennyblader/ddk-rn`.
+Both publish jobs therefore derive the tag from the version (`*-*` → `next`,
+otherwise `latest`) and export it as `NPM_CONFIG_TAG`. It has to be the env var,
+not `--tag`: ddk-ts's `prepublishOnly` (`napi prepublish`) publishes each
+platform sibling with its own bare `npm publish`, which accepts no tag argument
+but does inherit the environment. Install an RC with
+`npm install @bennyblader/ddk-rn@next` (or pin the exact version).
+
 Update `ddk-rn/CHANGELOG.md`'s `[Unreleased]` section **before** releasing:
 `prep-release.js` refuses a dirty tree, so it cannot be part of the release
 commit. That section is also the highest-signal input to the release notes.
