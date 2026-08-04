@@ -19,6 +19,12 @@ end
 target 'DdkRnExample' do
   config = use_native_modules!
 
+  # ddk-rn's generated podspec pins the uniffi-bindgen-react-native runtime pod
+  # to the exact ubrn version (0.31.0-3), but CocoaPods trunk only publishes up
+  # to 0.31.0-2 — the npm package is ahead of its published pod. Source the
+  # matching 0.31.0-3 podspec locally from node_modules instead of trunk.
+  pod 'uniffi-bindgen-react-native', :path => '../../node_modules/uniffi-bindgen-react-native'
+
   use_react_native!(
     :path => config[:reactNativePath],
     # An absolute path to your application root.

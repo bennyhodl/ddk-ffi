@@ -25,5 +25,11 @@
     "strict": true,
     "target": "ESNext",
     "verbatimModuleSyntax": true
-  }
+  },
+  // App.bdk.tsx is the preserved bdk-rn integration, kept for when bdk-rn ships
+  // an ubrn-0.31 build. Nothing imports it and `bdk-rn` is deliberately not a
+  // dependency (it pins ubrn 0.30.0-1, which cannot coexist with ddk-rn's
+  // 0.31.0-3), so type-checking it would fail on the unresolvable import.
+  // example/tsconfig.json excludes it too; this is the root `pnpm typecheck`.
+  "exclude": ["example/src/App.bdk.tsx"]
 }

@@ -307,6 +307,9 @@ e2e-android-test:
   set -euo pipefail
   SERIAL=$(adb devices | awk '/emulator.*device$/ {print $1; exit}')
   [ -n "$SERIAL" ] || { echo "✗ no emulator in adb devices"; exit 1; }
+  # Same suppression CI applies, so a local run reproduces it rather than being
+  # quietly more fragile (or quietly less) than the pipeline.
+  {{justfile_directory()}}/scripts/android-suppress-dialogs.sh "$SERIAL"
   cd {{justfile_directory()}}/ddk-rn/example && maestro --udid "$SERIAL" test .maestro/
 
 # Full Android e2e: validate, build, install, run

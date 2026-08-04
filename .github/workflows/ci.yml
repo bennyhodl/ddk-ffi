@@ -151,18 +151,21 @@ jobs:
       - name: Install ddk-rn deps
         run: cd ddk-rn && pnpm install
 
-      # typecheck resolves @bennyblader/ddk-rn through lib/, so the package has
-      # to be built first.
+      # Both typecheck steps below resolve @bennyblader/ddk-rn through lib/,
+      # so the package has to be built first.
       - name: Build ddk-rn package (bob)
         run: cd ddk-rn && pnpm prepare
 
       - name: eslint (ddk-rn)
         run: cd ddk-rn && pnpm lint
 
-      # ddk-rn/tsconfig.json has rootDir "." and no include list, so this one
-      # invocation covers the example's sources too.
       - name: tsc (ddk-rn)
         run: cd ddk-rn && pnpm typecheck
+
+      # A different tsconfig from ddk-rn's own — it is the one that excludes
+      # App.bdk.tsx and checks the example against the built package.
+      - name: tsc (ddk-rn example)
+        run: cd ddk-rn/example && pnpm typecheck
 
       - name: jest (ddk-rn)
         run: cd ddk-rn && pnpm test

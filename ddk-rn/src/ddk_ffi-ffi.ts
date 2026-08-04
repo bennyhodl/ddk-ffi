@@ -164,6 +164,34 @@ interface NativeModuleInterface {
     uniffi_out_err: UniffiRustCallStatus
   ): void;
   ubrn_ffi_ddk_ffi_rust_future_free_void(handle: bigint): void;
+  ubrn_uniffi_ddk_ffi_fn_clone_contractkeyprovider(
+    ptr: bigint,
+    uniffi_out_err: UniffiRustCallStatus
+  ): bigint;
+  ubrn_uniffi_ddk_ffi_fn_free_contractkeyprovider(
+    ptr: bigint,
+    uniffi_out_err: UniffiRustCallStatus
+  ): void;
+  ubrn_uniffi_ddk_ffi_fn_func_accept_offer(
+    offer: Uint8Array,
+    params: Uint8Array,
+    keys: bigint,
+    newTemporaryContractId: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus
+  ): Uint8Array;
+  ubrn_uniffi_ddk_ffi_fn_func_chain_hash_from_network(
+    network: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus
+  ): Uint8Array;
+  ubrn_uniffi_ddk_ffi_fn_func_compute_contract_id(
+    offer: Uint8Array,
+    accept: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus
+  ): Uint8Array;
+  ubrn_uniffi_ddk_ffi_fn_func_contract_info_payouts(
+    contractInfo: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus
+  ): Uint8Array;
   ubrn_uniffi_ddk_ffi_fn_func_convert_mnemonic_to_seed(
     mnemonic: Uint8Array,
     passphrase: Uint8Array,
@@ -212,6 +240,14 @@ interface NativeModuleInterface {
     remoteSerialId: bigint,
     uniffi_out_err: UniffiRustCallStatus
   ): Uint8Array;
+  ubrn_uniffi_ddk_ffi_fn_func_create_dlc_splice_input(
+    prevOffer: Uint8Array,
+    prevAccept: Uint8Array,
+    localParty: Uint8Array,
+    inputSerialId: Uint8Array,
+    maxWitnessLen: number,
+    uniffi_out_err: UniffiRustCallStatus
+  ): Uint8Array;
   ubrn_uniffi_ddk_ffi_fn_func_create_dlc_transactions(
     outcomes: Uint8Array,
     localParams: Uint8Array,
@@ -237,6 +273,15 @@ interface NativeModuleInterface {
   ubrn_uniffi_ddk_ffi_fn_func_create_fund_tx_locking_script(
     localFundPubkey: Uint8Array,
     remoteFundPubkey: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus
+  ): Uint8Array;
+  ubrn_uniffi_ddk_ffi_fn_func_create_funding_psbt(
+    offer: Uint8Array,
+    accept: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus
+  ): Uint8Array;
+  ubrn_uniffi_ddk_ffi_fn_func_create_offer(
+    params: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus
   ): Uint8Array;
   ubrn_uniffi_ddk_ffi_fn_func_create_refund_transaction(
@@ -268,9 +313,42 @@ interface NativeModuleInterface {
     path: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus
   ): Uint8Array;
+  ubrn_uniffi_ddk_ffi_fn_func_dlc_input_max_witness_len(
+    uniffi_out_err: UniffiRustCallStatus
+  ): number;
+  ubrn_uniffi_ddk_ffi_fn_func_dlc_transactions_from_messages(
+    offer: Uint8Array,
+    accept: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus
+  ): Uint8Array;
   ubrn_uniffi_ddk_ffi_fn_func_extract_ecdsa_signature_from_oracle_signatures(
     oracleSignatures: Uint8Array,
     adaptorSignature: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus
+  ): Uint8Array;
+  ubrn_uniffi_ddk_ffi_fn_func_finalize_sign(
+    offer: Uint8Array,
+    accept: Uint8Array,
+    sign: Uint8Array,
+    signedFundingPsbt: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus
+  ): Uint8Array;
+  ubrn_uniffi_ddk_ffi_fn_func_finalize_sign_spliced(
+    offer: Uint8Array,
+    accept: Uint8Array,
+    sign: Uint8Array,
+    signedFundingPsbt: Uint8Array,
+    keys: bigint,
+    spliceKeys: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus
+  ): Uint8Array;
+  ubrn_uniffi_ddk_ffi_fn_func_funding_input(
+    previousTransaction: Uint8Array,
+    vout: number,
+    inputSerialId: Uint8Array,
+    sequence: number,
+    maxWitnessLen: number,
+    redeemScript: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus
   ): Uint8Array;
   ubrn_uniffi_ddk_ffi_fn_func_get_pubkey_from_extkey(
@@ -287,6 +365,65 @@ interface NativeModuleInterface {
     network: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus
   ): Uint8Array;
+  ubrn_uniffi_ddk_ffi_fn_func_sign_accept(
+    offer: Uint8Array,
+    accept: Uint8Array,
+    keys: bigint,
+    temporaryContractId: Uint8Array,
+    signedFundingPsbt: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus
+  ): Uint8Array;
+  ubrn_uniffi_ddk_ffi_fn_func_sign_accept_spliced(
+    offer: Uint8Array,
+    accept: Uint8Array,
+    keys: bigint,
+    temporaryContractId: Uint8Array,
+    signedFundingPsbt: Uint8Array,
+    spliceKeys: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus
+  ): Uint8Array;
+  ubrn_uniffi_ddk_ffi_fn_func_sign_contract_cet(
+    offer: Uint8Array,
+    accept: Uint8Array,
+    sign: Uint8Array,
+    keys: bigint,
+    temporaryContractId: Uint8Array,
+    attestations: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus
+  ): Uint8Array;
+  ubrn_uniffi_ddk_ffi_fn_func_sign_contract_refund(
+    offer: Uint8Array,
+    accept: Uint8Array,
+    sign: Uint8Array,
+    keys: bigint,
+    temporaryContractId: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus
+  ): Uint8Array;
+  ubrn_uniffi_ddk_ffi_fn_func_sign_funding_psbt_with_descriptor(
+    offer: Uint8Array,
+    accept: Uint8Array,
+    fundingPsbt: Uint8Array,
+    descriptor: Uint8Array,
+    inputs: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus
+  ): Uint8Array;
+  ubrn_uniffi_ddk_ffi_fn_func_validate_accept(
+    offer: Uint8Array,
+    accept: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus
+  ): void;
+  ubrn_uniffi_ddk_ffi_fn_func_validate_offer(
+    offer: Uint8Array,
+    minTimeoutInterval: number,
+    maxTimeoutInterval: number,
+    uniffi_out_err: UniffiRustCallStatus
+  ): void;
+  ubrn_uniffi_ddk_ffi_fn_func_validate_sign(
+    offer: Uint8Array,
+    accept: Uint8Array,
+    sign: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus
+  ): void;
   ubrn_uniffi_ddk_ffi_fn_func_verify_cet_adaptor_sigs_from_oracle_info(
     adaptorSigs: Uint8Array,
     cets: Uint8Array,
@@ -391,26 +528,79 @@ interface NativeModuleInterface {
     uniffiSelf: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus
   ): number;
+  ubrn_uniffi_ddk_ffi_fn_constructor_contractkeyprovider_from_descriptor(
+    descriptor: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus
+  ): bigint;
+  ubrn_uniffi_ddk_ffi_fn_constructor_contractkeyprovider_from_mnemonic(
+    mnemonic: Uint8Array,
+    passphrase: Uint8Array,
+    network: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus
+  ): bigint;
+  ubrn_uniffi_ddk_ffi_fn_constructor_contractkeyprovider_from_seed(
+    seed: Uint8Array,
+    network: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus
+  ): bigint;
+  ubrn_uniffi_ddk_ffi_fn_constructor_contractkeyprovider_from_xprv(
+    xprv: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus
+  ): bigint;
+  ubrn_uniffi_ddk_ffi_fn_method_contractkeyprovider_funding_pubkey(
+    uniffiSelf: bigint,
+    temporaryContractId: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus
+  ): Uint8Array;
   ubrn_ffi_ddk_ffi_uniffi_contract_version(): number;
+  ubrn_uniffi_ddk_ffi_checksum_func_accept_offer(): number;
+  ubrn_uniffi_ddk_ffi_checksum_func_chain_hash_from_network(): number;
+  ubrn_uniffi_ddk_ffi_checksum_func_compute_contract_id(): number;
+  ubrn_uniffi_ddk_ffi_checksum_func_contract_info_payouts(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_convert_mnemonic_to_seed(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_create_cet(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_create_cet_adaptor_points_from_oracle_info(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_create_cet_adaptor_sigs_from_oracle_info(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_create_cet_adaptor_sigs_from_points(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_create_cets(): number;
+  ubrn_uniffi_ddk_ffi_checksum_func_create_dlc_splice_input(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_create_dlc_transactions(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_create_extkey_from_parent_path(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_create_extkey_from_seed(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_create_fund_tx_locking_script(): number;
+  ubrn_uniffi_ddk_ffi_checksum_func_create_funding_psbt(): number;
+  ubrn_uniffi_ddk_ffi_checksum_func_create_offer(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_create_refund_transaction(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_create_spliced_dlc_transactions(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_create_xpriv_from_parent_path(): number;
+  ubrn_uniffi_ddk_ffi_checksum_func_dlc_input_max_witness_len(): number;
+  ubrn_uniffi_ddk_ffi_checksum_func_dlc_transactions_from_messages(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_extract_ecdsa_signature_from_oracle_signatures(): number;
+  ubrn_uniffi_ddk_ffi_checksum_func_finalize_sign(): number;
+  ubrn_uniffi_ddk_ffi_checksum_func_finalize_sign_spliced(): number;
+  ubrn_uniffi_ddk_ffi_checksum_func_funding_input(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_get_pubkey_from_extkey(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_get_total_input_vsize(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_get_xpub_from_xpriv(): number;
+  ubrn_uniffi_ddk_ffi_checksum_func_sign_accept(): number;
+  ubrn_uniffi_ddk_ffi_checksum_func_sign_accept_spliced(): number;
+  ubrn_uniffi_ddk_ffi_checksum_func_sign_contract_cet(): number;
+  ubrn_uniffi_ddk_ffi_checksum_func_sign_contract_refund(): number;
+  ubrn_uniffi_ddk_ffi_checksum_func_sign_funding_psbt_with_descriptor(): number;
+  ubrn_uniffi_ddk_ffi_checksum_func_validate_accept(): number;
+  ubrn_uniffi_ddk_ffi_checksum_func_validate_offer(): number;
+  ubrn_uniffi_ddk_ffi_checksum_func_validate_sign(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_verify_cet_adaptor_sigs_from_oracle_info(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_version(): number;
+  ubrn_uniffi_ddk_ffi_checksum_constructor_contractkeyprovider_from_descriptor(): number;
+  ubrn_uniffi_ddk_ffi_checksum_constructor_contractkeyprovider_from_mnemonic(): number;
+  ubrn_uniffi_ddk_ffi_checksum_constructor_contractkeyprovider_from_seed(): number;
+  ubrn_uniffi_ddk_ffi_checksum_constructor_contractkeyprovider_from_xprv(): number;
+  ubrn_uniffi_ddk_ffi_checksum_method_contractkeyprovider_funding_pubkey(): number;
+  ubrn_uniffi_internal_fn_method_contractkeyprovider_ffi__bless_pointer(
+    pointer: bigint,
+    uniffi_out_err: UniffiRustCallStatus
+  ): UniffiGcObject;
   // Codegen call sites use these via `nativeModule().rustbuffer_alloc(...)`
   // and `nativeModule().rustbuffer_free(...)`. The JSI host object exposes
   // them as properties; see `props["rustbuffer_alloc"]` / `props["rustbuffer_free"]`

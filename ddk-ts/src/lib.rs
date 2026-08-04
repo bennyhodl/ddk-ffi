@@ -12,6 +12,7 @@
 #![allow(clippy::too_many_arguments)]
 #![allow(deprecated)]
 
+mod contract;
 pub mod conversions;
 mod error;
 mod types;

@@ -5,7 +5,6 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "browser": "dist/browser.js",
-  "type": "module",
   "repository": "https://github.com/bennyhodl/ddk-ffi",
   "license": "MIT",
   "keywords": [

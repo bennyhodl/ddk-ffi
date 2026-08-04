@@ -236,6 +236,18 @@ build every platform this repo ships — and `ddk-rn`'s `prepublishOnly` runs
 `scripts/verify-package.js` to refuse a hand-run `npm publish` that would ship
 without binaries.
 
+**Prereleases go to the `next` dist-tag.** `just release 1.0.0-rc1` works end to
+end — `prep-release.js` accepts `X.Y.Z[-tag]`, the workflow's `v*.*.*` trigger
+matches, and `verify-version` is plain string equality — but npm does **not**
+infer a dist-tag from a prerelease version, so a bare `npm publish` would make
+the RC the default install for anyone running `npm install @bennyblader/ddk-rn`.
+Both publish jobs therefore derive the tag from the version (`*-*` → `next`,
+otherwise `latest`) and export it as `NPM_CONFIG_TAG`. It has to be the env var,
+not `--tag`: ddk-ts's `prepublishOnly` (`napi prepublish`) publishes each
+platform sibling with its own bare `npm publish`, which accepts no tag argument
+but does inherit the environment. Install an RC with
+`npm install @bennyblader/ddk-rn@next` (or pin the exact version).
+
 Update `ddk-rn/CHANGELOG.md`'s `[Unreleased]` section **before** releasing:
 `prep-release.js` refuses a dirty tree, so it cannot be part of the release
 commit. That section is also the highest-signal input to the release notes.
@@ -277,6 +289,14 @@ the expensive one can be skipped:
 While editing a flow, stay in `e2e-ios-test`; only rebuild when the app itself
 changes (JS, Rust, or the generated bindings).
 
+**Adding a new `#[uniffi::export]` needs `just build-ios`, not `just uniffi-jsi`.**
+`uniffi-jsi` regenerates the TypeScript and C++, but the C++ calls into the
+XCFramework, which only `build-ios` rebuilds. Skip it and `e2e-ios-build` fails
+at link with `Undefined symbols ... _uniffi_ddk_ffi_fn_func_<new_name>` — the
+generated C++ referencing a symbol the stale static archive does not contain.
+Nothing earlier in the chain catches this: cargo, jest, tsc and the flow parser
+all pass, because none of them link the framework.
+
 **Validate flows even when you cannot run them.** Maestro has no `validate` or
 `--dry-run` mode, so `scripts/check-maestro-flows.sh` (used by both `just
 e2e-flows` and the CI `check` job) leans on two behaviours:
@@ -298,8 +318,18 @@ and the matcher now accepts both.
 **Maestro is pinned** via `MAESTRO_VERSION` in `ci.yml`. `curl | bash` installs
 whatever is newest, which is the same "moves without warning" problem as the NDK
 — and here it silently changes what the flow check can detect. Match it locally
-with `MAESTRO_VERSION=<version> curl -Ls https://get.maestro.mobile.dev | bash`;
-`maestro -v` is printed in CI so a mismatch is visible in the log.
+with
+
+```
+curl -Ls https://get.maestro.mobile.dev | MAESTRO_VERSION=<version> bash
+```
+
+and check `maestro -v` afterwards. The variable has to be on `bash`, not on
+`curl`: `MAESTRO_VERSION=x curl … | bash` exports it to `curl` only, the
+installer sees it unset and takes the `releases/latest` branch, and you get the
+newest release while believing you pinned. CI is unaffected — it sets the
+variable through the step's `env:`, so the whole shell has it — and `maestro -v`
+is printed in the job log, which is how to confirm what actually ran.
 
 This exists because `timeout:` on `assertVisible` is a *parse* error, not a slow
 assertion: `timeout` is not one of the element selector's 28 properties (only
@@ -318,14 +348,35 @@ fails on a selector, read the screenshot and `screen-hierarchy/*.json` under the
 `maestro-debug-*` artifact before assuming the app is broken; they show exactly
 what was on screen and what text Maestro could see.
 
-**A busy emulator can steal the foreground.** In the same run, Android sat in a
-60s `extendedWaitUntil` (because of the matcher bug above) and the Pixel Launcher
-ANR'd mid-wait — its "isn't responding" dialog covered the app, so the final
-hierarchy contains the launcher rather than the app. logcat showed the app itself
-had launched cleanly (`Displayed ddkrn.example/.MainActivity`) and
-`libbennyblader-ddk-rn.so` loaded fine. Treat a launcher ANR as emulator
-contention right after boot, not as an app failure — but it only got the chance
-because the flow was waiting on an assertion that could never pass.
+**A system dialog can hide the app, and it looks exactly like a broken app.**
+The Pixel Launcher ANRs on a freshly created emulator while it rebuilds its app
+list against GMS packages that updated during boot. Its "isn't responding"
+dialog is drawn on top, and **Maestro dumps only the foreground window** — so
+the app vanishes from the hierarchy while still running and rendering behind it,
+and whichever assertion is next fails. This has now cost two Android runs. Read
+the failure screenshot first: if it shows the app *and* a system dialog, the app
+is fine.
+
+Two defences, both needed:
+
+- `scripts/android-suppress-dialogs.sh` sets `hide_error_dialogs=1` **and**
+  `anr_show_background=0`, then reads both back and prints them. Measured on an
+  API 35 emulator by forcing ANRs (SIGSTOP the process, then send it input):
+  with both set no dialog appears; setting either one the other way brings it
+  straight back — `anr_show_background` overrides `hide_error_dialogs`, and it
+  is the one that governs a *background* app, which is the case here. Both apply
+  live, with no reboot and no configuration change. The read-back exists because
+  those two `settings put` calls were already being issued, redirected to
+  `/dev/null` with `|| true`, in the run that then failed to this dialog: the
+  one fact the log needed was whether they applied, and it had been thrown away.
+- `contract-flow.yaml` wraps the whole flow in `retry: maxRetries: 1`, opening
+  with a `runFlow … when: visible: id: android:id/aerr_close` that taps the
+  dialog away. It has to wrap everything, because the dialog lands whenever the
+  ANR fires — a one-shot dismissal up front only covers a dialog that is already
+  there, and that case needs no help (`launchApp` takes focus from a
+  pre-existing dialog on its own). The failing case is a dialog arriving later,
+  and a flow can only see it by failing, coming back around, and finding it.
+  On iOS the `when` never matches, so the block is skipped.
 
 Android needs a one-time `just e2e-android-setup` (~1.5GB). Two things to know:
 

@@ -13,27 +13,16 @@ name = "ddk_ffi"
 crate-type = ["cdylib", "staticlib", "rlib"]
 
 [dependencies]
-# Pinned exactly: uniffi-bindgen-react-native 0.31.0-3 requires uniffi_core =0.31.0.
-# A caret range floats to 0.31.x and breaks the generated bindings at typecheck.
 uniffi = { version = "=0.31.0", features = ["cli"] }
-# ddk-dlc = { path = "../../../ernest/dlcdevkit/dlc", features = ["use-serde"] }
-# ddk-dlc = { git = "https://github.com/bennyhodl/dlcdevkit.git", branch = "master", features = ["use-serde"] }
-ddk-dlc = { version = "1.1.1", features = ["use-serde"] }
+ddk = { version = "2.0.0-rc.1", default-features = false }
+ddk-dlc = { version = "2.0.0-rc.1", features = ["std", "use-serde"] }
+ddk-messages = { version = "2.0.0-rc.1", features = ["std", "use-serde"] }
+lightning = { version = "0.2", features = ["std"] }
 bitcoin = "0.32.7"
 thiserror = "2.0.12"
 secp256k1-zkp = "0.11.0"
 bip39 = "2.2.0"
 
-# ddk-ts depends on this crate by path and builds it for wasm32-wasip1-threads,
-# which drags uniffi_core in even though ddk-ts is napi, not uniffi.
-#
-# uniffi_core 0.31 declares `UniffiCompatibleFuture` with a `Send` bound unless
-# this feature is on, but its wasm32 blanket impl omits `Send` — so on wasm32
-# without the feature the two disagree and the crate fails to compile with
-# "`F` cannot be sent between threads safely". Futures on wasm32 are not `Send`
-# (it is single-threaded), which is exactly what this feature exists to express.
-#
-# Target-scoped, so iOS, Android and host builds are unaffected.
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 uniffi = { version = "=0.31.0", features = ["cli", "wasm-unstable-single-threaded"] }
 
