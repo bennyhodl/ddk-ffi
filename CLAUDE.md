@@ -160,14 +160,23 @@ Rules to preserve:
   $NDK_HOME/toolchains/llvm/prebuilt/darwin-x86_64/bin/llvm-readelf -l \
     ddk-rn/android/src/main/jniLibs/arm64-v8a/libddk_ffi.so | grep LOAD
   ```
-- **NDK 27.1.12297006 is pinned**, in `.github/workflows/publish.yml` and locally.
+- **NDK 27.1.12297006 is pinned**, as `NDK_VERSION` in both `ci.yml` and
+  `.github/workflows/publish.yml`, and locally.
   It was `ANDROID_NDK_LATEST_HOME`, which tracks whatever the runner image ships
   (r29 as of this writing) and moves without warning — a release could be built by
-  a toolchain nobody tested against. r27 is the runner's own default and the first
-  NDK to default to 16KB alignment; r28/r29 raised minimum API levels. Install the
-  same one locally with
+  a toolchain nobody tested against. r27 is the first NDK to default to 16KB
+  alignment; r28/r29 raised minimum API levels. Install the same one locally with
   `sdkmanager --sdk_root="$HOME/Library/Android/sdk" --install "ndk;27.1.12297006"`
   so `just build-android` reproduces CI.
+
+  **Both workflows must `sdkmanager --install` it, never merely assert it is
+  present.** The runner image preinstalls only a few NDKs and rotates them out
+  without notice: it dropped 27.1.12297006 (leaving 27.3.13750724 / 28.2.13676358
+  / 29.0.14206865), and because `publish.yml` only checked for the directory and
+  exited 1, the v1.0.0-rc2 release died in `build-ddk-rn-android` — `ci.yml`, which
+  installs, was green on that same image the same day. The whole point of the pin
+  is that it does *not* track the image, so it cannot depend on the image carrying
+  it. The install costs ~20s.
 - ubrn regenerates `ddk-rn/android/build.gradle` on every `--and-generate`. It
   drops the `net.java.dev.jna:jna` dependency because JNA is gated on ubrn's
   `--native-bindings` flag, which defaults to false and which nothing here passes;

@@ -12,6 +12,8 @@ permissions:
 env:
   APP_NAME: ddk-ts
   MACOSX_DEPLOYMENT_TARGET: '10.13'
+  # Keep in sync with ci.yml's NDK_VERSION and the example app's ndkVersion.
+  NDK_VERSION: '27.1.12297006'
 
 jobs:
   verify-version:
@@ -313,17 +315,27 @@ jobs:
       # Pinned rather than taken from ANDROID_NDK_LATEST_HOME: that variable
       # tracks whatever the runner image ships (r29 at time of writing) and
       # moves without warning, so a release could be built by a toolchain
-      # nobody tested against. r27 is the runner's own default, is what
-      # ANDROID_NDK_ROOT points at, and is the first release to default to
-      # 16KB page alignment. Keep this in sync with what you install locally.
+      # nobody tested against. r27 is the first release to default to 16KB
+      # page alignment. Keep this in sync with what you install locally.
+      #
+      # Installed rather than asserted (same as ci.yml): the runner image only
+      # preinstalls a handful of NDKs and rotates them out without notice — it
+      # dropped 27.1.12297006 for 27.3.13750724, which turned every release
+      # into a hard failure. The pin deliberately does not track the image, so
+      # fetch it when it is absent instead of depending on it being there.
+      - name: Pin the NDK
+        run: |
+          NDK_HOME="$ANDROID_SDK_ROOT/ndk/$NDK_VERSION"
+          if [ ! -d "$NDK_HOME" ]; then
+            echo "NDK $NDK_VERSION not preinstalled; installing. Present:"
+            ls "$ANDROID_SDK_ROOT/ndk" || true
+            yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" \
+              --install "ndk;$NDK_VERSION" >/dev/null
+          fi
+          [ -d "$NDK_HOME" ] || { echo "::error::NDK $NDK_VERSION unavailable"; exit 1; }
+          echo "ANDROID_NDK_HOME=$NDK_HOME" >> "$GITHUB_ENV"
       - name: Build JNI libraries
         run: |
-          export ANDROID_NDK_HOME="$ANDROID_SDK_ROOT/ndk/27.1.12297006"
-          if [ ! -d "$ANDROID_NDK_HOME" ]; then
-            echo "::error::Pinned NDK 27.1.12297006 is not on this runner. Installed:"
-            ls "$ANDROID_SDK_ROOT/ndk"
-            exit 1
-          fi
           echo "Using NDK at $ANDROID_NDK_HOME"
           just build-android
       - name: Upload JNI libraries
