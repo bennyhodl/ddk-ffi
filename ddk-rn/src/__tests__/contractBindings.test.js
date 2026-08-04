@@ -41,6 +41,8 @@ const FUNCTIONS = [
   'signAcceptSpliced',
   'finalizeSign',
   'finalizeSignSpliced',
+  'signContractCet',
+  'signContractRefund',
   'createDlcSpliceInput',
 ];
 
@@ -51,6 +53,7 @@ const RECORD_TYPES = [
   'AcceptResult',
   'SignResult',
   'SpliceKeyRef',
+  'OracleAttestationRef',
   'DescriptorInput',
   'PayoutRow',
   'ContractPayouts',

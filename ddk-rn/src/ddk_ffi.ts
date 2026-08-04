@@ -1343,6 +1343,127 @@ export function signAcceptSpliced(
 }
 
 /**
+ * Signs the CET matching a set of oracle attestations, returning the Bitcoin
+ * consensus-serialized transaction. It pays each party the attested outcome's
+ * payout and is ready to broadcast — no network access happens here.
+ *
+ * The settling party's funding secret key is derived inside Rust from `keys` +
+ * `temporary_contract_id` — the settling party's OWN temporary id (the offer's
+ * for the offering party, the `new_temporary_contract_id` passed to
+ * `accept_offer` for the accepting party). The key also identifies which side
+ * is settling, so there is no party argument to get wrong. Either party can
+ * settle alone: the counterparty's half of the 2-of-2 comes from decrypting its
+ * CET adaptor signature with the oracle signatures.
+ *
+ * Each entry in `attestations` pairs a wire-encoded `OracleAttestation` with
+ * the index of its oracle in the announcements of the contract info it settles.
+ * Attestations are verified against the announcements they claim to come from,
+ * so a forged or misindexed one cannot produce a CET
+ * ([`ContractError::InvalidAttestation`]). When no contract outcome matches the
+ * attested outcomes, [`ContractError::NoMatchingOutcome`] is returned — which
+ * is also what an attestation for an unrelated event looks like.
+ */
+export function signContractCet(
+  offer: ArrayBuffer,
+  accept: ArrayBuffer,
+  sign: ArrayBuffer,
+  keys: ContractKeyProviderLike,
+  temporaryContractId: ArrayBuffer,
+  attestations: Array<OracleAttestationRef>
+): ArrayBuffer /*throws*/ {
+  return ((__rb: Uint8Array) => {
+    try {
+      return FfiConverterArrayBuffer.lift(__rb);
+    } finally {
+      nativeModule().rustbuffer_free(__rb);
+    }
+  })(
+    uniffiCaller.rustCallWithError(
+      /*liftError:*/ FfiConverterTypeContractError.lift.bind(
+        FfiConverterTypeContractError
+      ),
+      /*caller:*/ (callStatus) => {
+        return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_sign_contract_cet(
+          FfiConverterArrayBuffer.lower(offer, nativeModule().rustbuffer_alloc),
+          FfiConverterArrayBuffer.lower(
+            accept,
+            nativeModule().rustbuffer_alloc
+          ),
+          FfiConverterArrayBuffer.lower(sign, nativeModule().rustbuffer_alloc),
+          FfiConverterTypeContractKeyProvider.lower(
+            keys,
+            nativeModule().rustbuffer_alloc
+          ),
+          FfiConverterArrayBuffer.lower(
+            temporaryContractId,
+            nativeModule().rustbuffer_alloc
+          ),
+          FfiConverterSequenceTypeOracleAttestationRef.lower(
+            attestations,
+            nativeModule().rustbuffer_alloc
+          ),
+          callStatus
+        );
+      },
+      /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString)
+    )
+  );
+}
+
+/**
+ * Signs the refund transaction, returning the Bitcoin consensus-serialized
+ * transaction. It returns each party its own collateral and can only be
+ * broadcast once the offer's `refund_locktime` has passed — enforcing that is
+ * the chain's job, not this function's.
+ *
+ * As with [`sign_contract_cet`], `temporary_contract_id` is the settling
+ * party's own temporary id and identifies which side is settling. Both parties
+ * signed the refund during the offer/accept exchange, so this only adds this
+ * party's half; the counterparty's stored signature is verified first.
+ */
+export function signContractRefund(
+  offer: ArrayBuffer,
+  accept: ArrayBuffer,
+  sign: ArrayBuffer,
+  keys: ContractKeyProviderLike,
+  temporaryContractId: ArrayBuffer
+): ArrayBuffer /*throws*/ {
+  return ((__rb: Uint8Array) => {
+    try {
+      return FfiConverterArrayBuffer.lift(__rb);
+    } finally {
+      nativeModule().rustbuffer_free(__rb);
+    }
+  })(
+    uniffiCaller.rustCallWithError(
+      /*liftError:*/ FfiConverterTypeContractError.lift.bind(
+        FfiConverterTypeContractError
+      ),
+      /*caller:*/ (callStatus) => {
+        return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_sign_contract_refund(
+          FfiConverterArrayBuffer.lower(offer, nativeModule().rustbuffer_alloc),
+          FfiConverterArrayBuffer.lower(
+            accept,
+            nativeModule().rustbuffer_alloc
+          ),
+          FfiConverterArrayBuffer.lower(sign, nativeModule().rustbuffer_alloc),
+          FfiConverterTypeContractKeyProvider.lower(
+            keys,
+            nativeModule().rustbuffer_alloc
+          ),
+          FfiConverterArrayBuffer.lower(
+            temporaryContractId,
+            nativeModule().rustbuffer_alloc
+          ),
+          callStatus
+        );
+      },
+      /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString)
+    )
+  );
+}
+
+/**
  * Signs a party's own funding inputs on the funding PSBT using a private output
  * descriptor (e.g. bdk's `wpkh(...)` with an xprv), returning the updated PSBT.
  * Each entry in `inputs` names one of this party's funding inputs (by serial
@@ -3053,6 +3174,62 @@ const FfiConverterTypeDlcInputInfo = (() => {
   return new FFIConverter();
 })();
 
+/**
+ * An oracle attestation paired with the position of the oracle that produced it
+ * in the contract's announcements, for [`sign_contract_cet`].
+ */
+export type OracleAttestationRef = {
+  /**
+   * The index of the attesting oracle in the contract info's announcements.
+   */
+  oracleIndex: number;
+  /**
+   * The wire-encoded `OracleAttestation`.
+   */
+  attestation: ArrayBuffer;
+};
+
+/**
+ * Generated factory for {@link OracleAttestationRef} record objects.
+ */
+export const OracleAttestationRef = (() => {
+  const defaults = () => ({});
+  const create = (() => {
+    return uniffiCreateRecord<
+      OracleAttestationRef,
+      ReturnType<typeof defaults>
+    >(defaults);
+  })();
+  return Object.freeze({
+    create,
+    new: create,
+    defaults: () => Object.freeze(defaults()) as Partial<OracleAttestationRef>,
+  });
+})();
+
+const FfiConverterTypeOracleAttestationRef = (() => {
+  type TypeName = OracleAttestationRef;
+  class FFIConverter extends AbstractFfiConverterByteArray<TypeName> {
+    read(from: RustBuffer): TypeName {
+      return {
+        oracleIndex: FfiConverterUInt32.read(from),
+        attestation: FfiConverterArrayBuffer.read(from),
+      };
+    }
+    write(value: TypeName, into: RustBuffer): void {
+      FfiConverterUInt32.write(value.oracleIndex, into);
+      FfiConverterArrayBuffer.write(value.attestation, into);
+    }
+    allocationSize(value: TypeName): number {
+      return (
+        FfiConverterUInt32.allocationSize(value.oracleIndex) +
+        FfiConverterArrayBuffer.allocationSize(value.attestation)
+      );
+    }
+  }
+  return new FFIConverter();
+})();
+
 export type OracleInfo = {
   publicKey: ArrayBuffer;
   nonces: Array<ArrayBuffer>;
@@ -3421,6 +3598,8 @@ export enum ContractError_Tags {
   PsbtMismatch = 'PsbtMismatch',
   MissingFinalizedInput = 'MissingFinalizedInput',
   UnsupportedScriptType = 'UnsupportedScriptType',
+  InvalidAttestation = 'InvalidAttestation',
+  NoMatchingOutcome = 'NoMatchingOutcome',
   Descriptor = 'Descriptor',
   Wallet = 'Wallet',
   Bip32 = 'Bip32',
@@ -3678,6 +3857,71 @@ export const ContractError = (() => {
       obj: UnsupportedScriptType_
     ): Readonly<{ inputIndex: number }> {
       return obj.inner;
+    }
+  }
+
+  type InvalidAttestation__interface = {
+    tag: ContractError_Tags.InvalidAttestation;
+    inner: Readonly<{ message: string }>;
+  };
+  class InvalidAttestation_
+    extends UniffiError
+    implements InvalidAttestation__interface
+  {
+    /**
+     * @private
+     * This field is private and should not be used, use `tag` instead.
+     */
+    readonly [uniffiTypeNameSymbol] = 'ContractError';
+    readonly tag = ContractError_Tags.InvalidAttestation;
+    readonly inner: Readonly<{ message: string }>;
+    constructor(inner: { message: string }) {
+      super('ContractError', 'InvalidAttestation');
+
+      this.inner = Object.freeze(inner);
+    }
+    static new(inner: { message: string }): InvalidAttestation_ {
+      return new InvalidAttestation_(inner);
+    }
+
+    static instanceOf(obj: any): obj is InvalidAttestation_ {
+      return obj.tag === ContractError_Tags.InvalidAttestation;
+    }
+    static hasInner(obj: any): obj is InvalidAttestation_ {
+      return InvalidAttestation_.instanceOf(obj);
+    }
+
+    static getInner(obj: InvalidAttestation_): Readonly<{ message: string }> {
+      return obj.inner;
+    }
+  }
+
+  type NoMatchingOutcome__interface = {
+    tag: ContractError_Tags.NoMatchingOutcome;
+  };
+  class NoMatchingOutcome_
+    extends UniffiError
+    implements NoMatchingOutcome__interface
+  {
+    /**
+     * @private
+     * This field is private and should not be used, use `tag` instead.
+     */
+    readonly [uniffiTypeNameSymbol] = 'ContractError';
+    readonly tag = ContractError_Tags.NoMatchingOutcome;
+    constructor() {
+      super('ContractError', 'NoMatchingOutcome');
+    }
+
+    static new(): NoMatchingOutcome_ {
+      return new NoMatchingOutcome_();
+    }
+
+    static instanceOf(obj: any): obj is NoMatchingOutcome_ {
+      return obj.tag === ContractError_Tags.NoMatchingOutcome;
+    }
+    static hasInner(obj: any): obj is NoMatchingOutcome_ {
+      return false;
     }
   }
 
@@ -3980,6 +4224,8 @@ export const ContractError = (() => {
     PsbtMismatch: PsbtMismatch_,
     MissingFinalizedInput: MissingFinalizedInput_,
     UnsupportedScriptType: UnsupportedScriptType_,
+    InvalidAttestation: InvalidAttestation_,
+    NoMatchingOutcome: NoMatchingOutcome_,
     Descriptor: Descriptor_,
     Wallet: Wallet_,
     Bip32: Bip32_,
@@ -4005,6 +4251,8 @@ export type ContractError = InstanceType<
     | 'PsbtMismatch'
     | 'MissingFinalizedInput'
     | 'UnsupportedScriptType'
+    | 'InvalidAttestation'
+    | 'NoMatchingOutcome'
     | 'Descriptor'
     | 'Wallet'
     | 'Bip32'
@@ -4051,34 +4299,40 @@ const FfiConverterTypeContractError = (() => {
             inputIndex: FfiConverterUInt32.read(from),
           });
         case 8:
-          return new ContractError.Descriptor({
+          return new ContractError.InvalidAttestation({
             message: FfiConverterString.read(from),
           });
         case 9:
-          return new ContractError.Wallet({
-            message: FfiConverterString.read(from),
-          });
+          return new ContractError.NoMatchingOutcome();
         case 10:
-          return new ContractError.Bip32({
+          return new ContractError.Descriptor({
             message: FfiConverterString.read(from),
           });
         case 11:
-          return new ContractError.Dlc({
+          return new ContractError.Wallet({
             message: FfiConverterString.read(from),
           });
         case 12:
-          return new ContractError.Key({
+          return new ContractError.Bip32({
             message: FfiConverterString.read(from),
           });
         case 13:
-          return new ContractError.Serialization({
+          return new ContractError.Dlc({
             message: FfiConverterString.read(from),
           });
         case 14:
-          return new ContractError.InvalidNetwork({
+          return new ContractError.Key({
             message: FfiConverterString.read(from),
           });
         case 15:
+          return new ContractError.Serialization({
+            message: FfiConverterString.read(from),
+          });
+        case 16:
+          return new ContractError.InvalidNetwork({
+            message: FfiConverterString.read(from),
+          });
+        case 17:
           return new ContractError.InvalidLength({
             field: FfiConverterString.read(from),
             expected: FfiConverterUInt32.read(from),
@@ -4132,50 +4386,60 @@ const FfiConverterTypeContractError = (() => {
           FfiConverterUInt32.write(inner.inputIndex, into);
           return;
         }
-        case ContractError_Tags.Descriptor: {
+        case ContractError_Tags.InvalidAttestation: {
           ordinalConverter.write(8, into);
           const inner = value.inner;
           FfiConverterString.write(inner.message, into);
           return;
         }
-        case ContractError_Tags.Wallet: {
+        case ContractError_Tags.NoMatchingOutcome: {
           ordinalConverter.write(9, into);
-          const inner = value.inner;
-          FfiConverterString.write(inner.message, into);
           return;
         }
-        case ContractError_Tags.Bip32: {
+        case ContractError_Tags.Descriptor: {
           ordinalConverter.write(10, into);
           const inner = value.inner;
           FfiConverterString.write(inner.message, into);
           return;
         }
-        case ContractError_Tags.Dlc: {
+        case ContractError_Tags.Wallet: {
           ordinalConverter.write(11, into);
           const inner = value.inner;
           FfiConverterString.write(inner.message, into);
           return;
         }
-        case ContractError_Tags.Key: {
+        case ContractError_Tags.Bip32: {
           ordinalConverter.write(12, into);
           const inner = value.inner;
           FfiConverterString.write(inner.message, into);
           return;
         }
-        case ContractError_Tags.Serialization: {
+        case ContractError_Tags.Dlc: {
           ordinalConverter.write(13, into);
           const inner = value.inner;
           FfiConverterString.write(inner.message, into);
           return;
         }
-        case ContractError_Tags.InvalidNetwork: {
+        case ContractError_Tags.Key: {
           ordinalConverter.write(14, into);
           const inner = value.inner;
           FfiConverterString.write(inner.message, into);
           return;
         }
-        case ContractError_Tags.InvalidLength: {
+        case ContractError_Tags.Serialization: {
           ordinalConverter.write(15, into);
+          const inner = value.inner;
+          FfiConverterString.write(inner.message, into);
+          return;
+        }
+        case ContractError_Tags.InvalidNetwork: {
+          ordinalConverter.write(16, into);
+          const inner = value.inner;
+          FfiConverterString.write(inner.message, into);
+          return;
+        }
+        case ContractError_Tags.InvalidLength: {
+          ordinalConverter.write(17, into);
           const inner = value.inner;
           FfiConverterString.write(inner.field, into);
           FfiConverterUInt32.write(inner.expected, into);
@@ -4231,51 +4495,60 @@ const FfiConverterTypeContractError = (() => {
           size += FfiConverterUInt32.allocationSize(inner.inputIndex);
           return size;
         }
-        case ContractError_Tags.Descriptor: {
+        case ContractError_Tags.InvalidAttestation: {
           const inner = value.inner;
           let size = ordinalConverter.allocationSize(8);
           size += FfiConverterString.allocationSize(inner.message);
           return size;
         }
-        case ContractError_Tags.Wallet: {
-          const inner = value.inner;
-          let size = ordinalConverter.allocationSize(9);
-          size += FfiConverterString.allocationSize(inner.message);
-          return size;
+        case ContractError_Tags.NoMatchingOutcome: {
+          return ordinalConverter.allocationSize(9);
         }
-        case ContractError_Tags.Bip32: {
+        case ContractError_Tags.Descriptor: {
           const inner = value.inner;
           let size = ordinalConverter.allocationSize(10);
           size += FfiConverterString.allocationSize(inner.message);
           return size;
         }
-        case ContractError_Tags.Dlc: {
+        case ContractError_Tags.Wallet: {
           const inner = value.inner;
           let size = ordinalConverter.allocationSize(11);
           size += FfiConverterString.allocationSize(inner.message);
           return size;
         }
-        case ContractError_Tags.Key: {
+        case ContractError_Tags.Bip32: {
           const inner = value.inner;
           let size = ordinalConverter.allocationSize(12);
           size += FfiConverterString.allocationSize(inner.message);
           return size;
         }
-        case ContractError_Tags.Serialization: {
+        case ContractError_Tags.Dlc: {
           const inner = value.inner;
           let size = ordinalConverter.allocationSize(13);
           size += FfiConverterString.allocationSize(inner.message);
           return size;
         }
-        case ContractError_Tags.InvalidNetwork: {
+        case ContractError_Tags.Key: {
           const inner = value.inner;
           let size = ordinalConverter.allocationSize(14);
           size += FfiConverterString.allocationSize(inner.message);
           return size;
         }
-        case ContractError_Tags.InvalidLength: {
+        case ContractError_Tags.Serialization: {
           const inner = value.inner;
           let size = ordinalConverter.allocationSize(15);
+          size += FfiConverterString.allocationSize(inner.message);
+          return size;
+        }
+        case ContractError_Tags.InvalidNetwork: {
+          const inner = value.inner;
+          let size = ordinalConverter.allocationSize(16);
+          size += FfiConverterString.allocationSize(inner.message);
+          return size;
+        }
+        case ContractError_Tags.InvalidLength: {
+          const inner = value.inner;
+          let size = ordinalConverter.allocationSize(17);
           size += FfiConverterString.allocationSize(inner.field);
           size += FfiConverterUInt32.allocationSize(inner.expected);
           size += FfiConverterUInt32.allocationSize(inner.actual);
@@ -5211,6 +5484,11 @@ const FfiConverterSequenceTypeSpliceKeyRef = new FfiConverterArray(
   FfiConverterTypeSpliceKeyRef
 );
 
+// FfiConverter for Array<OracleAttestationRef>
+const FfiConverterSequenceTypeOracleAttestationRef = new FfiConverterArray(
+  FfiConverterTypeOracleAttestationRef
+);
+
 // FfiConverter for Array<DescriptorInput>
 const FfiConverterSequenceTypeDescriptorInput = new FfiConverterArray(
   FfiConverterTypeDescriptorInput
@@ -5478,6 +5756,22 @@ function uniffiEnsureInitialized() {
     );
   }
   if (
+    nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_sign_contract_cet() !==
+    36727
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      'uniffi_ddk_ffi_checksum_func_sign_contract_cet'
+    );
+  }
+  if (
+    nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_sign_contract_refund() !==
+    23156
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      'uniffi_ddk_ffi_checksum_func_sign_contract_refund'
+    );
+  }
+  if (
     nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_sign_funding_psbt_with_descriptor() !==
     25961
   ) {
@@ -5579,6 +5873,7 @@ export default Object.freeze({
     FfiConverterTypeDlcInputInfo,
     FfiConverterTypeDlcTransactions,
     FfiConverterTypeExtendedKey,
+    FfiConverterTypeOracleAttestationRef,
     FfiConverterTypeOracleInfo,
     FfiConverterTypeParty,
     FfiConverterTypePartyParams,

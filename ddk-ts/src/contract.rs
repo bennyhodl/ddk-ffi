@@ -227,6 +227,25 @@ fn splice_keys_to_ffi(
   keys.into_iter().map(TryInto::try_into).collect()
 }
 
+/// An oracle attestation paired with the position of the oracle that produced it
+/// in the contract's announcements.
+#[napi(object)]
+pub struct OracleAttestationRef {
+  /// The index of the attesting oracle in the contract info's announcements.
+  pub oracle_index: u32,
+  /// The wire-encoded `OracleAttestation`.
+  pub attestation: Buffer,
+}
+
+impl From<OracleAttestationRef> for ddk_ffi::contract::OracleAttestationRef {
+  fn from(reference: OracleAttestationRef) -> Self {
+    ddk_ffi::contract::OracleAttestationRef {
+      oracle_index: reference.oracle_index,
+      attestation: buffer_to_vec(&reference.attestation),
+    }
+  }
+}
+
 /// Identifies a funding input and the descriptor wildcard index that derives its key.
 #[napi(object)]
 pub struct DescriptorInput {
@@ -593,6 +612,69 @@ pub fn finalize_sign_spliced(
   )
   .map_err(map_contract_error)?;
   Ok(vec_to_buffer(tx))
+}
+
+// ---------------------------------------------------------------------------
+// Settlement
+//
+// Named `signContractCet` / `signContractRefund` rather than `signCet` /
+// `signRefund` because `signCet` is already a free NAPI function in lib.rs (the
+// low-level transaction API). These are the contract-level operations: they take
+// the three wire messages, not a prepared transaction plus signatures.
+// ---------------------------------------------------------------------------
+
+/// Signs the CET matching a set of oracle attestations, returning the Bitcoin
+/// consensus-serialized transaction.
+///
+/// The settling party's funding key is derived inside Rust from `keys` +
+/// `temporaryContractId` — the settling party's OWN temporary id — and also
+/// identifies which side is settling, so either party can settle alone. Each
+/// entry in `attestations` pairs a wire-encoded `OracleAttestation` with its
+/// oracle's index in the contract's announcements. Throws `InvalidAttestation`
+/// for a forged or misindexed attestation and `NoMatchingOutcome` when no
+/// contract outcome corresponds to the attested one.
+#[napi]
+pub fn sign_contract_cet(
+  offer: Buffer,
+  accept: Buffer,
+  sign: Buffer,
+  keys: &ContractKeyProvider,
+  temporary_contract_id: Buffer,
+  attestations: Vec<OracleAttestationRef>,
+) -> Result<Buffer, &'static str> {
+  let cet = ddk_ffi::contract::sign_contract_cet(
+    buffer_to_vec(&offer),
+    buffer_to_vec(&accept),
+    buffer_to_vec(&sign),
+    keys.inner.clone(),
+    buffer_to_vec(&temporary_contract_id),
+    attestations.into_iter().map(Into::into).collect(),
+  )
+  .map_err(map_contract_error)?;
+  Ok(vec_to_buffer(cet))
+}
+
+/// Signs the refund transaction, returning the Bitcoin consensus-serialized
+/// transaction. It can only be broadcast once the offer's `refundLocktime` has
+/// passed; the chain enforces that, not this function. As with
+/// `signContractCet`, `temporaryContractId` is the settling party's own.
+#[napi]
+pub fn sign_contract_refund(
+  offer: Buffer,
+  accept: Buffer,
+  sign: Buffer,
+  keys: &ContractKeyProvider,
+  temporary_contract_id: Buffer,
+) -> Result<Buffer, &'static str> {
+  let refund = ddk_ffi::contract::sign_contract_refund(
+    buffer_to_vec(&offer),
+    buffer_to_vec(&accept),
+    buffer_to_vec(&sign),
+    keys.inner.clone(),
+    buffer_to_vec(&temporary_contract_id),
+  )
+  .map_err(map_contract_error)?;
+  Ok(vec_to_buffer(refund))
 }
 
 // ---------------------------------------------------------------------------

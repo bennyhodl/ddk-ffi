@@ -8,7 +8,7 @@ import {
   createRefundTransaction,
   TxOutput,
   TxInputInfo,
-  DlcOutcome,
+  Payout,
   PartyParams,
 } from '@bennyblader/ddk-ts'
 
@@ -77,10 +77,10 @@ console.log(`   Total vsize for ${testInputs.length} inputs: ${totalVsize} vbyte
 // Example of creating DLC transactions (with mock data)
 console.log('Example DLC transaction structure:')
 
-const outcomes: DlcOutcome[] = [
-  { localPayout: 100000000n, remotePayout: 0n },
-  { localPayout: 50000000n, remotePayout: 50000000n },
-  { localPayout: 0n, remotePayout: 100000000n },
+const outcomes: Payout[] = [
+  { offer: 100000000n, accept: 0n },
+  { offer: 50000000n, accept: 50000000n },
+  { offer: 0n, accept: 100000000n },
 ]
 
 const partyParams: PartyParams = {

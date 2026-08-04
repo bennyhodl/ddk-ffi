@@ -29,6 +29,7 @@ use ddk_contract::{
     PartyParams as RustPartyParams,
 };
 use ddk_messages::contract_msgs::ContractInfo;
+use ddk_messages::oracle_msgs::OracleAttestation;
 use ddk_messages::{AcceptDlc, FundingInput, OfferDlc, SignDlc};
 
 /// Errors returned by the stateless contract API.
@@ -414,6 +415,23 @@ pub struct SpliceKeyRef {
     pub input_serial_id: u64,
     /// The 32-byte temporary id of the previous contract being spliced from.
     pub prior_temporary_contract_id: Vec<u8>,
+}
+
+/// An oracle attestation paired with the position of the oracle that produced it
+/// in the contract's announcements, for [`sign_contract_cet`].
+#[derive(uniffi::Record)]
+pub struct OracleAttestationRef {
+    /// The index of the attesting oracle in the contract info's announcements.
+    pub oracle_index: u32,
+    /// The wire-encoded `OracleAttestation`.
+    pub attestation: Vec<u8>,
+}
+
+impl OracleAttestationRef {
+    fn into_rust(self) -> Result<(usize, OracleAttestation), ContractError> {
+        let attestation: OracleAttestation = decode_msg(&self.attestation, "oracle attestation")?;
+        Ok((self.oracle_index as usize, attestation))
+    }
 }
 
 /// Identifies a funding input and the descriptor wildcard index that derives its
@@ -810,6 +828,87 @@ pub fn finalize_sign_spliced(
 }
 
 // ---------------------------------------------------------------------------
+// Settlement
+//
+// A funded contract ends in one of two transactions, both spending the 2-of-2
+// funding output and both rebuilt from the wire messages: a CET once the oracles
+// attest, or the refund once its locktime passes.
+//
+// Named `sign_contract_*` rather than `sign_cet` / `sign_refund` because
+// `signCet` is already taken by the low-level transaction API (a `Transaction`
+// method in the React Native bindings, a free function in ddk-ts, which would
+// collide there). These are the contract-level operations: they take the three
+// wire messages, not a prepared transaction plus signatures.
+// ---------------------------------------------------------------------------
+
+/// Signs the CET matching a set of oracle attestations, returning the Bitcoin
+/// consensus-serialized transaction. It pays each party the attested outcome's
+/// payout and is ready to broadcast — no network access happens here.
+///
+/// The settling party's funding secret key is derived inside Rust from `keys` +
+/// `temporary_contract_id` — the settling party's OWN temporary id (the offer's
+/// for the offering party, the `new_temporary_contract_id` passed to
+/// `accept_offer` for the accepting party). The key also identifies which side
+/// is settling, so there is no party argument to get wrong. Either party can
+/// settle alone: the counterparty's half of the 2-of-2 comes from decrypting its
+/// CET adaptor signature with the oracle signatures.
+///
+/// Each entry in `attestations` pairs a wire-encoded `OracleAttestation` with
+/// the index of its oracle in the announcements of the contract info it settles.
+/// Attestations are verified against the announcements they claim to come from,
+/// so a forged or misindexed one cannot produce a CET
+/// ([`ContractError::InvalidAttestation`]). When no contract outcome matches the
+/// attested outcomes, [`ContractError::NoMatchingOutcome`] is returned — which
+/// is also what an attestation for an unrelated event looks like.
+#[uniffi::export]
+pub fn sign_contract_cet(
+    offer: Vec<u8>,
+    accept: Vec<u8>,
+    sign: Vec<u8>,
+    keys: Arc<ContractKeyProvider>,
+    temporary_contract_id: Vec<u8>,
+    attestations: Vec<OracleAttestationRef>,
+) -> Result<Vec<u8>, ContractError> {
+    let offer: OfferDlc = decode_msg(&offer, "offer")?;
+    let accept: AcceptDlc = decode_msg(&accept, "accept")?;
+    let sign: SignDlc = decode_msg(&sign, "sign")?;
+    let temp_id = to_array_32(&temporary_contract_id, "temporary_contract_id")?;
+    let funding_secret_key = keys.inner.funding_secret_key(temp_id)?;
+    let attestations = attestations
+        .into_iter()
+        .map(OracleAttestationRef::into_rust)
+        .collect::<Result<Vec<_>, _>>()?;
+    let cet = ddk_contract::sign_cet(&offer, &accept, &sign, &funding_secret_key, &attestations)?;
+    Ok(bitcoin::consensus::serialize(&cet))
+}
+
+/// Signs the refund transaction, returning the Bitcoin consensus-serialized
+/// transaction. It returns each party its own collateral and can only be
+/// broadcast once the offer's `refund_locktime` has passed — enforcing that is
+/// the chain's job, not this function's.
+///
+/// As with [`sign_contract_cet`], `temporary_contract_id` is the settling
+/// party's own temporary id and identifies which side is settling. Both parties
+/// signed the refund during the offer/accept exchange, so this only adds this
+/// party's half; the counterparty's stored signature is verified first.
+#[uniffi::export]
+pub fn sign_contract_refund(
+    offer: Vec<u8>,
+    accept: Vec<u8>,
+    sign: Vec<u8>,
+    keys: Arc<ContractKeyProvider>,
+    temporary_contract_id: Vec<u8>,
+) -> Result<Vec<u8>, ContractError> {
+    let offer: OfferDlc = decode_msg(&offer, "offer")?;
+    let accept: AcceptDlc = decode_msg(&accept, "accept")?;
+    let sign: SignDlc = decode_msg(&sign, "sign")?;
+    let temp_id = to_array_32(&temporary_contract_id, "temporary_contract_id")?;
+    let funding_secret_key = keys.inner.funding_secret_key(temp_id)?;
+    let refund = ddk_contract::sign_refund(&offer, &accept, &sign, &funding_secret_key)?;
+    Ok(bitcoin::consensus::serialize(&refund))
+}
+
+// ---------------------------------------------------------------------------
 // Splicing
 // ---------------------------------------------------------------------------
 
@@ -941,29 +1040,70 @@ mod tests {
     const OFFER_TEMP_ID: [u8; 32] = [0x5c; 32];
     const ACCEPT_TEMP_ID: [u8; 32] = [0xa1; 32];
     const NETWORK: Network = Network::Regtest;
+    // The oracle behind the fixture announcement. Held as constants so
+    // `attestation` can sign the outcomes the announcement commits to — the
+    // nonce secret is what forces the signature's R to equal the announced
+    // nonce, which is what `OracleAttestation::validate` checks.
+    const ORACLE_SECRET: [u8; 32] = [88; 32];
+    const ORACLE_NONCE_SECRET: [u8; 32] = [90; 32];
+    const EVENT_ID: &str = "ddk-ffi-test";
+
+    fn oracle_keypair(secp: &Secp256k1<All>) -> Keypair {
+        Keypair::from_secret_key(secp, &SecretKey::from_slice(&ORACLE_SECRET).unwrap())
+    }
 
     fn enum_contract_info() -> ContractInfo {
         enum_contract_info_with(TOTAL_COLLATERAL)
+    }
+
+    /// An attestation to one of the fixture contract's outcomes, as the oracle
+    /// that signed its announcement would publish it.
+    fn attestation(outcome: &str) -> OracleAttestation {
+        let secp = Secp256k1::new();
+        let oracle_key = oracle_keypair(&secp);
+        let signature = ddk_dlc::secp_utils::schnorrsig_sign_with_nonce(
+            &secp,
+            &ddk_messages::oracle_msgs::tagged_attestation_msg(outcome),
+            &oracle_key,
+            &ORACLE_NONCE_SECRET,
+        );
+        OracleAttestation {
+            event_id: EVENT_ID.to_string(),
+            oracle_public_key: XOnlyPublicKey::from_keypair(&oracle_key).0,
+            signatures: vec![signature],
+            outcomes: vec![outcome.to_string()],
+        }
+    }
+
+    fn attestation_ref(outcome: &str) -> OracleAttestationRef {
+        OracleAttestationRef {
+            oracle_index: 0,
+            attestation: encode_msg(&attestation(outcome)),
+        }
     }
 
     // A two-outcome enum contract with `total` collateral ("up" pays it all to
     // the offerer, "down" all to the accepter).
     fn enum_contract_info_with(total: Amount) -> ContractInfo {
         let secp = Secp256k1::new();
-        let oracle_key =
-            Keypair::from_secret_key(&secp, &SecretKey::from_slice(&[88; 32]).unwrap());
-        let nonce_key = Keypair::from_secret_key(&secp, &SecretKey::from_slice(&[90; 32]).unwrap());
+        let oracle_key = oracle_keypair(&secp);
+        let nonce_key =
+            Keypair::from_secret_key(&secp, &SecretKey::from_slice(&ORACLE_NONCE_SECRET).unwrap());
         let oracle_event = OracleEvent {
             oracle_nonces: vec![XOnlyPublicKey::from_keypair(&nonce_key).0],
             event_maturity_epoch: 750,
             event_descriptor: EventDescriptor::EnumEvent(EnumEventDescriptor {
                 outcomes: vec!["up".to_string(), "down".to_string()],
             }),
-            event_id: "ddk-ffi-test".to_string(),
+            event_id: EVENT_ID.to_string(),
         };
         let announcement = OracleAnnouncement {
+            // No aux randomness: the announcement signature is the only
+            // non-deterministic part of this fixture, and the ddk-rn example app
+            // embeds the encoded contract info as a hex constant that
+            // `print_example_fixtures` regenerates.
             announcement_signature: secp
-                .sign_schnorr(&tagged_announcement_msg(&oracle_event), &oracle_key),
+                .sign_schnorr_no_aux_rand(&tagged_announcement_msg(&oracle_event), &oracle_key),
             oracle_public_key: XOnlyPublicKey::from_keypair(&oracle_key).0,
             oracle_event,
         };
@@ -1241,6 +1381,66 @@ mod tests {
     // This is exactly the flow the example app runs.
     #[test]
     fn full_single_funded_flow_via_ffi() {
+        let contract = single_funded_contract();
+
+        // Standalone validation API: the same checks the lifecycle runs
+        // internally, callable on stored/received messages at any time.
+        validate_accept(contract.offer.clone(), contract.accept.clone()).unwrap();
+        validate_sign(
+            contract.offer.clone(),
+            contract.accept.clone(),
+            contract.sign.clone(),
+        )
+        .unwrap();
+        let contract_id =
+            compute_contract_id(contract.offer.clone(), contract.accept.clone()).unwrap();
+        assert_eq!(contract_id.len(), 32);
+        // A message that is not a valid SignDlc for these two is rejected.
+        assert!(validate_sign(
+            contract.offer.clone(),
+            contract.accept.clone(),
+            contract.accept.clone()
+        )
+        .is_err());
+
+        let signed_tx_bytes = finalize_sign(
+            contract.offer,
+            contract.accept,
+            contract.sign,
+            contract.funding_psbt,
+        )
+        .unwrap();
+
+        let signed_tx: Transaction = bitcoin::consensus::deserialize(&signed_tx_bytes).unwrap();
+        assert_eq!(
+            signed_tx.input.len(),
+            1,
+            "the offerer's single funding input"
+        );
+        assert!(
+            !signed_tx.input[0].witness.is_empty(),
+            "funding input is signed"
+        );
+    }
+
+    /// A funded single-funded contract: the three wire messages plus each
+    /// party's key provider and its own temporary contract id, which is what
+    /// settlement needs.
+    struct FundedContract {
+        offer: Vec<u8>,
+        accept: Vec<u8>,
+        sign: Vec<u8>,
+        funding_psbt: Vec<u8>,
+        offerer_keys: Arc<ContractKeyProvider>,
+        offer_temp_id: Vec<u8>,
+        acceptor_keys: Arc<ContractKeyProvider>,
+        accept_temp_id: Vec<u8>,
+    }
+
+    /// Drives offer -> accept -> funding PSBT -> sign entirely through the FFI
+    /// surface, for a 100 000 sat two-outcome enum contract funded solely by the
+    /// offerer.
+    fn single_funded_contract() -> FundedContract {
         let secp = Secp256k1::new();
         let path = DerivationPath::from_str("84h/1h/0h/0/0").unwrap();
 
@@ -1313,8 +1513,8 @@ mod tests {
                 min_timeout_interval: 100,
                 max_timeout_interval: 100_000,
             },
-            acceptor_keys,
-            accept_temp_id,
+            acceptor_keys.clone(),
+            accept_temp_id.clone(),
         )
         .unwrap()
         .accept;
@@ -1337,34 +1537,241 @@ mod tests {
         let sign = sign_accept(
             offer.clone(),
             accept.clone(),
-            offerer_keys,
-            offer_temp_id,
+            offerer_keys.clone(),
+            offer_temp_id.clone(),
             signed_psbt,
         )
         .unwrap()
         .sign;
 
-        // Standalone validation API: the same checks the lifecycle runs
-        // internally, callable on stored/received messages at any time.
-        validate_accept(offer.clone(), accept.clone()).unwrap();
-        validate_sign(offer.clone(), accept.clone(), sign.clone()).unwrap();
-        let contract_id = compute_contract_id(offer.clone(), accept.clone()).unwrap();
-        assert_eq!(contract_id.len(), 32);
-        // A message that is not a valid SignDlc for these two is rejected.
-        assert!(validate_sign(offer.clone(), accept.clone(), accept.clone()).is_err());
+        FundedContract {
+            offer,
+            accept,
+            sign,
+            funding_psbt,
+            offerer_keys,
+            offer_temp_id,
+            acceptor_keys,
+            accept_temp_id,
+        }
+    }
 
-        let signed_tx_bytes = finalize_sign(offer, accept, sign, funding_psbt).unwrap();
+    // -----------------------------------------------------------------------
+    // Settlement
+    // -----------------------------------------------------------------------
 
-        let signed_tx: Transaction = bitcoin::consensus::deserialize(&signed_tx_bytes).unwrap();
+    /// Both parties can settle the same contract independently and each ends up
+    /// broadcasting the same CET for the same attested outcome. "up" pays the
+    /// whole 100 000 sats to the offerer.
+    #[test]
+    fn settlement_signs_the_matching_cet() {
+        let contract = single_funded_contract();
+
+        let by_offerer = sign_contract_cet(
+            contract.offer.clone(),
+            contract.accept.clone(),
+            contract.sign.clone(),
+            contract.offerer_keys.clone(),
+            contract.offer_temp_id.clone(),
+            vec![attestation_ref("up")],
+        )
+        .unwrap();
+        let by_acceptor = sign_contract_cet(
+            contract.offer.clone(),
+            contract.accept.clone(),
+            contract.sign.clone(),
+            contract.acceptor_keys.clone(),
+            contract.accept_temp_id.clone(),
+            vec![attestation_ref("up")],
+        )
+        .unwrap();
+
+        let cet: Transaction = bitcoin::consensus::deserialize(&by_offerer).unwrap();
+        let acceptor_cet: Transaction = bitcoin::consensus::deserialize(&by_acceptor).unwrap();
+        // Not byte-equal: each party signs its own half fresh (RFC 6979) and
+        // recovers the counterparty's by decrypting its adaptor signature, whose
+        // nonce comes from the adaptor point rather than RFC 6979. Both
+        // witnesses are valid, so the transaction — which is what gets
+        // broadcast — is the same one.
         assert_eq!(
-            signed_tx.input.len(),
-            1,
-            "the offerer's single funding input"
+            cet.compute_txid(),
+            acceptor_cet.compute_txid(),
+            "either party settling broadcasts the same CET"
         );
         assert!(
-            !signed_tx.input[0].witness.is_empty(),
-            "funding input is signed"
+            !acceptor_cet.input[0].witness.is_empty(),
+            "the acceptor's 2-of-2 witness is complete too"
         );
+
+        assert_eq!(cet.input.len(), 1, "spends the 2-of-2 funding output");
+        assert!(
+            !cet.input[0].witness.is_empty(),
+            "2-of-2 witness is complete"
+        );
+        assert_eq!(
+            cet.output.len(),
+            1,
+            "\"up\" pays everything to one party, so the dust-value side is dropped"
+        );
+
+        // The other outcome is a different CET.
+        let down = sign_contract_cet(
+            contract.offer.clone(),
+            contract.accept.clone(),
+            contract.sign.clone(),
+            contract.offerer_keys.clone(),
+            contract.offer_temp_id.clone(),
+            vec![attestation_ref("down")],
+        )
+        .unwrap();
+        assert_ne!(down, by_offerer);
+    }
+
+    /// An attestation to an outcome the contract does not have resolves to no
+    /// CET, and a forged one is rejected before it can select any.
+    #[test]
+    fn settlement_rejects_unusable_attestations() {
+        let contract = single_funded_contract();
+
+        let unknown_outcome = sign_contract_cet(
+            contract.offer.clone(),
+            contract.accept.clone(),
+            contract.sign.clone(),
+            contract.offerer_keys.clone(),
+            contract.offer_temp_id.clone(),
+            vec![attestation_ref("sideways")],
+        );
+        assert!(matches!(
+            unknown_outcome,
+            Err(ContractError::NoMatchingOutcome)
+        ));
+
+        // Same outcome, wrong oracle: the announcement it claims to come from is
+        // the fixture's, so validation fails rather than producing a CET.
+        let secp = Secp256k1::new();
+        let impostor = Keypair::from_secret_key(&secp, &SecretKey::from_slice(&[77; 32]).unwrap());
+        let mut forged = attestation("up");
+        forged.oracle_public_key = XOnlyPublicKey::from_keypair(&impostor).0;
+        let result = sign_contract_cet(
+            contract.offer.clone(),
+            contract.accept.clone(),
+            contract.sign.clone(),
+            contract.offerer_keys.clone(),
+            contract.offer_temp_id.clone(),
+            vec![OracleAttestationRef {
+                oracle_index: 0,
+                attestation: encode_msg(&forged),
+            }],
+        );
+        assert!(matches!(
+            result,
+            Err(ContractError::InvalidAttestation { .. })
+        ));
+
+        // An out-of-range oracle index is reported the same way.
+        let bad_index = sign_contract_cet(
+            contract.offer.clone(),
+            contract.accept.clone(),
+            contract.sign.clone(),
+            contract.offerer_keys.clone(),
+            contract.offer_temp_id.clone(),
+            vec![OracleAttestationRef {
+                oracle_index: 3,
+                attestation: encode_msg(&attestation("up")),
+            }],
+        );
+        assert!(matches!(
+            bad_index,
+            Err(ContractError::InvalidAttestation { .. })
+        ));
+    }
+
+    /// The refund needs no oracle at all, and likewise both parties reach the
+    /// same transaction.
+    #[test]
+    fn settlement_signs_the_refund() {
+        let contract = single_funded_contract();
+
+        let by_offerer = sign_contract_refund(
+            contract.offer.clone(),
+            contract.accept.clone(),
+            contract.sign.clone(),
+            contract.offerer_keys.clone(),
+            contract.offer_temp_id.clone(),
+        )
+        .unwrap();
+        let by_acceptor = sign_contract_refund(
+            contract.offer.clone(),
+            contract.accept.clone(),
+            contract.sign.clone(),
+            contract.acceptor_keys.clone(),
+            contract.accept_temp_id.clone(),
+        )
+        .unwrap();
+        assert_eq!(by_offerer, by_acceptor);
+
+        let refund: Transaction = bitcoin::consensus::deserialize(&by_offerer).unwrap();
+        assert_eq!(refund.input.len(), 1);
+        assert!(!refund.input[0].witness.is_empty());
+        assert_eq!(
+            refund.lock_time.to_consensus_u32(),
+            1_000,
+            "carries the offer's refund_locktime"
+        );
+        // Single-funded: the accepter put up nothing, so only the offerer's
+        // collateral comes back.
+        assert_eq!(refund.output.len(), 1);
+    }
+
+    /// Prints the hex fixtures the ddk-rn example app embeds, so they can be
+    /// regenerated rather than reverse-engineered when the fixture contract
+    /// changes. Ignored: it asserts nothing and only exists to be run by hand
+    /// with `cargo test print_example_fixtures -- --ignored --nocapture`.
+    #[test]
+    #[ignore]
+    fn print_example_fixtures() {
+        fn hex(bytes: &[u8]) -> String {
+            bytes.iter().map(|b| format!("{b:02x}")).collect()
+        }
+        println!(
+            "CONTRACT_INFO_HEX = {}",
+            hex(&encode_msg(&enum_contract_info()))
+        );
+        // 60 000 sats: what a contract spliced out of the 100 000 sat one above
+        // is worth, used by the ddk-ts splice round-trip test.
+        println!(
+            "CONTRACT_INFO_60K_HEX = {}",
+            hex(&encode_msg(&enum_contract_info_with(Amount::from_sat(
+                60_000
+            ))))
+        );
+        // "sideways" is signed by the right oracle with the right nonce but is
+        // not an outcome any of these contracts has, which is what selects the
+        // NoMatchingOutcome path rather than InvalidAttestation.
+        for outcome in ["up", "down", "sideways"] {
+            println!(
+                "ATTESTATION_{}_HEX = {}",
+                outcome.to_uppercase(),
+                hex(&encode_msg(&attestation(outcome)))
+            );
+        }
+    }
+
+    /// A provider that is neither party's cannot settle: the derived key matches
+    /// no funding pubkey in the contract.
+    #[test]
+    fn settlement_rejects_a_stranger_key() {
+        let contract = single_funded_contract();
+        let stranger = provider("regtest");
+
+        let result = sign_contract_refund(
+            contract.offer.clone(),
+            contract.accept.clone(),
+            contract.sign.clone(),
+            stranger,
+            contract.offer_temp_id.clone(),
+        );
+        assert!(matches!(result, Err(ContractError::Key { .. })));
     }
 
     #[test]

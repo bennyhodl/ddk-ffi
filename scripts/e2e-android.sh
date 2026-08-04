@@ -43,8 +43,10 @@ SERIAL=$(adb devices | awk '/emulator.*device$/ {print $1; exit}')
 }
 echo "Using emulator $SERIAL"
 
-adb -s "$SERIAL" shell settings put secure anr_show_background 0 >/dev/null 2>&1 || true
-adb -s "$SERIAL" shell settings put global hide_error_dialogs 1 >/dev/null 2>&1 || true
+# Keep the emulator's own crash/ANR dialogs off the screen — one of them covering
+# the app is a real, observed failure mode, not a precaution. See the script for
+# what each setting does and why both are needed.
+"$(dirname "$0")/android-suppress-dialogs.sh" "$SERIAL"
 
 cd "$(dirname "$0")/../ddk-rn/example"
 

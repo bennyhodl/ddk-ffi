@@ -1,15 +1,17 @@
 /**
- * ddk-rn — full DLC funding flow, on device.
+ * ddk-rn — full DLC contract lifecycle, on device.
  *
- * Runs an entire two-party DLC funding flow through the ddk-rn (JSI → Rust)
- * bindings, with NO oracle and NO network:
+ * Runs an entire two-party DLC through the ddk-rn (JSI → Rust) bindings, with NO
+ * live oracle and NO network:
  *
  *   createOffer → validateOffer → acceptOffer → validateAccept →
  *   createFundingPsbt → signFundingPsbtWithDescriptor → signAccept →
- *   validateSign → finalizeSign → a fully-signed funding transaction.
+ *   validateSign → finalizeSign → a fully-signed funding transaction, then
+ *   signContractCet / signContractRefund → the two settlement transactions.
  *
- * The wallet parts (a private descriptor + a funding UTXO) are fixtures here, so
- * the flow is deterministic and offline — this is what the Maestro E2E asserts.
+ * The wallet parts (a private descriptor + a funding UTXO) and the oracle
+ * attestation are fixtures here, so the flow is deterministic and offline — this
+ * is what the Maestro E2E asserts.
  * (An earlier version wired this to bdk-rn for a real wallet; that's preserved in
  * App.bdk.tsx, disabled until bdk-rn ships an ubrn-0.31-compatible build.)
  */
@@ -38,6 +40,8 @@ import {
   computeContractId,
   contractInfoPayouts,
   finalizeSign,
+  signContractCet,
+  signContractRefund,
   version,
 } from '@bennyblader/ddk-rn';
 
@@ -52,7 +56,13 @@ const OFFERER_SPK_HEX = '00143a4279e9c96f8305f3bc0566f9d8be101c189a83';
 // A two-outcome ("up"/"down") enum contract with a signed oracle announcement
 // and 100 000 sats total collateral.
 const CONTRACT_INFO_HEX =
-  '0000000000000186a0000202757000000000000186a004646f776e000000000000000000fdd824a50e90df7ce7ebd675ee2aa81d38c1e040470e27a9f99fb1a1f923b601464d3002f902a28bd4b9de6373966266daf4fdda538fc968bc1fe92cfcc53c1010bcce2a44b9c62b2e40f9623c61ec464829cf5af49e0abf99cdac5564d05158ddf5a925fdd8224100019c5530e4385ebc41cdaf8257edf9a2baaf8506a4099103211e6ed7382103ed67000002eefdd8060a000202757004646f776e0c64646b2d6666692d74657374';
+  '0000000000000186a0000202757000000000000186a004646f776e000000000000000000fdd824a5e7bcb1a4d0af5cd7bcc1b9aaabc2ee7463752c4db3d34d28817e27f459da722f4b1c649cec355f3f7bb5d7d3c67605f03ebc4b2b1d42c1aedaa7f186b3077fd944b9c62b2e40f9623c61ec464829cf5af49e0abf99cdac5564d05158ddf5a925fdd8224100019c5530e4385ebc41cdaf8257edf9a2baaf8506a4099103211e6ed7382103ed67000002eefdd8060a000202757004646f776e0c64646b2d6666692d74657374';
+// The same oracle attesting to "up" — the outcome that pays the offerer the
+// whole 100 000 sats. Regenerate alongside CONTRACT_INFO_HEX with
+// `cargo test print_example_fixtures -- --ignored --nocapture` in ddk-ffi/.
+const ATTESTATION_UP_HEX =
+  '0c64646b2d6666692d7465737444b9c62b2e40f9623c61ec464829cf5af49e0abf99cdac5564d05158ddf5a92500019c5530e4385ebc41cdaf8257edf9a2baaf8506a4099103211e6ed7382103ed67e0b00db2f09efc08cda1554ae4f910a6fb5365c240e24d7be3514eed6825ce230001027570';
+const ATTESTED_OUTCOME = 'up';
 const ACCEPTOR_MNEMONIC =
   'legal winner thank year wave sausage worth useful legal winner thank yellow';
 
@@ -68,6 +78,9 @@ type DemoResult = {
   payoutRows: { label: string; offer: string; accept: string }[];
   fundingTxBytes: number;
   fundingTxPreview: string;
+  cetBytes: number;
+  cetPreview: string;
+  refundBytes: number;
 };
 
 function toHex(buffer: ArrayBuffer): string {
@@ -196,6 +209,27 @@ export default function App() {
         fundingPsbt
       );
 
+      // 6) Settle. Both paths are rebuilt from the three wire messages alone —
+      // nothing about the contract was stored. The offerer signs the CET the
+      // oracle's attestation selects; the acceptor signs the refund. Each side
+      // settles on its own: the counterparty's half of the 2-of-2 comes from
+      // the messages it already sent.
+      const cet = signContractCet(
+        offer,
+        accept,
+        signResult.sign,
+        offererKeys,
+        offerTempId,
+        [{ oracleIndex: 0, attestation: hexToArrayBuffer(ATTESTATION_UP_HEX) }]
+      );
+      const refund = signContractRefund(
+        offer,
+        accept,
+        signResult.sign,
+        acceptorKeys,
+        acceptTempId
+      );
+
       setResult({
         ddkVersion: version(),
         offerBytes: offer.byteLength,
@@ -205,6 +239,9 @@ export default function App() {
         payoutRows,
         fundingTxBytes: fundingTx.byteLength,
         fundingTxPreview: `${toHex(fundingTx).slice(0, 64)}…`,
+        cetBytes: cet.byteLength,
+        cetPreview: `${toHex(cet).slice(0, 64)}…`,
+        refundBytes: refund.byteLength,
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -218,13 +255,13 @@ export default function App() {
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.title}>DDK · DLC</Text>
         <Text style={styles.subtitle}>
-          A full two-party DLC funding flow through the ddk-rn bindings — no
-          oracle, no network.
+          A full two-party DLC — offer to settlement — through the ddk-rn
+          bindings. No live oracle, no network.
         </Text>
 
         <Pressable
           testID="run-flow"
-          accessibilityLabel="Run the funding flow"
+          accessibilityLabel="Run the contract flow"
           style={({ pressed }) => [
             styles.button,
             pressed && styles.buttonPressed,
@@ -235,7 +272,7 @@ export default function App() {
           {loading ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.buttonText}>Run the funding flow</Text>
+            <Text style={styles.buttonText}>Run the contract flow</Text>
           )}
         </Pressable>
 
@@ -288,6 +325,27 @@ export default function App() {
               <Field label="Raw tx" value={result.fundingTxPreview} mono />
               <Text style={styles.note}>
                 Fully signed and ready to broadcast.
+              </Text>
+            </View>
+
+            <View
+              testID="flow-settled"
+              style={[styles.card, styles.successCard]}
+            >
+              <Text style={styles.cardTitle}>✓ Settled</Text>
+              <Field
+                label={`CET · oracle attested "${ATTESTED_OUTCOME}"`}
+                value={`${result.cetBytes} bytes`}
+              />
+              <Field label="Raw CET" value={result.cetPreview} mono />
+              <Field
+                label="Refund transaction"
+                value={`${result.refundBytes} bytes`}
+              />
+              <Text style={styles.note}>
+                Both rebuilt from the three wire messages alone — no stored
+                contract state. The offerer signed the CET, the acceptor the
+                refund; either party can settle without the other.
               </Text>
             </View>
 
