@@ -29,6 +29,8 @@ pub fn map_contract_error(err: ContractError) -> napi::Error<&'static str> {
     ContractError::PsbtMismatch { .. } => "PsbtMismatch",
     ContractError::MissingFinalizedInput { .. } => "MissingFinalizedInput",
     ContractError::UnsupportedScriptType { .. } => "UnsupportedScriptType",
+    ContractError::InvalidAttestation { .. } => "InvalidAttestation",
+    ContractError::NoMatchingOutcome => "NoMatchingOutcome",
     ContractError::Descriptor { .. } => "Descriptor",
     ContractError::Wallet { .. } => "Wallet",
     ContractError::Bip32 { .. } => "Bip32",

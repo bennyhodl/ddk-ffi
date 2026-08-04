@@ -51,6 +51,10 @@ pub enum ContractError {
     MissingFinalizedInput { input_index: u32 },
     #[error("PSBT input {input_index} has an unsupported script type")]
     UnsupportedScriptType { input_index: u32 },
+    #[error("invalid attestation: {message}")]
+    InvalidAttestation { message: String },
+    #[error("no contract outcome matches the given attestations")]
+    NoMatchingOutcome,
     #[error("descriptor error: {message}")]
     Descriptor { message: String },
     #[error("wallet error: {message}")]
@@ -91,6 +95,8 @@ impl From<ddk_contract::ContractError> for ContractError {
             E::UnsupportedScriptType { input_index } => ContractError::UnsupportedScriptType {
                 input_index: input_index as u32,
             },
+            E::InvalidAttestation(message) => ContractError::InvalidAttestation { message },
+            E::NoMatchingOutcome => ContractError::NoMatchingOutcome,
             E::Descriptor(message) => ContractError::Descriptor { message },
             E::Wallet(message) => ContractError::Wallet { message },
             E::Bip32(message) => ContractError::Bip32 { message },

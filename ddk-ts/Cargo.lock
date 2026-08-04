@@ -335,8 +335,9 @@ checksum = "01334b89b69ff726750c5ce5073fc8bd860e99aa9a8fc5ca11b04730e3aee97a"
 
 [[package]]
 name = "ddk"
-version = "1.1.2"
-source = "git+https://github.com/bennyhodl/dlcdevkit.git?branch=stateless-dlc-creation#bf7746cfff95b5651ed59beee472f31a59cf33d7"
+version = "2.0.0-rc.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b2ad0cd47782413adb6c33c037fd0c80482bbc574d7a63d775b30ed3a84915f"
 dependencies = [
  "bdk_chain",
  "bdk_wallet",
@@ -355,8 +356,9 @@ dependencies = [
 
 [[package]]
 name = "ddk-dlc"
-version = "1.1.2"
-source = "git+https://github.com/bennyhodl/dlcdevkit.git?branch=stateless-dlc-creation#bf7746cfff95b5651ed59beee472f31a59cf33d7"
+version = "2.0.0-rc.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8f0bb253ab615009071b4753f87ea32c961236bfe0b950f8de0032c6ce74f278"
 dependencies = [
  "bitcoin",
  "miniscript",
@@ -367,8 +369,9 @@ dependencies = [
 
 [[package]]
 name = "ddk-manager"
-version = "1.1.2"
-source = "git+https://github.com/bennyhodl/dlcdevkit.git?branch=stateless-dlc-creation#bf7746cfff95b5651ed59beee472f31a59cf33d7"
+version = "2.0.0-rc.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6b42e8f5c9868c3e2bcdacb30cbd4e4a8b3279f15da937471a56d726657c3c60"
 dependencies = [
  "async-trait",
  "bitcoin",
@@ -386,8 +389,9 @@ dependencies = [
 
 [[package]]
 name = "ddk-messages"
-version = "1.1.2"
-source = "git+https://github.com/bennyhodl/dlcdevkit.git?branch=stateless-dlc-creation#bf7746cfff95b5651ed59beee472f31a59cf33d7"
+version = "2.0.0-rc.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "befc018356a37259f216be7c7996f3273d021175d75f21d4cd4b80328f92c908"
 dependencies = [
  "bitcoin",
  "ddk-dlc",
@@ -398,8 +402,9 @@ dependencies = [
 
 [[package]]
 name = "ddk-trie"
-version = "1.1.2"
-source = "git+https://github.com/bennyhodl/dlcdevkit.git?branch=stateless-dlc-creation#bf7746cfff95b5651ed59beee472f31a59cf33d7"
+version = "2.0.0-rc.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a08bb5fc6beeaa35b366aa418f35d1cb17d1e639ed494d5fb1e9aa063c9bdfb4"
 dependencies = [
  "bitcoin",
  "ddk-dlc",

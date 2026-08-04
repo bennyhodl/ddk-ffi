@@ -10,18 +10,12 @@ crate-type = ["cdylib", "rlib"]
 path = "src/lib.rs"
 
 [dependencies]
-# Import the existing DDK library
 ddk_ffi = { path = "../ddk-ffi" }
 
-# NAPI-RS dependencies
 napi = { version = "3.9", default-features = false, features = ["napi9", "serde-json"] }
 napi-derive = "3.5"
 
-# Match the same dependencies as ddk-ffi. ddk-dlc MUST resolve to the same
-# version/source ddk_ffi uses (1.1.x, `stateless-dlc-creation` branch) or the
-# secp256k1_zkp / DLC types won't unify across the ddk_ffi boundary. If you
-# repoint ddk-ffi at a local dlcdevkit checkout, repoint this line too.
-ddk-dlc = { git = "https://github.com/bennyhodl/dlcdevkit.git", branch = "stateless-dlc-creation", features = ["std", "use-serde"] }
+ddk-dlc = { version = "2.0.0-rc.1", features = ["std", "use-serde"] }
 bitcoin = "0.32.7"
 thiserror = "2.0.12"
 secp256k1-zkp = "0.11.0"

@@ -27,10 +27,6 @@ name: CI
 # This replaces ddk-ffi.yml, ddk-ts.yml, ddk-rn.yml, feature-parity.yml and
 # ddk-rn-e2e.yml, which ran as five independent workflows with no ordering
 # between them. publish.yml is separate and tag-driven.
-#
-# ddk-ffi builds against the dlcdevkit `stateless-dlc-creation` branch (git deps
-# in ddk-ffi/ddk-ts Cargo.toml, commit-pinned in Cargo.lock). Once that branch
-# lands on master and is published, repoint both to the crates.io release.
 
 on:
   push:
