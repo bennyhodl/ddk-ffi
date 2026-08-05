@@ -17,7 +17,6 @@ import {
   type UniffiObjectFactory,
   AbstractFfiConverterByteArray,
   FfiConverterArray,
-  FfiConverterArrayBuffer,
   FfiConverterBool,
   FfiConverterInt32,
   FfiConverterObject,
@@ -26,6 +25,7 @@ import {
   FfiConverterUInt32,
   FfiConverterUInt64,
   FfiConverterUInt8,
+  FfiConverterUint8Array,
   RustBuffer,
   UniffiAbstractObject,
   UniffiEnum,
@@ -56,10 +56,10 @@ const uniffiIsDebug =
  * it must match `params.party.funding_pubkey` (derive both from the same provider).
  */
 export function acceptOffer(
-  offer: ArrayBuffer,
+  offer: Uint8Array,
   params: AcceptOfferParams,
   keys: ContractKeyProviderLike,
-  newTemporaryContractId: ArrayBuffer
+  newTemporaryContractId: Uint8Array
 ): AcceptResult /*throws*/ {
   return ((__rb: Uint8Array) => {
     try {
@@ -74,7 +74,7 @@ export function acceptOffer(
       ),
       /*caller:*/ (callStatus) => {
         return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_accept_offer(
-          FfiConverterArrayBuffer.lower(offer, nativeModule().rustbuffer_alloc),
+          FfiConverterUint8Array.lower(offer, nativeModule().rustbuffer_alloc),
           FfiConverterTypeAcceptOfferParams.lower(
             params,
             nativeModule().rustbuffer_alloc
@@ -83,7 +83,7 @@ export function acceptOffer(
             keys,
             nativeModule().rustbuffer_alloc
           ),
-          FfiConverterArrayBuffer.lower(
+          FfiConverterUint8Array.lower(
             newTemporaryContractId,
             nativeModule().rustbuffer_alloc
           ),
@@ -99,10 +99,10 @@ export function acceptOffer(
  * The 32-byte chain hash for a network (`bitcoin` / `testnet` / `signet` /
  * `regtest`). Use it for [`CreateOfferParams::chain_hash`].
  */
-export function chainHashFromNetwork(network: string): ArrayBuffer /*throws*/ {
+export function chainHashFromNetwork(network: string): Uint8Array /*throws*/ {
   return ((__rb: Uint8Array) => {
     try {
-      return FfiConverterArrayBuffer.lift(__rb);
+      return FfiConverterUint8Array.lift(__rb);
     } finally {
       nativeModule().rustbuffer_free(__rb);
     }
@@ -127,12 +127,12 @@ export function chainHashFromNetwork(network: string): ArrayBuffer /*throws*/ {
  * stable id of the funded contract. Use it to key stored contracts.
  */
 export function computeContractId(
-  offer: ArrayBuffer,
-  accept: ArrayBuffer
-): ArrayBuffer /*throws*/ {
+  offer: Uint8Array,
+  accept: Uint8Array
+): Uint8Array /*throws*/ {
   return ((__rb: Uint8Array) => {
     try {
-      return FfiConverterArrayBuffer.lift(__rb);
+      return FfiConverterUint8Array.lift(__rb);
     } finally {
       nativeModule().rustbuffer_free(__rb);
     }
@@ -143,11 +143,8 @@ export function computeContractId(
       ),
       /*caller:*/ (callStatus) => {
         return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_compute_contract_id(
-          FfiConverterArrayBuffer.lower(offer, nativeModule().rustbuffer_alloc),
-          FfiConverterArrayBuffer.lower(
-            accept,
-            nativeModule().rustbuffer_alloc
-          ),
+          FfiConverterUint8Array.lower(offer, nativeModule().rustbuffer_alloc),
+          FfiConverterUint8Array.lower(accept, nativeModule().rustbuffer_alloc),
           callStatus
         );
       },
@@ -166,7 +163,7 @@ export function computeContractId(
  * contracts contribute the rows of each of their sub-contracts.
  */
 export function contractInfoPayouts(
-  contractInfo: ArrayBuffer
+  contractInfo: Uint8Array
 ): ContractPayouts /*throws*/ {
   return ((__rb: Uint8Array) => {
     try {
@@ -181,7 +178,7 @@ export function contractInfoPayouts(
       ),
       /*caller:*/ (callStatus) => {
         return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_contract_info_payouts(
-          FfiConverterArrayBuffer.lower(
+          FfiConverterUint8Array.lower(
             contractInfo,
             nativeModule().rustbuffer_alloc
           ),
@@ -196,10 +193,10 @@ export function contractInfoPayouts(
 export function convertMnemonicToSeed(
   mnemonic: string,
   passphrase: string | undefined
-): ArrayBuffer /*throws*/ {
+): Uint8Array /*throws*/ {
   return ((__rb: Uint8Array) => {
     try {
-      return FfiConverterArrayBuffer.lift(__rb);
+      return FfiConverterUint8Array.lift(__rb);
     } finally {
       nativeModule().rustbuffer_free(__rb);
     }
@@ -277,8 +274,8 @@ export function createCet(
 
 export function createCetAdaptorPointsFromOracleInfo(
   oracleInfo: Array<OracleInfo>,
-  msgs: Array<Array<Array<ArrayBuffer>>>
-): Array<ArrayBuffer> /*throws*/ {
+  msgs: Array<Array<Array<Uint8Array>>>
+): Array<Uint8Array> /*throws*/ {
   return ((__rb: Uint8Array) => {
     try {
       return FfiConverterSequenceBytes.lift(__rb);
@@ -311,10 +308,10 @@ export function createCetAdaptorPointsFromOracleInfo(
 export function createCetAdaptorSigsFromOracleInfo(
   cets: Array<Transaction>,
   oracleInfo: Array<OracleInfo>,
-  fundingSecretKey: ArrayBuffer,
-  fundingScriptPubkey: ArrayBuffer,
+  fundingSecretKey: Uint8Array,
+  fundingScriptPubkey: Uint8Array,
   fundOutputValue: bigint,
-  msgs: Array<Array<Array<ArrayBuffer>>>
+  msgs: Array<Array<Array<Uint8Array>>>
 ): Array<AdaptorSignature> /*throws*/ {
   return ((__rb: Uint8Array) => {
     try {
@@ -337,11 +334,11 @@ export function createCetAdaptorSigsFromOracleInfo(
             oracleInfo,
             nativeModule().rustbuffer_alloc
           ),
-          FfiConverterArrayBuffer.lower(
+          FfiConverterUint8Array.lower(
             fundingSecretKey,
             nativeModule().rustbuffer_alloc
           ),
-          FfiConverterArrayBuffer.lower(
+          FfiConverterUint8Array.lower(
             fundingScriptPubkey,
             nativeModule().rustbuffer_alloc
           ),
@@ -366,9 +363,9 @@ export function createCetAdaptorSigsFromOracleInfo(
  */
 export function createCetAdaptorSigsFromPoints(
   cets: Array<Transaction>,
-  adaptorPoints: Array<ArrayBuffer>,
-  fundingSecretKey: ArrayBuffer,
-  fundingScriptPubkey: ArrayBuffer,
+  adaptorPoints: Array<Uint8Array>,
+  fundingSecretKey: Uint8Array,
+  fundingScriptPubkey: Uint8Array,
   fundOutputValue: bigint
 ): Array<AdaptorSignature> /*throws*/ {
   return ((__rb: Uint8Array) => {
@@ -392,11 +389,11 @@ export function createCetAdaptorSigsFromPoints(
             adaptorPoints,
             nativeModule().rustbuffer_alloc
           ),
-          FfiConverterArrayBuffer.lower(
+          FfiConverterUint8Array.lower(
             fundingSecretKey,
             nativeModule().rustbuffer_alloc
           ),
-          FfiConverterArrayBuffer.lower(
+          FfiConverterUint8Array.lower(
             fundingScriptPubkey,
             nativeModule().rustbuffer_alloc
           ),
@@ -418,8 +415,8 @@ export function createCetAdaptorSigsFromPoints(
 export function createCets(
   fundTxId: string,
   fundVout: number,
-  localFinalScriptPubkey: ArrayBuffer,
-  remoteFinalScriptPubkey: ArrayBuffer,
+  localFinalScriptPubkey: Uint8Array,
+  remoteFinalScriptPubkey: Uint8Array,
   outcomes: Array<Payout>,
   lockTime: number,
   localSerialId: bigint,
@@ -440,11 +437,11 @@ export function createCets(
         return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_create_cets(
           FfiConverterString.lower(fundTxId, nativeModule().rustbuffer_alloc),
           FfiConverterUInt32.lower(fundVout, nativeModule().rustbuffer_alloc),
-          FfiConverterArrayBuffer.lower(
+          FfiConverterUint8Array.lower(
             localFinalScriptPubkey,
             nativeModule().rustbuffer_alloc
           ),
-          FfiConverterArrayBuffer.lower(
+          FfiConverterUint8Array.lower(
             remoteFinalScriptPubkey,
             nativeModule().rustbuffer_alloc
           ),
@@ -477,15 +474,15 @@ export function createCets(
  * greater than 108 — use [`dlc_input_max_witness_len`].
  */
 export function createDlcSpliceInput(
-  prevOffer: ArrayBuffer,
-  prevAccept: ArrayBuffer,
+  prevOffer: Uint8Array,
+  prevAccept: Uint8Array,
   localParty: Party,
   inputSerialId: bigint | undefined,
   maxWitnessLen: number
-): ArrayBuffer /*throws*/ {
+): Uint8Array /*throws*/ {
   return ((__rb: Uint8Array) => {
     try {
-      return FfiConverterArrayBuffer.lift(__rb);
+      return FfiConverterUint8Array.lift(__rb);
     } finally {
       nativeModule().rustbuffer_free(__rb);
     }
@@ -496,11 +493,11 @@ export function createDlcSpliceInput(
       ),
       /*caller:*/ (callStatus) => {
         return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_create_dlc_splice_input(
-          FfiConverterArrayBuffer.lower(
+          FfiConverterUint8Array.lower(
             prevOffer,
             nativeModule().rustbuffer_alloc
           ),
-          FfiConverterArrayBuffer.lower(
+          FfiConverterUint8Array.lower(
             prevAccept,
             nativeModule().rustbuffer_alloc
           ),
@@ -597,12 +594,12 @@ export function createDlcTransactions(
  * Input: 78-byte encoded xpriv, Output: 78-byte encoded xpriv
  */
 export function createExtkeyFromParentPath(
-  extkey: ArrayBuffer,
+  extkey: Uint8Array,
   path: string
-): ArrayBuffer /*throws*/ {
+): Uint8Array /*throws*/ {
   return ((__rb: Uint8Array) => {
     try {
-      return FfiConverterArrayBuffer.lift(__rb);
+      return FfiConverterUint8Array.lift(__rb);
     } finally {
       nativeModule().rustbuffer_free(__rb);
     }
@@ -613,10 +610,7 @@ export function createExtkeyFromParentPath(
       ),
       /*caller:*/ (callStatus) => {
         return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_create_extkey_from_parent_path(
-          FfiConverterArrayBuffer.lower(
-            extkey,
-            nativeModule().rustbuffer_alloc
-          ),
+          FfiConverterUint8Array.lower(extkey, nativeModule().rustbuffer_alloc),
           FfiConverterString.lower(path, nativeModule().rustbuffer_alloc),
           callStatus
         );
@@ -631,12 +625,12 @@ export function createExtkeyFromParentPath(
  * Returns 78-byte encoded xpriv
  */
 export function createExtkeyFromSeed(
-  seed: ArrayBuffer,
+  seed: Uint8Array,
   network: string
-): ArrayBuffer /*throws*/ {
+): Uint8Array /*throws*/ {
   return ((__rb: Uint8Array) => {
     try {
-      return FfiConverterArrayBuffer.lift(__rb);
+      return FfiConverterUint8Array.lift(__rb);
     } finally {
       nativeModule().rustbuffer_free(__rb);
     }
@@ -647,7 +641,7 @@ export function createExtkeyFromSeed(
       ),
       /*caller:*/ (callStatus) => {
         return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_create_extkey_from_seed(
-          FfiConverterArrayBuffer.lower(seed, nativeModule().rustbuffer_alloc),
+          FfiConverterUint8Array.lower(seed, nativeModule().rustbuffer_alloc),
           FfiConverterString.lower(network, nativeModule().rustbuffer_alloc),
           callStatus
         );
@@ -661,12 +655,12 @@ export function createExtkeyFromSeed(
  * Create a funding script pubkey for DLC transactions
  */
 export function createFundTxLockingScript(
-  localFundPubkey: ArrayBuffer,
-  remoteFundPubkey: ArrayBuffer
-): ArrayBuffer /*throws*/ {
+  localFundPubkey: Uint8Array,
+  remoteFundPubkey: Uint8Array
+): Uint8Array /*throws*/ {
   return ((__rb: Uint8Array) => {
     try {
-      return FfiConverterArrayBuffer.lift(__rb);
+      return FfiConverterUint8Array.lift(__rb);
     } finally {
       nativeModule().rustbuffer_free(__rb);
     }
@@ -677,11 +671,11 @@ export function createFundTxLockingScript(
       ),
       /*caller:*/ (callStatus) => {
         return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_create_fund_tx_locking_script(
-          FfiConverterArrayBuffer.lower(
+          FfiConverterUint8Array.lower(
             localFundPubkey,
             nativeModule().rustbuffer_alloc
           ),
-          FfiConverterArrayBuffer.lower(
+          FfiConverterUint8Array.lower(
             remoteFundPubkey,
             nativeModule().rustbuffer_alloc
           ),
@@ -697,12 +691,12 @@ export function createFundTxLockingScript(
  * Rebuilds the BIP-174 funding PSBT from the offer and accept messages.
  */
 export function createFundingPsbt(
-  offer: ArrayBuffer,
-  accept: ArrayBuffer
-): ArrayBuffer /*throws*/ {
+  offer: Uint8Array,
+  accept: Uint8Array
+): Uint8Array /*throws*/ {
   return ((__rb: Uint8Array) => {
     try {
-      return FfiConverterArrayBuffer.lift(__rb);
+      return FfiConverterUint8Array.lift(__rb);
     } finally {
       nativeModule().rustbuffer_free(__rb);
     }
@@ -713,11 +707,8 @@ export function createFundingPsbt(
       ),
       /*caller:*/ (callStatus) => {
         return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_create_funding_psbt(
-          FfiConverterArrayBuffer.lower(offer, nativeModule().rustbuffer_alloc),
-          FfiConverterArrayBuffer.lower(
-            accept,
-            nativeModule().rustbuffer_alloc
-          ),
+          FfiConverterUint8Array.lower(offer, nativeModule().rustbuffer_alloc),
+          FfiConverterUint8Array.lower(accept, nativeModule().rustbuffer_alloc),
           callStatus
         );
       },
@@ -729,10 +720,10 @@ export function createFundingPsbt(
 /**
  * Creates an offer. Returns the wire-encoded `OfferDlc` to send to the accepting party.
  */
-export function createOffer(params: CreateOfferParams): ArrayBuffer /*throws*/ {
+export function createOffer(params: CreateOfferParams): Uint8Array /*throws*/ {
   return ((__rb: Uint8Array) => {
     try {
-      return FfiConverterArrayBuffer.lift(__rb);
+      return FfiConverterUint8Array.lift(__rb);
     } finally {
       nativeModule().rustbuffer_free(__rb);
     }
@@ -759,8 +750,8 @@ export function createOffer(params: CreateOfferParams): ArrayBuffer /*throws*/ {
  * Create a refund transaction
  */
 export function createRefundTransaction(
-  localFinalScriptPubkey: ArrayBuffer,
-  remoteFinalScriptPubkey: ArrayBuffer,
+  localFinalScriptPubkey: Uint8Array,
+  remoteFinalScriptPubkey: Uint8Array,
   localAmount: bigint,
   remoteAmount: bigint,
   lockTime: number,
@@ -780,11 +771,11 @@ export function createRefundTransaction(
       ),
       /*caller:*/ (callStatus) => {
         return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_create_refund_transaction(
-          FfiConverterArrayBuffer.lower(
+          FfiConverterUint8Array.lower(
             localFinalScriptPubkey,
             nativeModule().rustbuffer_alloc
           ),
-          FfiConverterArrayBuffer.lower(
+          FfiConverterUint8Array.lower(
             remoteFinalScriptPubkey,
             nativeModule().rustbuffer_alloc
           ),
@@ -880,14 +871,14 @@ export function createSplicedDlcTransactions(
  * This function handles both seeds (64 bytes) and xprivs (78 bytes) which is confusing
  */
 export function createXprivFromParentPath(
-  seedOrXpriv: ArrayBuffer,
+  seedOrXpriv: Uint8Array,
   baseDerivationPath: string,
   network: string,
   path: string
-): ArrayBuffer /*throws*/ {
+): Uint8Array /*throws*/ {
   return ((__rb: Uint8Array) => {
     try {
-      return FfiConverterArrayBuffer.lift(__rb);
+      return FfiConverterUint8Array.lift(__rb);
     } finally {
       nativeModule().rustbuffer_free(__rb);
     }
@@ -898,7 +889,7 @@ export function createXprivFromParentPath(
       ),
       /*caller:*/ (callStatus) => {
         return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_create_xpriv_from_parent_path(
-          FfiConverterArrayBuffer.lower(
+          FfiConverterUint8Array.lower(
             seedOrXpriv,
             nativeModule().rustbuffer_alloc
           ),
@@ -936,8 +927,8 @@ export function dlcInputMaxWitnessLen(): number {
  * Rebuilds the unsigned funding, CET, and refund transactions from the messages.
  */
 export function dlcTransactionsFromMessages(
-  offer: ArrayBuffer,
-  accept: ArrayBuffer
+  offer: Uint8Array,
+  accept: Uint8Array
 ): DlcTransactions /*throws*/ {
   return ((__rb: Uint8Array) => {
     try {
@@ -952,11 +943,8 @@ export function dlcTransactionsFromMessages(
       ),
       /*caller:*/ (callStatus) => {
         return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_dlc_transactions_from_messages(
-          FfiConverterArrayBuffer.lower(offer, nativeModule().rustbuffer_alloc),
-          FfiConverterArrayBuffer.lower(
-            accept,
-            nativeModule().rustbuffer_alloc
-          ),
+          FfiConverterUint8Array.lower(offer, nativeModule().rustbuffer_alloc),
+          FfiConverterUint8Array.lower(accept, nativeModule().rustbuffer_alloc),
           callStatus
         );
       },
@@ -966,12 +954,12 @@ export function dlcTransactionsFromMessages(
 }
 
 export function extractEcdsaSignatureFromOracleSignatures(
-  oracleSignatures: Array<ArrayBuffer>,
-  adaptorSignature: ArrayBuffer
-): ArrayBuffer /*throws*/ {
+  oracleSignatures: Array<Uint8Array>,
+  adaptorSignature: Uint8Array
+): Uint8Array /*throws*/ {
   return ((__rb: Uint8Array) => {
     try {
-      return FfiConverterArrayBuffer.lift(__rb);
+      return FfiConverterUint8Array.lift(__rb);
     } finally {
       nativeModule().rustbuffer_free(__rb);
     }
@@ -986,7 +974,7 @@ export function extractEcdsaSignatureFromOracleSignatures(
             oracleSignatures,
             nativeModule().rustbuffer_alloc
           ),
-          FfiConverterArrayBuffer.lower(
+          FfiConverterUint8Array.lower(
             adaptorSignature,
             nativeModule().rustbuffer_alloc
           ),
@@ -1003,14 +991,14 @@ export function extractEcdsaSignatureFromOracleSignatures(
  * transaction. Returns the Bitcoin consensus-serialized signed transaction.
  */
 export function finalizeSign(
-  offer: ArrayBuffer,
-  accept: ArrayBuffer,
-  sign: ArrayBuffer,
-  signedFundingPsbt: ArrayBuffer
-): ArrayBuffer /*throws*/ {
+  offer: Uint8Array,
+  accept: Uint8Array,
+  sign: Uint8Array,
+  signedFundingPsbt: Uint8Array
+): Uint8Array /*throws*/ {
   return ((__rb: Uint8Array) => {
     try {
-      return FfiConverterArrayBuffer.lift(__rb);
+      return FfiConverterUint8Array.lift(__rb);
     } finally {
       nativeModule().rustbuffer_free(__rb);
     }
@@ -1021,13 +1009,10 @@ export function finalizeSign(
       ),
       /*caller:*/ (callStatus) => {
         return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_finalize_sign(
-          FfiConverterArrayBuffer.lower(offer, nativeModule().rustbuffer_alloc),
-          FfiConverterArrayBuffer.lower(
-            accept,
-            nativeModule().rustbuffer_alloc
-          ),
-          FfiConverterArrayBuffer.lower(sign, nativeModule().rustbuffer_alloc),
-          FfiConverterArrayBuffer.lower(
+          FfiConverterUint8Array.lower(offer, nativeModule().rustbuffer_alloc),
+          FfiConverterUint8Array.lower(accept, nativeModule().rustbuffer_alloc),
+          FfiConverterUint8Array.lower(sign, nativeModule().rustbuffer_alloc),
+          FfiConverterUint8Array.lower(
             signedFundingPsbt,
             nativeModule().rustbuffer_alloc
           ),
@@ -1045,16 +1030,16 @@ export function finalizeSign(
  * re-derived inside Rust from `keys`.
  */
 export function finalizeSignSpliced(
-  offer: ArrayBuffer,
-  accept: ArrayBuffer,
-  sign: ArrayBuffer,
-  signedFundingPsbt: ArrayBuffer,
+  offer: Uint8Array,
+  accept: Uint8Array,
+  sign: Uint8Array,
+  signedFundingPsbt: Uint8Array,
   keys: ContractKeyProviderLike,
   spliceKeys: Array<SpliceKeyRef>
-): ArrayBuffer /*throws*/ {
+): Uint8Array /*throws*/ {
   return ((__rb: Uint8Array) => {
     try {
-      return FfiConverterArrayBuffer.lift(__rb);
+      return FfiConverterUint8Array.lift(__rb);
     } finally {
       nativeModule().rustbuffer_free(__rb);
     }
@@ -1065,13 +1050,10 @@ export function finalizeSignSpliced(
       ),
       /*caller:*/ (callStatus) => {
         return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_finalize_sign_spliced(
-          FfiConverterArrayBuffer.lower(offer, nativeModule().rustbuffer_alloc),
-          FfiConverterArrayBuffer.lower(
-            accept,
-            nativeModule().rustbuffer_alloc
-          ),
-          FfiConverterArrayBuffer.lower(sign, nativeModule().rustbuffer_alloc),
-          FfiConverterArrayBuffer.lower(
+          FfiConverterUint8Array.lower(offer, nativeModule().rustbuffer_alloc),
+          FfiConverterUint8Array.lower(accept, nativeModule().rustbuffer_alloc),
+          FfiConverterUint8Array.lower(sign, nativeModule().rustbuffer_alloc),
+          FfiConverterUint8Array.lower(
             signedFundingPsbt,
             nativeModule().rustbuffer_alloc
           ),
@@ -1106,16 +1088,16 @@ export function finalizeSignSpliced(
  * - `redeem_script`: the redeem script for a P2SH input, or empty for others.
  */
 export function fundingInput(
-  previousTransaction: ArrayBuffer,
+  previousTransaction: Uint8Array,
   vout: number,
   inputSerialId: bigint | undefined,
   sequence: number,
   maxWitnessLen: number,
-  redeemScript: ArrayBuffer
-): ArrayBuffer /*throws*/ {
+  redeemScript: Uint8Array
+): Uint8Array /*throws*/ {
   return ((__rb: Uint8Array) => {
     try {
-      return FfiConverterArrayBuffer.lift(__rb);
+      return FfiConverterUint8Array.lift(__rb);
     } finally {
       nativeModule().rustbuffer_free(__rb);
     }
@@ -1126,7 +1108,7 @@ export function fundingInput(
       ),
       /*caller:*/ (callStatus) => {
         return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_funding_input(
-          FfiConverterArrayBuffer.lower(
+          FfiConverterUint8Array.lower(
             previousTransaction,
             nativeModule().rustbuffer_alloc
           ),
@@ -1140,7 +1122,7 @@ export function fundingInput(
             maxWitnessLen,
             nativeModule().rustbuffer_alloc
           ),
-          FfiConverterArrayBuffer.lower(
+          FfiConverterUint8Array.lower(
             redeemScript,
             nativeModule().rustbuffer_alloc
           ),
@@ -1157,12 +1139,12 @@ export function fundingInput(
  * Input: 78-byte encoded xpriv/xpub, Output: 33-byte compressed public key
  */
 export function getPubkeyFromExtkey(
-  extkey: ArrayBuffer,
+  extkey: Uint8Array,
   network: string
-): ArrayBuffer /*throws*/ {
+): Uint8Array /*throws*/ {
   return ((__rb: Uint8Array) => {
     try {
-      return FfiConverterArrayBuffer.lift(__rb);
+      return FfiConverterUint8Array.lift(__rb);
     } finally {
       nativeModule().rustbuffer_free(__rb);
     }
@@ -1173,10 +1155,7 @@ export function getPubkeyFromExtkey(
       ),
       /*caller:*/ (callStatus) => {
         return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_get_pubkey_from_extkey(
-          FfiConverterArrayBuffer.lower(
-            extkey,
-            nativeModule().rustbuffer_alloc
-          ),
+          FfiConverterUint8Array.lower(extkey, nativeModule().rustbuffer_alloc),
           FfiConverterString.lower(network, nativeModule().rustbuffer_alloc),
           callStatus
         );
@@ -1211,12 +1190,12 @@ export function getTotalInputVsize(inputs: Array<TxInputInfo>): number {
  * Input: 78-byte encoded xpriv, Output: 78-byte encoded xpub
  */
 export function getXpubFromXpriv(
-  xpriv: ArrayBuffer,
+  xpriv: Uint8Array,
   network: string
-): ArrayBuffer /*throws*/ {
+): Uint8Array /*throws*/ {
   return ((__rb: Uint8Array) => {
     try {
-      return FfiConverterArrayBuffer.lift(__rb);
+      return FfiConverterUint8Array.lift(__rb);
     } finally {
       nativeModule().rustbuffer_free(__rb);
     }
@@ -1227,7 +1206,7 @@ export function getXpubFromXpriv(
       ),
       /*caller:*/ (callStatus) => {
         return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_get_xpub_from_xpriv(
-          FfiConverterArrayBuffer.lower(xpriv, nativeModule().rustbuffer_alloc),
+          FfiConverterUint8Array.lower(xpriv, nativeModule().rustbuffer_alloc),
           FfiConverterString.lower(network, nativeModule().rustbuffer_alloc),
           callStatus
         );
@@ -1243,11 +1222,11 @@ export function getXpubFromXpriv(
  * `temporary_contract_id` (the new contract's id).
  */
 export function signAccept(
-  offer: ArrayBuffer,
-  accept: ArrayBuffer,
+  offer: Uint8Array,
+  accept: Uint8Array,
   keys: ContractKeyProviderLike,
-  temporaryContractId: ArrayBuffer,
-  signedFundingPsbt: ArrayBuffer
+  temporaryContractId: Uint8Array,
+  signedFundingPsbt: Uint8Array
 ): SignResult /*throws*/ {
   return ((__rb: Uint8Array) => {
     try {
@@ -1262,20 +1241,17 @@ export function signAccept(
       ),
       /*caller:*/ (callStatus) => {
         return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_sign_accept(
-          FfiConverterArrayBuffer.lower(offer, nativeModule().rustbuffer_alloc),
-          FfiConverterArrayBuffer.lower(
-            accept,
-            nativeModule().rustbuffer_alloc
-          ),
+          FfiConverterUint8Array.lower(offer, nativeModule().rustbuffer_alloc),
+          FfiConverterUint8Array.lower(accept, nativeModule().rustbuffer_alloc),
           FfiConverterTypeContractKeyProvider.lower(
             keys,
             nativeModule().rustbuffer_alloc
           ),
-          FfiConverterArrayBuffer.lower(
+          FfiConverterUint8Array.lower(
             temporaryContractId,
             nativeModule().rustbuffer_alloc
           ),
-          FfiConverterArrayBuffer.lower(
+          FfiConverterUint8Array.lower(
             signedFundingPsbt,
             nativeModule().rustbuffer_alloc
           ),
@@ -1293,11 +1269,11 @@ export function signAccept(
  * prior funding secret key is re-derived inside Rust from `keys`.
  */
 export function signAcceptSpliced(
-  offer: ArrayBuffer,
-  accept: ArrayBuffer,
+  offer: Uint8Array,
+  accept: Uint8Array,
   keys: ContractKeyProviderLike,
-  temporaryContractId: ArrayBuffer,
-  signedFundingPsbt: ArrayBuffer,
+  temporaryContractId: Uint8Array,
+  signedFundingPsbt: Uint8Array,
   spliceKeys: Array<SpliceKeyRef>
 ): SignResult /*throws*/ {
   return ((__rb: Uint8Array) => {
@@ -1313,20 +1289,17 @@ export function signAcceptSpliced(
       ),
       /*caller:*/ (callStatus) => {
         return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_sign_accept_spliced(
-          FfiConverterArrayBuffer.lower(offer, nativeModule().rustbuffer_alloc),
-          FfiConverterArrayBuffer.lower(
-            accept,
-            nativeModule().rustbuffer_alloc
-          ),
+          FfiConverterUint8Array.lower(offer, nativeModule().rustbuffer_alloc),
+          FfiConverterUint8Array.lower(accept, nativeModule().rustbuffer_alloc),
           FfiConverterTypeContractKeyProvider.lower(
             keys,
             nativeModule().rustbuffer_alloc
           ),
-          FfiConverterArrayBuffer.lower(
+          FfiConverterUint8Array.lower(
             temporaryContractId,
             nativeModule().rustbuffer_alloc
           ),
-          FfiConverterArrayBuffer.lower(
+          FfiConverterUint8Array.lower(
             signedFundingPsbt,
             nativeModule().rustbuffer_alloc
           ),
@@ -1364,16 +1337,16 @@ export function signAcceptSpliced(
  * is also what an attestation for an unrelated event looks like.
  */
 export function signContractCet(
-  offer: ArrayBuffer,
-  accept: ArrayBuffer,
-  sign: ArrayBuffer,
+  offer: Uint8Array,
+  accept: Uint8Array,
+  sign: Uint8Array,
   keys: ContractKeyProviderLike,
-  temporaryContractId: ArrayBuffer,
+  temporaryContractId: Uint8Array,
   attestations: Array<OracleAttestationRef>
-): ArrayBuffer /*throws*/ {
+): Uint8Array /*throws*/ {
   return ((__rb: Uint8Array) => {
     try {
-      return FfiConverterArrayBuffer.lift(__rb);
+      return FfiConverterUint8Array.lift(__rb);
     } finally {
       nativeModule().rustbuffer_free(__rb);
     }
@@ -1384,17 +1357,14 @@ export function signContractCet(
       ),
       /*caller:*/ (callStatus) => {
         return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_sign_contract_cet(
-          FfiConverterArrayBuffer.lower(offer, nativeModule().rustbuffer_alloc),
-          FfiConverterArrayBuffer.lower(
-            accept,
-            nativeModule().rustbuffer_alloc
-          ),
-          FfiConverterArrayBuffer.lower(sign, nativeModule().rustbuffer_alloc),
+          FfiConverterUint8Array.lower(offer, nativeModule().rustbuffer_alloc),
+          FfiConverterUint8Array.lower(accept, nativeModule().rustbuffer_alloc),
+          FfiConverterUint8Array.lower(sign, nativeModule().rustbuffer_alloc),
           FfiConverterTypeContractKeyProvider.lower(
             keys,
             nativeModule().rustbuffer_alloc
           ),
-          FfiConverterArrayBuffer.lower(
+          FfiConverterUint8Array.lower(
             temporaryContractId,
             nativeModule().rustbuffer_alloc
           ),
@@ -1422,15 +1392,15 @@ export function signContractCet(
  * party's half; the counterparty's stored signature is verified first.
  */
 export function signContractRefund(
-  offer: ArrayBuffer,
-  accept: ArrayBuffer,
-  sign: ArrayBuffer,
+  offer: Uint8Array,
+  accept: Uint8Array,
+  sign: Uint8Array,
   keys: ContractKeyProviderLike,
-  temporaryContractId: ArrayBuffer
-): ArrayBuffer /*throws*/ {
+  temporaryContractId: Uint8Array
+): Uint8Array /*throws*/ {
   return ((__rb: Uint8Array) => {
     try {
-      return FfiConverterArrayBuffer.lift(__rb);
+      return FfiConverterUint8Array.lift(__rb);
     } finally {
       nativeModule().rustbuffer_free(__rb);
     }
@@ -1441,17 +1411,14 @@ export function signContractRefund(
       ),
       /*caller:*/ (callStatus) => {
         return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_sign_contract_refund(
-          FfiConverterArrayBuffer.lower(offer, nativeModule().rustbuffer_alloc),
-          FfiConverterArrayBuffer.lower(
-            accept,
-            nativeModule().rustbuffer_alloc
-          ),
-          FfiConverterArrayBuffer.lower(sign, nativeModule().rustbuffer_alloc),
+          FfiConverterUint8Array.lower(offer, nativeModule().rustbuffer_alloc),
+          FfiConverterUint8Array.lower(accept, nativeModule().rustbuffer_alloc),
+          FfiConverterUint8Array.lower(sign, nativeModule().rustbuffer_alloc),
           FfiConverterTypeContractKeyProvider.lower(
             keys,
             nativeModule().rustbuffer_alloc
           ),
-          FfiConverterArrayBuffer.lower(
+          FfiConverterUint8Array.lower(
             temporaryContractId,
             nativeModule().rustbuffer_alloc
           ),
@@ -1471,15 +1438,15 @@ export function signContractRefund(
  * and `sh(wpkh())`, with or without a wildcard.
  */
 export function signFundingPsbtWithDescriptor(
-  offer: ArrayBuffer,
-  accept: ArrayBuffer,
-  fundingPsbt: ArrayBuffer,
+  offer: Uint8Array,
+  accept: Uint8Array,
+  fundingPsbt: Uint8Array,
   descriptor: string,
   inputs: Array<DescriptorInput>
-): ArrayBuffer /*throws*/ {
+): Uint8Array /*throws*/ {
   return ((__rb: Uint8Array) => {
     try {
-      return FfiConverterArrayBuffer.lift(__rb);
+      return FfiConverterUint8Array.lift(__rb);
     } finally {
       nativeModule().rustbuffer_free(__rb);
     }
@@ -1490,12 +1457,9 @@ export function signFundingPsbtWithDescriptor(
       ),
       /*caller:*/ (callStatus) => {
         return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_sign_funding_psbt_with_descriptor(
-          FfiConverterArrayBuffer.lower(offer, nativeModule().rustbuffer_alloc),
-          FfiConverterArrayBuffer.lower(
-            accept,
-            nativeModule().rustbuffer_alloc
-          ),
-          FfiConverterArrayBuffer.lower(
+          FfiConverterUint8Array.lower(offer, nativeModule().rustbuffer_alloc),
+          FfiConverterUint8Array.lower(accept, nativeModule().rustbuffer_alloc),
+          FfiConverterUint8Array.lower(
             fundingPsbt,
             nativeModule().rustbuffer_alloc
           ),
@@ -1519,8 +1483,8 @@ export function signFundingPsbtWithDescriptor(
  * exposed so a stored/received `AcceptDlc` can be verified on its own.
  */
 export function validateAccept(
-  offer: ArrayBuffer,
-  accept: ArrayBuffer
+  offer: Uint8Array,
+  accept: Uint8Array
 ): void /*throws*/ {
   uniffiCaller.rustCallWithError(
     /*liftError:*/ FfiConverterTypeContractError.lift.bind(
@@ -1528,8 +1492,8 @@ export function validateAccept(
     ),
     /*caller:*/ (callStatus) => {
       nativeModule().ubrn_uniffi_ddk_ffi_fn_func_validate_accept(
-        FfiConverterArrayBuffer.lower(offer, nativeModule().rustbuffer_alloc),
-        FfiConverterArrayBuffer.lower(accept, nativeModule().rustbuffer_alloc),
+        FfiConverterUint8Array.lower(offer, nativeModule().rustbuffer_alloc),
+        FfiConverterUint8Array.lower(accept, nativeModule().rustbuffer_alloc),
         callStatus
       );
     },
@@ -1548,7 +1512,7 @@ export function validateAccept(
  * e.g. before persisting it, or when loading it back later.
  */
 export function validateOffer(
-  offer: ArrayBuffer,
+  offer: Uint8Array,
   minTimeoutInterval: number,
   maxTimeoutInterval: number
 ): void /*throws*/ {
@@ -1558,7 +1522,7 @@ export function validateOffer(
     ),
     /*caller:*/ (callStatus) => {
       nativeModule().ubrn_uniffi_ddk_ffi_fn_func_validate_offer(
-        FfiConverterArrayBuffer.lower(offer, nativeModule().rustbuffer_alloc),
+        FfiConverterUint8Array.lower(offer, nativeModule().rustbuffer_alloc),
         FfiConverterUInt32.lower(
           minTimeoutInterval,
           nativeModule().rustbuffer_alloc
@@ -1581,9 +1545,9 @@ export function validateOffer(
  * can be verified on its own.
  */
 export function validateSign(
-  offer: ArrayBuffer,
-  accept: ArrayBuffer,
-  sign: ArrayBuffer
+  offer: Uint8Array,
+  accept: Uint8Array,
+  sign: Uint8Array
 ): void /*throws*/ {
   uniffiCaller.rustCallWithError(
     /*liftError:*/ FfiConverterTypeContractError.lift.bind(
@@ -1591,9 +1555,9 @@ export function validateSign(
     ),
     /*caller:*/ (callStatus) => {
       nativeModule().ubrn_uniffi_ddk_ffi_fn_func_validate_sign(
-        FfiConverterArrayBuffer.lower(offer, nativeModule().rustbuffer_alloc),
-        FfiConverterArrayBuffer.lower(accept, nativeModule().rustbuffer_alloc),
-        FfiConverterArrayBuffer.lower(sign, nativeModule().rustbuffer_alloc),
+        FfiConverterUint8Array.lower(offer, nativeModule().rustbuffer_alloc),
+        FfiConverterUint8Array.lower(accept, nativeModule().rustbuffer_alloc),
+        FfiConverterUint8Array.lower(sign, nativeModule().rustbuffer_alloc),
         callStatus
       );
     },
@@ -1605,10 +1569,10 @@ export function verifyCetAdaptorSigsFromOracleInfo(
   adaptorSigs: Array<AdaptorSignature>,
   cets: Array<Transaction>,
   oracleInfos: Array<OracleInfo>,
-  pubkey: ArrayBuffer,
-  fundingScriptPubkey: ArrayBuffer,
+  pubkey: Uint8Array,
+  fundingScriptPubkey: Uint8Array,
   totalCollateral: bigint,
-  msgs: Array<Array<Array<ArrayBuffer>>>
+  msgs: Array<Array<Array<Uint8Array>>>
 ): boolean {
   return FfiConverterBool.lift(
     uniffiCaller.rustCall(
@@ -1626,11 +1590,8 @@ export function verifyCetAdaptorSigsFromOracleInfo(
             oracleInfos,
             nativeModule().rustbuffer_alloc
           ),
-          FfiConverterArrayBuffer.lower(
-            pubkey,
-            nativeModule().rustbuffer_alloc
-          ),
-          FfiConverterArrayBuffer.lower(
+          FfiConverterUint8Array.lower(pubkey, nativeModule().rustbuffer_alloc),
+          FfiConverterUint8Array.lower(
             fundingScriptPubkey,
             nativeModule().rustbuffer_alloc
           ),
@@ -1674,15 +1635,15 @@ export type ContractPartyParams = {
   /**
    * The 33-byte compressed DLC funding public key.
    */
-  fundingPubkey: ArrayBuffer;
+  fundingPubkey: Uint8Array;
   /**
    * The wallet UTXOs this party contributes, each a wire-encoded `FundingInput`.
    */
-  fundingInputs: Array<ArrayBuffer>;
+  fundingInputs: Array<Uint8Array>;
   /**
    * The script pubkey (raw bytes) CET and refund payouts are sent to.
    */
-  payoutSpk: ArrayBuffer;
+  payoutSpk: Uint8Array;
   /**
    * Serial id ordering the payout output; randomly generated when `None`.
    */
@@ -1690,7 +1651,7 @@ export type ContractPartyParams = {
   /**
    * The script pubkey (raw bytes) funding change is sent to.
    */
-  changeSpk: ArrayBuffer;
+  changeSpk: Uint8Array;
   /**
    * Serial id ordering the change output; randomly generated when `None`.
    */
@@ -1719,29 +1680,29 @@ const FfiConverterTypeContractPartyParams = (() => {
   class FFIConverter extends AbstractFfiConverterByteArray<TypeName> {
     read(from: RustBuffer): TypeName {
       return {
-        fundingPubkey: FfiConverterArrayBuffer.read(from),
+        fundingPubkey: FfiConverterUint8Array.read(from),
         fundingInputs: FfiConverterSequenceBytes.read(from),
-        payoutSpk: FfiConverterArrayBuffer.read(from),
+        payoutSpk: FfiConverterUint8Array.read(from),
         payoutSerialId: FfiConverterOptionalUInt64.read(from),
-        changeSpk: FfiConverterArrayBuffer.read(from),
+        changeSpk: FfiConverterUint8Array.read(from),
         changeSerialId: FfiConverterOptionalUInt64.read(from),
       };
     }
     write(value: TypeName, into: RustBuffer): void {
-      FfiConverterArrayBuffer.write(value.fundingPubkey, into);
+      FfiConverterUint8Array.write(value.fundingPubkey, into);
       FfiConverterSequenceBytes.write(value.fundingInputs, into);
-      FfiConverterArrayBuffer.write(value.payoutSpk, into);
+      FfiConverterUint8Array.write(value.payoutSpk, into);
       FfiConverterOptionalUInt64.write(value.payoutSerialId, into);
-      FfiConverterArrayBuffer.write(value.changeSpk, into);
+      FfiConverterUint8Array.write(value.changeSpk, into);
       FfiConverterOptionalUInt64.write(value.changeSerialId, into);
     }
     allocationSize(value: TypeName): number {
       return (
-        FfiConverterArrayBuffer.allocationSize(value.fundingPubkey) +
+        FfiConverterUint8Array.allocationSize(value.fundingPubkey) +
         FfiConverterSequenceBytes.allocationSize(value.fundingInputs) +
-        FfiConverterArrayBuffer.allocationSize(value.payoutSpk) +
+        FfiConverterUint8Array.allocationSize(value.payoutSpk) +
         FfiConverterOptionalUInt64.allocationSize(value.payoutSerialId) +
-        FfiConverterArrayBuffer.allocationSize(value.changeSpk) +
+        FfiConverterUint8Array.allocationSize(value.changeSpk) +
         FfiConverterOptionalUInt64.allocationSize(value.changeSerialId)
       );
     }
@@ -1875,9 +1836,9 @@ const FfiConverterString = uniffiCreateFfiConverterString(stringConverter);
 export type TxInput = {
   txid: string;
   vout: number;
-  scriptSig: ArrayBuffer;
+  scriptSig: Uint8Array;
   sequence: number;
-  witness: Array<ArrayBuffer>;
+  witness: Array<Uint8Array>;
 };
 
 /**
@@ -1902,7 +1863,7 @@ const FfiConverterTypeTxInput = (() => {
       return {
         txid: FfiConverterString.read(from),
         vout: FfiConverterUInt32.read(from),
-        scriptSig: FfiConverterArrayBuffer.read(from),
+        scriptSig: FfiConverterUint8Array.read(from),
         sequence: FfiConverterUInt32.read(from),
         witness: FfiConverterSequenceBytes.read(from),
       };
@@ -1910,7 +1871,7 @@ const FfiConverterTypeTxInput = (() => {
     write(value: TypeName, into: RustBuffer): void {
       FfiConverterString.write(value.txid, into);
       FfiConverterUInt32.write(value.vout, into);
-      FfiConverterArrayBuffer.write(value.scriptSig, into);
+      FfiConverterUint8Array.write(value.scriptSig, into);
       FfiConverterUInt32.write(value.sequence, into);
       FfiConverterSequenceBytes.write(value.witness, into);
     }
@@ -1918,7 +1879,7 @@ const FfiConverterTypeTxInput = (() => {
       return (
         FfiConverterString.allocationSize(value.txid) +
         FfiConverterUInt32.allocationSize(value.vout) +
-        FfiConverterArrayBuffer.allocationSize(value.scriptSig) +
+        FfiConverterUint8Array.allocationSize(value.scriptSig) +
         FfiConverterUInt32.allocationSize(value.sequence) +
         FfiConverterSequenceBytes.allocationSize(value.witness)
       );
@@ -1929,7 +1890,7 @@ const FfiConverterTypeTxInput = (() => {
 
 export type TxOutput = {
   value: bigint;
-  scriptPubkey: ArrayBuffer;
+  scriptPubkey: Uint8Array;
 };
 
 /**
@@ -1969,17 +1930,17 @@ const FfiConverterTypeTxOutput = (() => {
     read(from: RustBuffer): TypeName {
       return {
         value: FfiConverterUInt64.read(from),
-        scriptPubkey: FfiConverterArrayBuffer.read(from),
+        scriptPubkey: FfiConverterUint8Array.read(from),
       };
     }
     write(value: TypeName, into: RustBuffer): void {
       FfiConverterUInt64.write(value.value, into);
-      FfiConverterArrayBuffer.write(value.scriptPubkey, into);
+      FfiConverterUint8Array.write(value.scriptPubkey, into);
     }
     allocationSize(value: TypeName): number {
       return (
         FfiConverterUInt64.allocationSize(value.value) +
-        FfiConverterArrayBuffer.allocationSize(value.scriptPubkey)
+        FfiConverterUint8Array.allocationSize(value.scriptPubkey)
       );
     }
   }
@@ -1991,7 +1952,7 @@ export type Transaction = {
   lockTime: number;
   inputs: Array<TxInput>;
   outputs: Array<TxOutput>;
-  rawBytes: ArrayBuffer;
+  rawBytes: Uint8Array;
 };
 
 /**
@@ -2010,8 +1971,8 @@ export const Transaction = (() => {
     defaults: () => Object.freeze(defaults()) as Partial<Transaction>,
     addSignature(
       self_: Transaction,
-      signature: ArrayBuffer,
-      pubkey: ArrayBuffer,
+      signature: Uint8Array,
+      pubkey: Uint8Array,
       inputIndex: number
     ): Transaction {
       return ((__rb: Uint8Array) => {
@@ -2031,11 +1992,11 @@ export const Transaction = (() => {
                 self_,
                 nativeModule().rustbuffer_alloc
               ),
-              FfiConverterArrayBuffer.lower(
+              FfiConverterUint8Array.lower(
                 signature,
                 nativeModule().rustbuffer_alloc
               ),
-              FfiConverterArrayBuffer.lower(
+              FfiConverterUint8Array.lower(
                 pubkey,
                 nativeModule().rustbuffer_alloc
               ),
@@ -2053,10 +2014,10 @@ export const Transaction = (() => {
     cetAdaptorSignatureFromOracleInfo(
       self_: Transaction,
       oracleInfo: OracleInfo,
-      fundingSk: ArrayBuffer,
-      fundingScriptPubkey: ArrayBuffer,
+      fundingSk: Uint8Array,
+      fundingScriptPubkey: Uint8Array,
       totalCollateral: bigint,
-      msgs: Array<ArrayBuffer>
+      msgs: Array<Uint8Array>
     ): AdaptorSignature {
       return ((__rb: Uint8Array) => {
         try {
@@ -2079,11 +2040,11 @@ export const Transaction = (() => {
                 oracleInfo,
                 nativeModule().rustbuffer_alloc
               ),
-              FfiConverterArrayBuffer.lower(
+              FfiConverterUint8Array.lower(
                 fundingSk,
                 nativeModule().rustbuffer_alloc
               ),
-              FfiConverterArrayBuffer.lower(
+              FfiConverterUint8Array.lower(
                 fundingScriptPubkey,
                 nativeModule().rustbuffer_alloc
               ),
@@ -2105,9 +2066,9 @@ export const Transaction = (() => {
     cetAdaptorSignatureInputs(
       self_: Transaction,
       oracleInfo: Array<OracleInfo>,
-      fundingScriptPubkey: ArrayBuffer,
+      fundingScriptPubkey: Uint8Array,
       fundOutputValue: bigint,
-      msgs: Array<Array<ArrayBuffer>>
+      msgs: Array<Array<Uint8Array>>
     ): CetAdaptorSignatureDebugInfo {
       return ((__rb: Uint8Array) => {
         try {
@@ -2130,7 +2091,7 @@ export const Transaction = (() => {
                 oracleInfo,
                 nativeModule().rustbuffer_alloc
               ),
-              FfiConverterArrayBuffer.lower(
+              FfiConverterUint8Array.lower(
                 fundingScriptPubkey,
                 nativeModule().rustbuffer_alloc
               ),
@@ -2151,12 +2112,12 @@ export const Transaction = (() => {
     },
     cetSighash(
       self_: Transaction,
-      fundingScriptPubkey: ArrayBuffer,
+      fundingScriptPubkey: Uint8Array,
       fundOutputValue: bigint
-    ): ArrayBuffer {
+    ): Uint8Array {
       return ((__rb: Uint8Array) => {
         try {
-          return FfiConverterArrayBuffer.lift(__rb);
+          return FfiConverterUint8Array.lift(__rb);
         } finally {
           nativeModule().rustbuffer_free(__rb);
         }
@@ -2171,7 +2132,7 @@ export const Transaction = (() => {
                 self_,
                 nativeModule().rustbuffer_alloc
               ),
-              FfiConverterArrayBuffer.lower(
+              FfiConverterUint8Array.lower(
                 fundingScriptPubkey,
                 nativeModule().rustbuffer_alloc
               ),
@@ -2188,14 +2149,14 @@ export const Transaction = (() => {
     },
     rawFundingInputSignature(
       self_: Transaction,
-      privkey: ArrayBuffer,
+      privkey: Uint8Array,
       prevTxId: string,
       prevTxVout: number,
       value: bigint
-    ): ArrayBuffer {
+    ): Uint8Array {
       return ((__rb: Uint8Array) => {
         try {
-          return FfiConverterArrayBuffer.lift(__rb);
+          return FfiConverterUint8Array.lift(__rb);
         } finally {
           nativeModule().rustbuffer_free(__rb);
         }
@@ -2210,7 +2171,7 @@ export const Transaction = (() => {
                 self_,
                 nativeModule().rustbuffer_alloc
               ),
-              FfiConverterArrayBuffer.lower(
+              FfiConverterUint8Array.lower(
                 privkey,
                 nativeModule().rustbuffer_alloc
               ),
@@ -2232,11 +2193,11 @@ export const Transaction = (() => {
     },
     signCet(
       self_: Transaction,
-      adaptorSignature: ArrayBuffer,
-      oracleSignatures: Array<ArrayBuffer>,
-      fundingSecretKey: ArrayBuffer,
-      otherPubkey: ArrayBuffer,
-      fundingScriptPubkey: ArrayBuffer,
+      adaptorSignature: Uint8Array,
+      oracleSignatures: Array<Uint8Array>,
+      fundingSecretKey: Uint8Array,
+      otherPubkey: Uint8Array,
+      fundingScriptPubkey: Uint8Array,
       fundOutputValue: bigint
     ): Transaction {
       return ((__rb: Uint8Array) => {
@@ -2256,7 +2217,7 @@ export const Transaction = (() => {
                 self_,
                 nativeModule().rustbuffer_alloc
               ),
-              FfiConverterArrayBuffer.lower(
+              FfiConverterUint8Array.lower(
                 adaptorSignature,
                 nativeModule().rustbuffer_alloc
               ),
@@ -2264,15 +2225,15 @@ export const Transaction = (() => {
                 oracleSignatures,
                 nativeModule().rustbuffer_alloc
               ),
-              FfiConverterArrayBuffer.lower(
+              FfiConverterUint8Array.lower(
                 fundingSecretKey,
                 nativeModule().rustbuffer_alloc
               ),
-              FfiConverterArrayBuffer.lower(
+              FfiConverterUint8Array.lower(
                 otherPubkey,
                 nativeModule().rustbuffer_alloc
               ),
-              FfiConverterArrayBuffer.lower(
+              FfiConverterUint8Array.lower(
                 fundingScriptPubkey,
                 nativeModule().rustbuffer_alloc
               ),
@@ -2289,7 +2250,7 @@ export const Transaction = (() => {
     },
     signFundInput(
       self_: Transaction,
-      privkey: ArrayBuffer,
+      privkey: Uint8Array,
       prevTxId: string,
       prevTxVout: number,
       value: bigint
@@ -2311,7 +2272,7 @@ export const Transaction = (() => {
                 self_,
                 nativeModule().rustbuffer_alloc
               ),
-              FfiConverterArrayBuffer.lower(
+              FfiConverterUint8Array.lower(
                 privkey,
                 nativeModule().rustbuffer_alloc
               ),
@@ -2334,8 +2295,8 @@ export const Transaction = (() => {
     signMultiSigInput(
       self_: Transaction,
       dlcInput: DlcInputInfo,
-      localPrivkey: ArrayBuffer,
-      remoteSignature: ArrayBuffer
+      localPrivkey: Uint8Array,
+      remoteSignature: Uint8Array
     ): Transaction {
       return ((__rb: Uint8Array) => {
         try {
@@ -2358,11 +2319,11 @@ export const Transaction = (() => {
                 dlcInput,
                 nativeModule().rustbuffer_alloc
               ),
-              FfiConverterArrayBuffer.lower(
+              FfiConverterUint8Array.lower(
                 localPrivkey,
                 nativeModule().rustbuffer_alloc
               ),
-              FfiConverterArrayBuffer.lower(
+              FfiConverterUint8Array.lower(
                 remoteSignature,
                 nativeModule().rustbuffer_alloc
               ),
@@ -2375,8 +2336,8 @@ export const Transaction = (() => {
     },
     verifyFundSignature(
       self_: Transaction,
-      signature: ArrayBuffer,
-      pubkey: ArrayBuffer,
+      signature: Uint8Array,
+      pubkey: Uint8Array,
       txid: string,
       vout: number,
       inputAmount: bigint
@@ -2392,11 +2353,11 @@ export const Transaction = (() => {
                 self_,
                 nativeModule().rustbuffer_alloc
               ),
-              FfiConverterArrayBuffer.lower(
+              FfiConverterUint8Array.lower(
                 signature,
                 nativeModule().rustbuffer_alloc
               ),
-              FfiConverterArrayBuffer.lower(
+              FfiConverterUint8Array.lower(
                 pubkey,
                 nativeModule().rustbuffer_alloc
               ),
@@ -2425,7 +2386,7 @@ const FfiConverterTypeTransaction = (() => {
         lockTime: FfiConverterUInt32.read(from),
         inputs: FfiConverterSequenceTypeTxInput.read(from),
         outputs: FfiConverterSequenceTypeTxOutput.read(from),
-        rawBytes: FfiConverterArrayBuffer.read(from),
+        rawBytes: FfiConverterUint8Array.read(from),
       };
     }
     write(value: TypeName, into: RustBuffer): void {
@@ -2433,7 +2394,7 @@ const FfiConverterTypeTransaction = (() => {
       FfiConverterUInt32.write(value.lockTime, into);
       FfiConverterSequenceTypeTxInput.write(value.inputs, into);
       FfiConverterSequenceTypeTxOutput.write(value.outputs, into);
-      FfiConverterArrayBuffer.write(value.rawBytes, into);
+      FfiConverterUint8Array.write(value.rawBytes, into);
     }
     allocationSize(value: TypeName): number {
       return (
@@ -2441,7 +2402,7 @@ const FfiConverterTypeTransaction = (() => {
         FfiConverterUInt32.allocationSize(value.lockTime) +
         FfiConverterSequenceTypeTxInput.allocationSize(value.inputs) +
         FfiConverterSequenceTypeTxOutput.allocationSize(value.outputs) +
-        FfiConverterArrayBuffer.allocationSize(value.rawBytes)
+        FfiConverterUint8Array.allocationSize(value.rawBytes)
       );
     }
   }
@@ -2452,7 +2413,7 @@ export type DlcTransactions = {
   fund: Transaction;
   cets: Array<Transaction>;
   refund: Transaction;
-  fundingScriptPubkey: ArrayBuffer;
+  fundingScriptPubkey: Uint8Array;
 };
 
 /**
@@ -2480,21 +2441,21 @@ const FfiConverterTypeDlcTransactions = (() => {
         fund: FfiConverterTypeTransaction.read(from),
         cets: FfiConverterSequenceTypeTransaction.read(from),
         refund: FfiConverterTypeTransaction.read(from),
-        fundingScriptPubkey: FfiConverterArrayBuffer.read(from),
+        fundingScriptPubkey: FfiConverterUint8Array.read(from),
       };
     }
     write(value: TypeName, into: RustBuffer): void {
       FfiConverterTypeTransaction.write(value.fund, into);
       FfiConverterSequenceTypeTransaction.write(value.cets, into);
       FfiConverterTypeTransaction.write(value.refund, into);
-      FfiConverterArrayBuffer.write(value.fundingScriptPubkey, into);
+      FfiConverterUint8Array.write(value.fundingScriptPubkey, into);
     }
     allocationSize(value: TypeName): number {
       return (
         FfiConverterTypeTransaction.allocationSize(value.fund) +
         FfiConverterSequenceTypeTransaction.allocationSize(value.cets) +
         FfiConverterTypeTransaction.allocationSize(value.refund) +
-        FfiConverterArrayBuffer.allocationSize(value.fundingScriptPubkey)
+        FfiConverterUint8Array.allocationSize(value.fundingScriptPubkey)
       );
     }
   }
@@ -2508,7 +2469,7 @@ export type AcceptResult = {
   /**
    * The wire-encoded `AcceptDlc` message to send to the offering party.
    */
-  accept: ArrayBuffer;
+  accept: Uint8Array;
   /**
    * The unsigned funding, CET, and refund transactions.
    */
@@ -2516,7 +2477,7 @@ export type AcceptResult = {
   /**
    * The BIP-174 funding PSBT ready to be signed by either party's funding source.
    */
-  fundingPsbt: ArrayBuffer;
+  fundingPsbt: Uint8Array;
 };
 
 /**
@@ -2541,21 +2502,21 @@ const FfiConverterTypeAcceptResult = (() => {
   class FFIConverter extends AbstractFfiConverterByteArray<TypeName> {
     read(from: RustBuffer): TypeName {
       return {
-        accept: FfiConverterArrayBuffer.read(from),
+        accept: FfiConverterUint8Array.read(from),
         transactions: FfiConverterTypeDlcTransactions.read(from),
-        fundingPsbt: FfiConverterArrayBuffer.read(from),
+        fundingPsbt: FfiConverterUint8Array.read(from),
       };
     }
     write(value: TypeName, into: RustBuffer): void {
-      FfiConverterArrayBuffer.write(value.accept, into);
+      FfiConverterUint8Array.write(value.accept, into);
       FfiConverterTypeDlcTransactions.write(value.transactions, into);
-      FfiConverterArrayBuffer.write(value.fundingPsbt, into);
+      FfiConverterUint8Array.write(value.fundingPsbt, into);
     }
     allocationSize(value: TypeName): number {
       return (
-        FfiConverterArrayBuffer.allocationSize(value.accept) +
+        FfiConverterUint8Array.allocationSize(value.accept) +
         FfiConverterTypeDlcTransactions.allocationSize(value.transactions) +
-        FfiConverterArrayBuffer.allocationSize(value.fundingPsbt)
+        FfiConverterUint8Array.allocationSize(value.fundingPsbt)
       );
     }
   }
@@ -2563,8 +2524,8 @@ const FfiConverterTypeAcceptResult = (() => {
 })();
 
 export type AdaptorSignature = {
-  signature: ArrayBuffer;
-  proof: ArrayBuffer;
+  signature: Uint8Array;
+  proof: Uint8Array;
 };
 
 /**
@@ -2585,10 +2546,10 @@ export const AdaptorSignature = (() => {
       self_: AdaptorSignature,
       cet: Transaction,
       oracleInfos: Array<OracleInfo>,
-      pubkey: ArrayBuffer,
-      fundingScriptPubkey: ArrayBuffer,
+      pubkey: Uint8Array,
+      fundingScriptPubkey: Uint8Array,
       totalCollateral: bigint,
-      msgs: Array<Array<ArrayBuffer>>
+      msgs: Array<Array<Uint8Array>>
     ): boolean {
       return FfiConverterBool.lift(
         uniffiCaller.rustCall(
@@ -2606,11 +2567,11 @@ export const AdaptorSignature = (() => {
                 oracleInfos,
                 nativeModule().rustbuffer_alloc
               ),
-              FfiConverterArrayBuffer.lower(
+              FfiConverterUint8Array.lower(
                 pubkey,
                 nativeModule().rustbuffer_alloc
               ),
-              FfiConverterArrayBuffer.lower(
+              FfiConverterUint8Array.lower(
                 fundingScriptPubkey,
                 nativeModule().rustbuffer_alloc
               ),
@@ -2637,18 +2598,18 @@ const FfiConverterTypeAdaptorSignature = (() => {
   class FFIConverter extends AbstractFfiConverterByteArray<TypeName> {
     read(from: RustBuffer): TypeName {
       return {
-        signature: FfiConverterArrayBuffer.read(from),
-        proof: FfiConverterArrayBuffer.read(from),
+        signature: FfiConverterUint8Array.read(from),
+        proof: FfiConverterUint8Array.read(from),
       };
     }
     write(value: TypeName, into: RustBuffer): void {
-      FfiConverterArrayBuffer.write(value.signature, into);
-      FfiConverterArrayBuffer.write(value.proof, into);
+      FfiConverterUint8Array.write(value.signature, into);
+      FfiConverterUint8Array.write(value.proof, into);
     }
     allocationSize(value: TypeName): number {
       return (
-        FfiConverterArrayBuffer.allocationSize(value.signature) +
-        FfiConverterArrayBuffer.allocationSize(value.proof)
+        FfiConverterUint8Array.allocationSize(value.signature) +
+        FfiConverterUint8Array.allocationSize(value.proof)
       );
     }
   }
@@ -2668,11 +2629,11 @@ export type CetAdaptorSignatureDebugInfo = {
   /**
    * The sighash (32 bytes) - this is the message that gets signed
    */
-  sighash: ArrayBuffer;
+  sighash: Uint8Array;
   /**
    * The adaptor point (33 bytes compressed public key)
    */
-  adaptorPoint: ArrayBuffer;
+  adaptorPoint: Uint8Array;
   /**
    * Input index (always 0 for CETs)
    */
@@ -2680,7 +2641,7 @@ export type CetAdaptorSignatureDebugInfo = {
   /**
    * The funding script pubkey used for sighash
    */
-  scriptPubkey: ArrayBuffer;
+  scriptPubkey: Uint8Array;
   /**
    * The fund output value used for sighash
    */
@@ -2692,7 +2653,7 @@ export type CetAdaptorSignatureDebugInfo = {
   /**
    * Raw CET bytes for verification
    */
-  cetRaw: ArrayBuffer;
+  cetRaw: Uint8Array;
 };
 
 /**
@@ -2719,33 +2680,33 @@ const FfiConverterTypeCetAdaptorSignatureDebugInfo = (() => {
   class FFIConverter extends AbstractFfiConverterByteArray<TypeName> {
     read(from: RustBuffer): TypeName {
       return {
-        sighash: FfiConverterArrayBuffer.read(from),
-        adaptorPoint: FfiConverterArrayBuffer.read(from),
+        sighash: FfiConverterUint8Array.read(from),
+        adaptorPoint: FfiConverterUint8Array.read(from),
         inputIndex: FfiConverterUInt32.read(from),
-        scriptPubkey: FfiConverterArrayBuffer.read(from),
+        scriptPubkey: FfiConverterUint8Array.read(from),
         value: FfiConverterUInt64.read(from),
         cetTxid: FfiConverterString.read(from),
-        cetRaw: FfiConverterArrayBuffer.read(from),
+        cetRaw: FfiConverterUint8Array.read(from),
       };
     }
     write(value: TypeName, into: RustBuffer): void {
-      FfiConverterArrayBuffer.write(value.sighash, into);
-      FfiConverterArrayBuffer.write(value.adaptorPoint, into);
+      FfiConverterUint8Array.write(value.sighash, into);
+      FfiConverterUint8Array.write(value.adaptorPoint, into);
       FfiConverterUInt32.write(value.inputIndex, into);
-      FfiConverterArrayBuffer.write(value.scriptPubkey, into);
+      FfiConverterUint8Array.write(value.scriptPubkey, into);
       FfiConverterUInt64.write(value.value, into);
       FfiConverterString.write(value.cetTxid, into);
-      FfiConverterArrayBuffer.write(value.cetRaw, into);
+      FfiConverterUint8Array.write(value.cetRaw, into);
     }
     allocationSize(value: TypeName): number {
       return (
-        FfiConverterArrayBuffer.allocationSize(value.sighash) +
-        FfiConverterArrayBuffer.allocationSize(value.adaptorPoint) +
+        FfiConverterUint8Array.allocationSize(value.sighash) +
+        FfiConverterUint8Array.allocationSize(value.adaptorPoint) +
         FfiConverterUInt32.allocationSize(value.inputIndex) +
-        FfiConverterArrayBuffer.allocationSize(value.scriptPubkey) +
+        FfiConverterUint8Array.allocationSize(value.scriptPubkey) +
         FfiConverterUInt64.allocationSize(value.value) +
         FfiConverterString.allocationSize(value.cetTxid) +
-        FfiConverterArrayBuffer.allocationSize(value.cetRaw)
+        FfiConverterUint8Array.allocationSize(value.cetRaw)
       );
     }
   }
@@ -2946,15 +2907,15 @@ export type CreateOfferParams = {
   /**
    * The 32-byte chain hash the contract settles on.
    */
-  chainHash: ArrayBuffer;
+  chainHash: Uint8Array;
   /**
    * The 32-byte temporary contract id; randomly generated when `None`.
    */
-  temporaryContractId?: ArrayBuffer;
+  temporaryContractId?: Uint8Array;
   /**
    * The contract payout and oracle information, wire-encoded `ContractInfo`.
    */
-  contractInfo: ArrayBuffer;
+  contractInfo: Uint8Array;
   /**
    * The collateral, in satoshis, contributed by the offering party.
    */
@@ -3007,9 +2968,9 @@ const FfiConverterTypeCreateOfferParams = (() => {
   class FFIConverter extends AbstractFfiConverterByteArray<TypeName> {
     read(from: RustBuffer): TypeName {
       return {
-        chainHash: FfiConverterArrayBuffer.read(from),
+        chainHash: FfiConverterUint8Array.read(from),
         temporaryContractId: FfiConverterOptionalBytes.read(from),
-        contractInfo: FfiConverterArrayBuffer.read(from),
+        contractInfo: FfiConverterUint8Array.read(from),
         offerCollateralSats: FfiConverterUInt64.read(from),
         party: FfiConverterTypeContractPartyParams.read(from),
         fundOutputSerialId: FfiConverterOptionalUInt64.read(from),
@@ -3020,9 +2981,9 @@ const FfiConverterTypeCreateOfferParams = (() => {
       };
     }
     write(value: TypeName, into: RustBuffer): void {
-      FfiConverterArrayBuffer.write(value.chainHash, into);
+      FfiConverterUint8Array.write(value.chainHash, into);
       FfiConverterOptionalBytes.write(value.temporaryContractId, into);
-      FfiConverterArrayBuffer.write(value.contractInfo, into);
+      FfiConverterUint8Array.write(value.contractInfo, into);
       FfiConverterUInt64.write(value.offerCollateralSats, into);
       FfiConverterTypeContractPartyParams.write(value.party, into);
       FfiConverterOptionalUInt64.write(value.fundOutputSerialId, into);
@@ -3033,9 +2994,9 @@ const FfiConverterTypeCreateOfferParams = (() => {
     }
     allocationSize(value: TypeName): number {
       return (
-        FfiConverterArrayBuffer.allocationSize(value.chainHash) +
+        FfiConverterUint8Array.allocationSize(value.chainHash) +
         FfiConverterOptionalBytes.allocationSize(value.temporaryContractId) +
-        FfiConverterArrayBuffer.allocationSize(value.contractInfo) +
+        FfiConverterUint8Array.allocationSize(value.contractInfo) +
         FfiConverterUInt64.allocationSize(value.offerCollateralSats) +
         FfiConverterTypeContractPartyParams.allocationSize(value.party) +
         FfiConverterOptionalUInt64.allocationSize(value.fundOutputSerialId) +
@@ -3108,12 +3069,12 @@ const FfiConverterTypeDescriptorInput = (() => {
 export type DlcInputInfo = {
   fundTx: Transaction;
   fundVout: number;
-  localFundPubkey: ArrayBuffer;
-  remoteFundPubkey: ArrayBuffer;
+  localFundPubkey: Uint8Array;
+  remoteFundPubkey: Uint8Array;
   fundAmount: bigint;
   maxWitnessLen: number;
   inputSerialId: bigint;
-  contractId: ArrayBuffer;
+  contractId: Uint8Array;
 };
 
 /**
@@ -3140,34 +3101,34 @@ const FfiConverterTypeDlcInputInfo = (() => {
       return {
         fundTx: FfiConverterTypeTransaction.read(from),
         fundVout: FfiConverterUInt32.read(from),
-        localFundPubkey: FfiConverterArrayBuffer.read(from),
-        remoteFundPubkey: FfiConverterArrayBuffer.read(from),
+        localFundPubkey: FfiConverterUint8Array.read(from),
+        remoteFundPubkey: FfiConverterUint8Array.read(from),
         fundAmount: FfiConverterUInt64.read(from),
         maxWitnessLen: FfiConverterUInt32.read(from),
         inputSerialId: FfiConverterUInt64.read(from),
-        contractId: FfiConverterArrayBuffer.read(from),
+        contractId: FfiConverterUint8Array.read(from),
       };
     }
     write(value: TypeName, into: RustBuffer): void {
       FfiConverterTypeTransaction.write(value.fundTx, into);
       FfiConverterUInt32.write(value.fundVout, into);
-      FfiConverterArrayBuffer.write(value.localFundPubkey, into);
-      FfiConverterArrayBuffer.write(value.remoteFundPubkey, into);
+      FfiConverterUint8Array.write(value.localFundPubkey, into);
+      FfiConverterUint8Array.write(value.remoteFundPubkey, into);
       FfiConverterUInt64.write(value.fundAmount, into);
       FfiConverterUInt32.write(value.maxWitnessLen, into);
       FfiConverterUInt64.write(value.inputSerialId, into);
-      FfiConverterArrayBuffer.write(value.contractId, into);
+      FfiConverterUint8Array.write(value.contractId, into);
     }
     allocationSize(value: TypeName): number {
       return (
         FfiConverterTypeTransaction.allocationSize(value.fundTx) +
         FfiConverterUInt32.allocationSize(value.fundVout) +
-        FfiConverterArrayBuffer.allocationSize(value.localFundPubkey) +
-        FfiConverterArrayBuffer.allocationSize(value.remoteFundPubkey) +
+        FfiConverterUint8Array.allocationSize(value.localFundPubkey) +
+        FfiConverterUint8Array.allocationSize(value.remoteFundPubkey) +
         FfiConverterUInt64.allocationSize(value.fundAmount) +
         FfiConverterUInt32.allocationSize(value.maxWitnessLen) +
         FfiConverterUInt64.allocationSize(value.inputSerialId) +
-        FfiConverterArrayBuffer.allocationSize(value.contractId)
+        FfiConverterUint8Array.allocationSize(value.contractId)
       );
     }
   }
@@ -3186,7 +3147,7 @@ export type OracleAttestationRef = {
   /**
    * The wire-encoded `OracleAttestation`.
    */
-  attestation: ArrayBuffer;
+  attestation: Uint8Array;
 };
 
 /**
@@ -3213,17 +3174,17 @@ const FfiConverterTypeOracleAttestationRef = (() => {
     read(from: RustBuffer): TypeName {
       return {
         oracleIndex: FfiConverterUInt32.read(from),
-        attestation: FfiConverterArrayBuffer.read(from),
+        attestation: FfiConverterUint8Array.read(from),
       };
     }
     write(value: TypeName, into: RustBuffer): void {
       FfiConverterUInt32.write(value.oracleIndex, into);
-      FfiConverterArrayBuffer.write(value.attestation, into);
+      FfiConverterUint8Array.write(value.attestation, into);
     }
     allocationSize(value: TypeName): number {
       return (
         FfiConverterUInt32.allocationSize(value.oracleIndex) +
-        FfiConverterArrayBuffer.allocationSize(value.attestation)
+        FfiConverterUint8Array.allocationSize(value.attestation)
       );
     }
   }
@@ -3231,8 +3192,8 @@ const FfiConverterTypeOracleAttestationRef = (() => {
 })();
 
 export type OracleInfo = {
-  publicKey: ArrayBuffer;
-  nonces: Array<ArrayBuffer>;
+  publicKey: Uint8Array;
+  nonces: Array<Uint8Array>;
 };
 
 /**
@@ -3257,17 +3218,17 @@ const FfiConverterTypeOracleInfo = (() => {
   class FFIConverter extends AbstractFfiConverterByteArray<TypeName> {
     read(from: RustBuffer): TypeName {
       return {
-        publicKey: FfiConverterArrayBuffer.read(from),
+        publicKey: FfiConverterUint8Array.read(from),
         nonces: FfiConverterSequenceBytes.read(from),
       };
     }
     write(value: TypeName, into: RustBuffer): void {
-      FfiConverterArrayBuffer.write(value.publicKey, into);
+      FfiConverterUint8Array.write(value.publicKey, into);
       FfiConverterSequenceBytes.write(value.nonces, into);
     }
     allocationSize(value: TypeName): number {
       return (
-        FfiConverterArrayBuffer.allocationSize(value.publicKey) +
+        FfiConverterUint8Array.allocationSize(value.publicKey) +
         FfiConverterSequenceBytes.allocationSize(value.nonces)
       );
     }
@@ -3278,7 +3239,7 @@ const FfiConverterTypeOracleInfo = (() => {
 export type TxInputInfo = {
   txid: string;
   vout: number;
-  scriptSig: ArrayBuffer;
+  scriptSig: Uint8Array;
   maxWitnessLength: number;
   serialId: bigint;
 };
@@ -3307,7 +3268,7 @@ const FfiConverterTypeTxInputInfo = (() => {
       return {
         txid: FfiConverterString.read(from),
         vout: FfiConverterUInt32.read(from),
-        scriptSig: FfiConverterArrayBuffer.read(from),
+        scriptSig: FfiConverterUint8Array.read(from),
         maxWitnessLength: FfiConverterUInt32.read(from),
         serialId: FfiConverterUInt64.read(from),
       };
@@ -3315,7 +3276,7 @@ const FfiConverterTypeTxInputInfo = (() => {
     write(value: TypeName, into: RustBuffer): void {
       FfiConverterString.write(value.txid, into);
       FfiConverterUInt32.write(value.vout, into);
-      FfiConverterArrayBuffer.write(value.scriptSig, into);
+      FfiConverterUint8Array.write(value.scriptSig, into);
       FfiConverterUInt32.write(value.maxWitnessLength, into);
       FfiConverterUInt64.write(value.serialId, into);
     }
@@ -3323,7 +3284,7 @@ const FfiConverterTypeTxInputInfo = (() => {
       return (
         FfiConverterString.allocationSize(value.txid) +
         FfiConverterUInt32.allocationSize(value.vout) +
-        FfiConverterArrayBuffer.allocationSize(value.scriptSig) +
+        FfiConverterUint8Array.allocationSize(value.scriptSig) +
         FfiConverterUInt32.allocationSize(value.maxWitnessLength) +
         FfiConverterUInt64.allocationSize(value.serialId)
       );
@@ -3333,10 +3294,10 @@ const FfiConverterTypeTxInputInfo = (() => {
 })();
 
 export type PartyParams = {
-  fundPubkey: ArrayBuffer;
-  changeScriptPubkey: ArrayBuffer;
+  fundPubkey: Uint8Array;
+  changeScriptPubkey: Uint8Array;
   changeSerialId: bigint;
-  payoutScriptPubkey: ArrayBuffer;
+  payoutScriptPubkey: Uint8Array;
   payoutSerialId: bigint;
   inputs: Array<TxInputInfo>;
   inputAmount: bigint;
@@ -3398,10 +3359,10 @@ const FfiConverterTypePartyParams = (() => {
   class FFIConverter extends AbstractFfiConverterByteArray<TypeName> {
     read(from: RustBuffer): TypeName {
       return {
-        fundPubkey: FfiConverterArrayBuffer.read(from),
-        changeScriptPubkey: FfiConverterArrayBuffer.read(from),
+        fundPubkey: FfiConverterUint8Array.read(from),
+        changeScriptPubkey: FfiConverterUint8Array.read(from),
         changeSerialId: FfiConverterUInt64.read(from),
-        payoutScriptPubkey: FfiConverterArrayBuffer.read(from),
+        payoutScriptPubkey: FfiConverterUint8Array.read(from),
         payoutSerialId: FfiConverterUInt64.read(from),
         inputs: FfiConverterSequenceTypeTxInputInfo.read(from),
         inputAmount: FfiConverterUInt64.read(from),
@@ -3410,10 +3371,10 @@ const FfiConverterTypePartyParams = (() => {
       };
     }
     write(value: TypeName, into: RustBuffer): void {
-      FfiConverterArrayBuffer.write(value.fundPubkey, into);
-      FfiConverterArrayBuffer.write(value.changeScriptPubkey, into);
+      FfiConverterUint8Array.write(value.fundPubkey, into);
+      FfiConverterUint8Array.write(value.changeScriptPubkey, into);
       FfiConverterUInt64.write(value.changeSerialId, into);
-      FfiConverterArrayBuffer.write(value.payoutScriptPubkey, into);
+      FfiConverterUint8Array.write(value.payoutScriptPubkey, into);
       FfiConverterUInt64.write(value.payoutSerialId, into);
       FfiConverterSequenceTypeTxInputInfo.write(value.inputs, into);
       FfiConverterUInt64.write(value.inputAmount, into);
@@ -3422,10 +3383,10 @@ const FfiConverterTypePartyParams = (() => {
     }
     allocationSize(value: TypeName): number {
       return (
-        FfiConverterArrayBuffer.allocationSize(value.fundPubkey) +
-        FfiConverterArrayBuffer.allocationSize(value.changeScriptPubkey) +
+        FfiConverterUint8Array.allocationSize(value.fundPubkey) +
+        FfiConverterUint8Array.allocationSize(value.changeScriptPubkey) +
         FfiConverterUInt64.allocationSize(value.changeSerialId) +
-        FfiConverterArrayBuffer.allocationSize(value.payoutScriptPubkey) +
+        FfiConverterUint8Array.allocationSize(value.payoutScriptPubkey) +
         FfiConverterUInt64.allocationSize(value.payoutSerialId) +
         FfiConverterSequenceTypeTxInputInfo.allocationSize(value.inputs) +
         FfiConverterUInt64.allocationSize(value.inputAmount) +
@@ -3487,7 +3448,7 @@ export type SignResult = {
   /**
    * The wire-encoded `SignDlc` message to send to the accepting party.
    */
-  sign: ArrayBuffer;
+  sign: Uint8Array;
   /**
    * The unsigned funding, CET, and refund transactions.
    */
@@ -3516,17 +3477,17 @@ const FfiConverterTypeSignResult = (() => {
   class FFIConverter extends AbstractFfiConverterByteArray<TypeName> {
     read(from: RustBuffer): TypeName {
       return {
-        sign: FfiConverterArrayBuffer.read(from),
+        sign: FfiConverterUint8Array.read(from),
         transactions: FfiConverterTypeDlcTransactions.read(from),
       };
     }
     write(value: TypeName, into: RustBuffer): void {
-      FfiConverterArrayBuffer.write(value.sign, into);
+      FfiConverterUint8Array.write(value.sign, into);
       FfiConverterTypeDlcTransactions.write(value.transactions, into);
     }
     allocationSize(value: TypeName): number {
       return (
-        FfiConverterArrayBuffer.allocationSize(value.sign) +
+        FfiConverterUint8Array.allocationSize(value.sign) +
         FfiConverterTypeDlcTransactions.allocationSize(value.transactions)
       );
     }
@@ -3546,7 +3507,7 @@ export type SpliceKeyRef = {
   /**
    * The 32-byte temporary id of the previous contract being spliced from.
    */
-  priorTemporaryContractId: ArrayBuffer;
+  priorTemporaryContractId: Uint8Array;
 };
 
 /**
@@ -3572,17 +3533,17 @@ const FfiConverterTypeSpliceKeyRef = (() => {
     read(from: RustBuffer): TypeName {
       return {
         inputSerialId: FfiConverterUInt64.read(from),
-        priorTemporaryContractId: FfiConverterArrayBuffer.read(from),
+        priorTemporaryContractId: FfiConverterUint8Array.read(from),
       };
     }
     write(value: TypeName, into: RustBuffer): void {
       FfiConverterUInt64.write(value.inputSerialId, into);
-      FfiConverterArrayBuffer.write(value.priorTemporaryContractId, into);
+      FfiConverterUint8Array.write(value.priorTemporaryContractId, into);
     }
     allocationSize(value: TypeName): number {
       return (
         FfiConverterUInt64.allocationSize(value.inputSerialId) +
-        FfiConverterArrayBuffer.allocationSize(value.priorTemporaryContractId)
+        FfiConverterUint8Array.allocationSize(value.priorTemporaryContractId)
       );
     }
   }
@@ -5155,7 +5116,7 @@ export interface ContractKeyProviderLike {
    * The 33-byte compressed funding public key for a contract, from its
    * 32-byte temporary id. Publish this in the offer or accept message.
    */
-  fundingPubkey(temporaryContractId: ArrayBuffer) /*throws*/ : ArrayBuffer;
+  fundingPubkey(temporaryContractId: Uint8Array) /*throws*/ : Uint8Array;
 }
 /**
  * @deprecated Use `ContractKeyProviderLike` instead.
@@ -5247,7 +5208,7 @@ export class ContractKeyProvider
    * `convert_mnemonic_to_seed`).
    */
   static fromSeed(
-    seed: ArrayBuffer,
+    seed: Uint8Array,
     network: string
   ): ContractKeyProviderLike /*throws*/ {
     return FfiConverterTypeContractKeyProvider.lift(
@@ -5257,10 +5218,7 @@ export class ContractKeyProvider
         ),
         /*caller:*/ (callStatus) => {
           return nativeModule().ubrn_uniffi_ddk_ffi_fn_constructor_contractkeyprovider_from_seed(
-            FfiConverterArrayBuffer.lower(
-              seed,
-              nativeModule().rustbuffer_alloc
-            ),
+            FfiConverterUint8Array.lower(seed, nativeModule().rustbuffer_alloc),
             FfiConverterString.lower(network, nativeModule().rustbuffer_alloc),
             callStatus
           );
@@ -5274,7 +5232,7 @@ export class ContractKeyProvider
    * Builds a provider from a 78-byte encoded master extended private key
    * (the encoding produced by `create_extkey_from_seed`).
    */
-  static fromXprv(xprv: ArrayBuffer): ContractKeyProviderLike /*throws*/ {
+  static fromXprv(xprv: Uint8Array): ContractKeyProviderLike /*throws*/ {
     return FfiConverterTypeContractKeyProvider.lift(
       uniffiCaller.rustCallWithError(
         /*liftError:*/ FfiConverterTypeContractError.lift.bind(
@@ -5282,10 +5240,7 @@ export class ContractKeyProvider
         ),
         /*caller:*/ (callStatus) => {
           return nativeModule().ubrn_uniffi_ddk_ffi_fn_constructor_contractkeyprovider_from_xprv(
-            FfiConverterArrayBuffer.lower(
-              xprv,
-              nativeModule().rustbuffer_alloc
-            ),
+            FfiConverterUint8Array.lower(xprv, nativeModule().rustbuffer_alloc),
             callStatus
           );
         },
@@ -5298,10 +5253,10 @@ export class ContractKeyProvider
    * The 33-byte compressed funding public key for a contract, from its
    * 32-byte temporary id. Publish this in the offer or accept message.
    */
-  fundingPubkey(temporaryContractId: ArrayBuffer): ArrayBuffer /*throws*/ {
+  fundingPubkey(temporaryContractId: Uint8Array): Uint8Array /*throws*/ {
     return ((__rb: Uint8Array) => {
       try {
-        return FfiConverterArrayBuffer.lift(__rb);
+        return FfiConverterUint8Array.lift(__rb);
       } finally {
         nativeModule().rustbuffer_free(__rb);
       }
@@ -5313,7 +5268,7 @@ export class ContractKeyProvider
         /*caller:*/ (callStatus) => {
           return nativeModule().ubrn_uniffi_ddk_ffi_fn_method_contractkeyprovider_funding_pubkey(
             uniffiTypeContractKeyProviderObjectFactory.clonePointer(this),
-            FfiConverterArrayBuffer.lower(
+            FfiConverterUint8Array.lower(
               temporaryContractId,
               nativeModule().rustbuffer_alloc
             ),
@@ -5408,10 +5363,8 @@ const FfiConverterTypeContractKeyProvider = new FfiConverterObject(
   uniffiTypeContractKeyProviderObjectFactory
 );
 
-// FfiConverter for Array<ArrayBuffer>
-const FfiConverterSequenceBytes = new FfiConverterArray(
-  FfiConverterArrayBuffer
-);
+// FfiConverter for Array<Uint8Array>
+const FfiConverterSequenceBytes = new FfiConverterArray(FfiConverterUint8Array);
 
 // FfiConverter for bigint | undefined
 const FfiConverterOptionalUInt64 = new FfiConverterOptional(FfiConverterUInt64);
@@ -5439,9 +5392,9 @@ const FfiConverterSequenceTypePayoutRow = new FfiConverterArray(
   FfiConverterTypePayoutRow
 );
 
-// FfiConverter for ArrayBuffer | undefined
+// FfiConverter for Uint8Array | undefined
 const FfiConverterOptionalBytes = new FfiConverterOptional(
-  FfiConverterArrayBuffer
+  FfiConverterUint8Array
 );
 
 // FfiConverter for Array<TxInputInfo>
@@ -5459,12 +5412,12 @@ const FfiConverterSequenceTypeOracleInfo = new FfiConverterArray(
   FfiConverterTypeOracleInfo
 );
 
-// FfiConverter for Array<Array<ArrayBuffer>>
+// FfiConverter for Array<Array<Uint8Array>>
 const FfiConverterSequenceSequenceBytes = new FfiConverterArray(
   FfiConverterSequenceBytes
 );
 
-// FfiConverter for Array<Array<Array<ArrayBuffer>>>
+// FfiConverter for Array<Array<Array<Uint8Array>>>
 const FfiConverterSequenceSequenceSequenceBytes = new FfiConverterArray(
   FfiConverterSequenceSequenceBytes
 );

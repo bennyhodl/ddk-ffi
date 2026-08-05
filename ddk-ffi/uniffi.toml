@@ -15,6 +15,16 @@
 #
 # Note: strictTypeChecking is left off — ubrn 0.31's generated TS does not pass
 # this project's strict tsconfig, which is why ubrn defaults `@ts-nocheck` on.
+#
+# strictByteArrays is ON, and that is a cross-binding decision, not a ddk-ts one.
+# It exists for the Node bindings: a Node `Buffer` IS a `Uint8Array` subclass, so
+# every `Vec<u8>` argument accepts a Buffer with no conversion, which is what
+# ddk-ts's consumers pass. There is no way to scope it to one binding — ubrn's TS
+# pipeline auto-discovers this file and ignores `--config` — so it also moves
+# ddk-rn's public byte type from ArrayBuffer to Uint8Array. Return values are
+# Uint8Array on both; `Buffer.isBuffer(ret)` is false. Wrap zero-copy with
+# `Buffer.from(ret.buffer, ret.byteOffset, ret.byteLength)`.
 
 [bindings.typescript]
 logLevel = "none"
+strictByteArrays = true

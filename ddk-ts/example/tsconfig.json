@@ -1,8 +1,11 @@
 {
+  // NodeNext, and the package is ESM: the generated bindings resolve their
+  // native library through `import.meta.url`, so @bennyblader/ddk-ts cannot be
+  // required from CommonJS.
   "compilerOptions": {
-    "target": "ES2020",
-    "module": "CommonJS",
-    "moduleResolution": "node",
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "outDir": "./dist",
     "rootDir": "./src",
     "strict": true,

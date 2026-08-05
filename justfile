@@ -2,16 +2,16 @@
 # Develop
 # ====================
 
-# Check all Rust crates (cargo test) and the TypeScript bindings (tsc)
+# Check the Rust crate (cargo test) and both sets of bindings
 check:
     cd {{justfile_directory()}}/ddk-ffi && cargo test --all-features
-    cd {{justfile_directory()}}/ddk-ts && cargo test
+    cd {{justfile_directory()}}/ddk-ts && pnpm generate:debug && pnpm test
     cd {{justfile_directory()}}/ddk-rn && pnpm typecheck
 
-# Lint all Rust crates (rustfmt + clippy) and the React Native bindings (eslint)
+# Lint the Rust crate (rustfmt + clippy) and the React Native bindings (eslint)
 lint:
     cd {{justfile_directory()}}/ddk-ffi && cargo fmt -- --check && cargo clippy --all-features -- -D warnings
-    cd {{justfile_directory()}}/ddk-ts && cargo fmt -- --check && cargo clippy -- -D warnings
+    cd {{justfile_directory()}}/ddk-ts && pnpm format:check
     cd {{justfile_directory()}}/ddk-rn && pnpm lint
 
 # ====================
@@ -23,7 +23,7 @@ build:
     just uniffi-jsi
     just uniffi-turbo
     just build-ios
-    cd {{justfile_directory()}}/ddk-ts && pnpm install && pnpm build
+    cd {{justfile_directory()}}/ddk-ts && pnpm install && pnpm generate
     @echo ""
     @echo "🎉 Bindings built — React Native (iOS) + TypeScript 🎉"
     @echo "🔥 Run 'just example-ios' to test the build"
@@ -329,25 +329,30 @@ clean:
   cd {{justfile_directory()}}/ddk-rn && rm -rf cpp/ddk_ffi.* cpp/ddk-rn.* cpp/UniffiCallInvoker.h src/ddk_ffi*.ts src/NativeDdkRn.ts ios/DdkRn.xcframework android/src/main/jniLibs lib ios/build android/build example/ios/build example/android/build example/android/app/build example/ios/Pods example/ios/Podfile.lock example/ios/DdkRnExample.xcworkspace src/index.tsx
 
   # Clean TypeScript/Node.js bindings
-  cd {{justfile_directory()}}/ddk-ts && rm -rf node_modules dist target pnpm-lock.yaml
+  cd {{justfile_directory()}}/ddk-ts && rm -rf node_modules dist platform src
   cd {{justfile_directory()}}/ddk-ts/example && rm -rf node_modules dist
 
 # ====================
 # TypeScript (Node.js) Bindings
 # ====================
 
-# Build TypeScript bindings for current platform
+# ddk-ts contains no Rust. `pnpm generate` builds the ddk-ffi cdylib, generates
+# the N-API bindings from it into ddk-ts/src, compiles them to dist/, and links
+# the host platform package into node_modules so tests and the example resolve
+# the library exactly as a consumer does.
+#
+# Generate + build the TypeScript bindings for the host platform
 ts-build:
-    cd {{justfile_directory()}}/ddk-ts && pnpm install && pnpm build
+    cd {{justfile_directory()}}/ddk-ts && pnpm install && pnpm generate
 
-# Build TypeScript bindings for all supported platforms (Darwin ARM64 and Linux x64)
+# Build for every published platform (needs the cross toolchains; CI does this per host)
 ts-build-all:
-    cd {{justfile_directory()}}/ddk-ts && pnpm install && pnpm build:darwin-arm64 && pnpm build:linux-x64
+    cd {{justfile_directory()}}/ddk-ts && pnpm install && pnpm build
 
 # Run TypeScript example
 ts-example:
-    cd {{justfile_directory()}}/ddk-ts && pnpm build
-    cd {{justfile_directory()}}/ddk-ts/example && pnpm install && pnpm build && pnpm start
+    cd {{justfile_directory()}}/ddk-ts && pnpm generate
+    cd {{justfile_directory()}}/ddk-ts/example && pnpm install && pnpm dev
 
 # Run TypeScript tests
 ts-test:
@@ -360,7 +365,7 @@ ts-test:
 # Publishing happens in CI, not here. Neither package can be built correctly on
 # one machine any more: ddk-rn ships prebuilt binaries that need a macOS host for
 # the XCFramework and a Linux host with the NDK for the JNI libraries, and ddk-ts
-# ships per-platform napi builds. This recipe therefore only bumps versions and
+# ships one cdylib per platform. This recipe therefore only bumps versions and
 # pushes a tag; .github/workflows/publish.yml does the rest.
 
 # Bump ddk-ts, ddk-rn and ddk-ffi to <version>, commit, tag v<version> and push (CI publishes)

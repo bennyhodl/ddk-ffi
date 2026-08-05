@@ -1,15 +1,19 @@
 #!/usr/bin/env node
 // Usage: node scripts/prep-release.js <X.Y.Z[-tag]>
 //
-// Bumps versions in ddk-ts/package.json, ddk-rn/package.json, both Cargo.tomls
-// and both Cargo.locks, commits, creates tag v<version>, and pushes. CI
+// Bumps versions in ddk-ts/package.json, ddk-rn/package.json, ddk-ffi/Cargo.toml
+// and ddk-ffi/Cargo.lock, commits, creates tag v<version>, and pushes. CI
 // (.github/workflows/publish.yml) takes over on tag push and publishes both npm
 // packages.
 //
-// The lockfiles matter: each records its own crate's version, so bumping only
+// The lockfile matters: it records the crate's own version, so bumping only
 // Cargo.toml leaves the release commit internally inconsistent and the next
 // `cargo build` rewrites the lock — which then blocks the *following* release,
 // because this script refuses a dirty tree. Both were stale after v0.4.0.
+//
+// ddk-ts has no Cargo.toml: it is generated from ddk-ffi, so ddk-ffi's version
+// is the only Rust version in the repo — and it is what `version()` returns to
+// consumers of both packages.
 
 const fs = require('fs');
 const path = require('path');
@@ -52,12 +56,10 @@ const bumpCargoToml = file => {
   console.log(`\u2713 ${file} \u2192 ${version}`);
 };
 bumpCargoToml('ddk-ffi/Cargo.toml');
-bumpCargoToml('ddk-ts/Cargo.toml');
 
 // Rewrite the `version` that follows a given `name = "<crate>"` entry. Done by
 // regex rather than by invoking cargo so the release path stays offline, fast,
-// and incapable of re-resolving unrelated dependencies. ddk_ffi appears in
-// ddk-ts's lockfile too, as a path dependency.
+// and incapable of re-resolving unrelated dependencies.
 const bumpCargoLock = (file, crates) => {
   const p = path.join(repoRoot, file);
   let out = read(p);
@@ -73,11 +75,10 @@ const bumpCargoLock = (file, crates) => {
   console.log(`\u2713 ${file} \u2192 ${version} (${crates.join(', ')})`);
 };
 bumpCargoLock('ddk-ffi/Cargo.lock', ['ddk_ffi']);
-bumpCargoLock('ddk-ts/Cargo.lock', ['ddk_ts', 'ddk_ffi']);
 
 run(
   'git add ddk-ts/package.json ddk-rn/package.json ' +
-    'ddk-ffi/Cargo.toml ddk-ffi/Cargo.lock ddk-ts/Cargo.toml ddk-ts/Cargo.lock'
+    'ddk-ffi/Cargo.toml ddk-ffi/Cargo.lock'
 );
 run(`git commit -m "chore: release v${version}"`);
 run(`git tag v${version}`);
