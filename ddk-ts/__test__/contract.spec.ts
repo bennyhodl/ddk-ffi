@@ -37,6 +37,11 @@ const ACCEPTOR_MNEMONIC = 'legal winner thank year wave sausage worth useful leg
 const MNEMONIC = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
 
 const buf = (hex: string) => Buffer.from(hex, 'hex')
+// The bindings are generated with strictByteArrays, so a `Vec<u8>` return is a
+// Uint8Array, not a Buffer. Arguments need no conversion (a Buffer IS a
+// Uint8Array); this only re-wraps a return value to reach Buffer's own methods,
+// and it is zero-copy.
+const bytes = (u: Uint8Array) => Buffer.from(u.buffer, u.byteOffset, u.byteLength)
 const tempId = (marker: number) => Buffer.alloc(32, marker)
 const FUNDING_SERIAL = 100n
 
@@ -157,11 +162,11 @@ describe('ContractKeyProvider', () => {
     const expected = fromMnemonic.fundingPubkey(id)
     expect(expected.length).toBe(33)
     expect([0x02, 0x03]).toContain(expected[0])
-    expect(fromSeed.fundingPubkey(id).equals(expected)).toBe(true)
-    expect(fromXprv.fundingPubkey(id).equals(expected)).toBe(true)
+    expect(bytes(fromSeed.fundingPubkey(id)).equals(expected)).toBe(true)
+    expect(bytes(fromXprv.fundingPubkey(id)).equals(expected)).toBe(true)
     // Deterministic, and different ids yield different keys.
-    expect(fromMnemonic.fundingPubkey(id).equals(expected)).toBe(true)
-    expect(fromMnemonic.fundingPubkey(tempId(0x22)).equals(expected)).toBe(false)
+    expect(bytes(fromMnemonic.fundingPubkey(id)).equals(expected)).toBe(true)
+    expect(bytes(fromMnemonic.fundingPubkey(tempId(0x22))).equals(expected)).toBe(false)
   })
 
   test('fromDescriptor derives from the descriptor xprv', () => {
@@ -175,7 +180,7 @@ describe('ContractKeyProvider', () => {
       provider.fundingPubkey(Buffer.alloc(31))
       throw new Error('should have thrown')
     } catch (e) {
-      expect((e as { code?: string }).code).toBe('InvalidLength')
+      expect((e as { tag?: string }).tag).toBe('InvalidLength')
     }
   })
 
@@ -184,7 +189,7 @@ describe('ContractKeyProvider', () => {
       ddk.ContractKeyProvider.fromSeed(Buffer.alloc(64), 'mainnet-typo')
       throw new Error('should have thrown')
     } catch (e) {
-      expect((e as { code?: string }).code).toBe('InvalidNetwork')
+      expect((e as { tag?: string }).tag).toBe('InvalidNetwork')
     }
   })
 })
@@ -202,7 +207,7 @@ describe('offer-building helpers', () => {
 
   test('fundingInput encodes a FundingInput', () => {
     const input = ddk.fundingInput(buf(PREV_TX_HEX), 0, FUNDING_SERIAL, 0xffffffff, 108, Buffer.alloc(0))
-    expect(Buffer.isBuffer(input)).toBe(true)
+    expect(input instanceof Uint8Array).toBe(true)
     expect(input.length).toBeGreaterThan(0)
   })
 })
@@ -228,7 +233,7 @@ describe('full single-funded lifecycle', () => {
   })
 
   test('finalizeSign -> a signed funding transaction', () => {
-    expect(Buffer.isBuffer(flow.fundingTx)).toBe(true)
+    expect(flow.fundingTx instanceof Uint8Array).toBe(true)
     expect(flow.fundingTx.length).toBeGreaterThan(0)
     // Signing added witnesses, so the final transaction is larger than the
     // unsigned one acceptOffer rebuilt.
@@ -238,16 +243,16 @@ describe('full single-funded lifecycle', () => {
   // The whole point of the stateless API: nothing is stored, so every artifact
   // has to come back byte-identical from the messages alone.
   test('createFundingPsbt rebuilds the PSBT acceptOffer returned', () => {
-    expect(ddk.createFundingPsbt(flow.offer, flow.accept).equals(flow.acceptResult.fundingPsbt)).toBe(true)
+    expect(bytes(ddk.createFundingPsbt(flow.offer, flow.accept)).equals(flow.acceptResult.fundingPsbt)).toBe(true)
   })
 
   test('dlcTransactionsFromMessages rebuilds what acceptOffer returned', () => {
     const rebuilt = ddk.dlcTransactionsFromMessages(flow.offer, flow.accept)
-    expect(rebuilt.fund.rawBytes.equals(flow.acceptResult.transactions.fund.rawBytes)).toBe(true)
-    expect(rebuilt.refund.rawBytes.equals(flow.acceptResult.transactions.refund.rawBytes)).toBe(true)
+    expect(bytes(rebuilt.fund.rawBytes).equals(flow.acceptResult.transactions.fund.rawBytes)).toBe(true)
+    expect(bytes(rebuilt.refund.rawBytes).equals(flow.acceptResult.transactions.refund.rawBytes)).toBe(true)
     expect(rebuilt.cets.length).toBe(flow.acceptResult.transactions.cets.length)
     rebuilt.cets.forEach((cet, i) => {
-      expect(cet.rawBytes.equals(flow.acceptResult.transactions.cets[i]!.rawBytes)).toBe(true)
+      expect(bytes(cet.rawBytes).equals(flow.acceptResult.transactions.cets[i]!.rawBytes)).toBe(true)
     })
   })
 })
@@ -260,7 +265,7 @@ describe('validation rejects tampered / mismatched messages', () => {
       ddk.validateOffer(buf('deadbeef'), 100, 100_000)
       throw new Error('should have thrown')
     } catch (e) {
-      expect(typeof (e as { code?: string }).code).toBe('string')
+      expect(typeof (e as { tag?: string }).tag).toBe('string')
     }
   })
 
@@ -283,14 +288,14 @@ describe('validation rejects tampered / mismatched messages', () => {
   // messages is, which is what makes storing only the messages sufficient.
   test('the offer is deterministic, and rebuilt artifacts are stable across accepts', () => {
     const again = runFullFlow()
-    expect(again.offer.equals(flow.offer)).toBe(true)
+    expect(bytes(again.offer).equals(flow.offer)).toBe(true)
 
-    expect(ddk.computeContractId(flow.offer, again.accept).equals(ddk.computeContractId(flow.offer, flow.accept))).toBe(
-      true,
-    )
+    expect(
+      bytes(ddk.computeContractId(flow.offer, again.accept)).equals(ddk.computeContractId(flow.offer, flow.accept)),
+    ).toBe(true)
     const fromOther = ddk.dlcTransactionsFromMessages(flow.offer, again.accept)
-    expect(fromOther.fund.rawBytes.equals(flow.acceptResult.transactions.fund.rawBytes)).toBe(true)
-    expect(fromOther.refund.rawBytes.equals(flow.acceptResult.transactions.refund.rawBytes)).toBe(true)
+    expect(bytes(fromOther.fund.rawBytes).equals(flow.acceptResult.transactions.fund.rawBytes)).toBe(true)
+    expect(bytes(fromOther.refund.rawBytes).equals(flow.acceptResult.transactions.refund.rawBytes)).toBe(true)
   })
 
   test('validateOffer rejects an oracle timeout outside the accepted window', () => {
@@ -304,7 +309,7 @@ describe('validation rejects tampered / mismatched messages', () => {
       ddk.computeContractId(buf('deadbeef'), flow.accept)
       throw new Error('should have thrown')
     } catch (e) {
-      expect((e as { code?: string }).code).toBe('Serialization')
+      expect((e as { tag?: string }).tag).toBe('Serialization')
     }
   })
 })
@@ -315,13 +320,13 @@ describe('inspection', () => {
   test('computeContractId is 32 bytes and stable', () => {
     const id = ddk.computeContractId(flow.offer, flow.accept)
     expect(id.length).toBe(32)
-    expect(id.equals(ddk.computeContractId(flow.offer, flow.accept))).toBe(true)
+    expect(bytes(id).equals(ddk.computeContractId(flow.offer, flow.accept))).toBe(true)
   })
 
   test('dlcTransactionsFromMessages rebuilds the transactions', () => {
     const txs = ddk.dlcTransactionsFromMessages(flow.offer, flow.accept)
     expect(txs.cets.length).toBe(2)
-    expect(Buffer.isBuffer(txs.fund.rawBytes)).toBe(true)
+    expect(txs.fund.rawBytes instanceof Uint8Array).toBe(true)
   })
 
   test('contractInfoPayouts derives the enum payout table', () => {
@@ -351,7 +356,7 @@ describe('settlement', () => {
       flow.offerTempId,
       up,
     )
-    expect(Buffer.isBuffer(cet)).toBe(true)
+    expect(cet instanceof Uint8Array).toBe(true)
     expect(cet.length).toBeGreaterThan(0)
     // The other outcome resolves to a different CET.
     const down = ddk.signContractCet(
@@ -362,7 +367,7 @@ describe('settlement', () => {
       flow.offerTempId,
       [{ oracleIndex: 0, attestation: buf(ATTESTATION_DOWN_HEX) }],
     )
-    expect(down.equals(cet)).toBe(false)
+    expect(bytes(down).equals(cet)).toBe(false)
   })
 
   test('either party can settle on its own', () => {
@@ -384,7 +389,7 @@ describe('settlement', () => {
       ])
       throw new Error('should have thrown')
     } catch (e) {
-      expect((e as { code?: string }).code).toBe('NoMatchingOutcome')
+      expect((e as { tag?: string }).tag).toBe('NoMatchingOutcome')
     }
   })
 
@@ -395,7 +400,7 @@ describe('settlement', () => {
       ])
       throw new Error('should have thrown')
     } catch (e) {
-      expect((e as { code?: string }).code).toBe('InvalidAttestation')
+      expect((e as { tag?: string }).tag).toBe('InvalidAttestation')
     }
   })
 
@@ -415,7 +420,7 @@ describe('settlement', () => {
       flow.acceptTempId,
     )
     expect(byOfferer.length).toBeGreaterThan(0)
-    expect(byAcceptor.equals(byOfferer)).toBe(true)
+    expect(bytes(byAcceptor).equals(byOfferer)).toBe(true)
   })
 
   test('a provider that is neither party throws Key', () => {
@@ -424,7 +429,7 @@ describe('settlement', () => {
       ddk.signContractRefund(flow.offer, flow.accept, flow.signResult.sign, stranger, flow.offerTempId)
       throw new Error('should have thrown')
     } catch (e) {
-      expect((e as { code?: string }).code).toBe('Key')
+      expect((e as { tag?: string }).tag).toBe('Key')
     }
   })
 })
@@ -440,7 +445,7 @@ describe('splicing', () => {
       900n,
       ddk.dlcInputMaxWitnessLen(),
     )
-    expect(Buffer.isBuffer(spliceInput)).toBe(true)
+    expect(spliceInput instanceof Uint8Array).toBe(true)
     expect(spliceInput.length).toBeGreaterThan(0)
   })
 
@@ -523,7 +528,7 @@ describe('splicing', () => {
   const splice = runSpliceOut()
 
   test('signAcceptSpliced -> finalizeSignSpliced completes a spliced contract', () => {
-    expect(Buffer.isBuffer(splice.fundingTx)).toBe(true)
+    expect(splice.fundingTx instanceof Uint8Array).toBe(true)
     expect(() => ddk.validateSign(splice.offerB, splice.acceptB, splice.signB)).not.toThrow()
     // Witnesses were added for the prior 2-of-2, so the signed transaction is
     // larger than the unsigned one rebuilt from the messages.
@@ -561,6 +566,6 @@ describe('splicing', () => {
     expect(cet.length).toBeGreaterThan(0)
     const refund = ddk.signContractRefund(splice.offerB, splice.acceptB, splice.signB, flow.acceptorKeys, acceptTempIdB)
     expect(refund.length).toBeGreaterThan(0)
-    expect(refund.equals(cet)).toBe(false)
+    expect(bytes(refund).equals(cet)).toBe(false)
   })
 })

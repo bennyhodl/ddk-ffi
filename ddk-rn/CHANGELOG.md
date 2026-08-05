@@ -22,6 +22,7 @@ CI installs the example app on an iOS simulator and an Android emulator and driv
 
 - **Free functions are now record methods.** `isDustOutput` → `TxOutput.isDust`; `getChangeOutputAndFees` → `PartyParams.changeOutputAndFees`; `verifyCetAdaptorSigFromOracleInfo` → `AdaptorSignature.verifyFromOracleInfo`; and nine transaction functions (`addSignatureToTransaction`, `verifyFundTxSignature`, `getRawFundingTransactionInputSignature`, `signFundTransactionInput`, `signMultiSigInput`, `signCet`, `createCetAdaptorSignatureFromOracleInfo`, `getCetAdaptorSignatureInputs`, `getCetSighash`) → `Transaction.*`. This comes with UniFFI 0.29 → 0.31, a migration from UDL to proc-macros, and library-based binding generation — the Rust source is now the single source of truth for the interface.
 - **`DLCError` is structured.** `InvalidArgument`/`Secp256k1Error` carry a typed `message` and `KeyError` carries a nested `ExtendedKey` enum, where every variant used to be a flat string.
+- **Bytes are `Uint8Array`, not `ArrayBuffer`.** Every `Vec<u8>` argument and return type moves. This comes from `strictByteArrays` in `ddk-ffi/uniffi.toml`, which was turned on for `@bennyblader/ddk-ts` — a Node `Buffer` is a `Uint8Array`, so its consumers pass byte arguments unchanged — and ubrn reads that one file for every binding it generates. The two packages now agree on the byte type, which they never did before.
 
 ## [0.1.4] - 2025-01-15
 - Updated build configuration
