@@ -3,13 +3,13 @@ name: CI
 # One pipeline for the whole repo, three stages, each gating the next:
 #
 #   check  →  build-rn   (ios, android)     →  e2e (ios, android)
-#          →  build-ts   (darwin, linux, wasm)
+#          →  build-ts   (darwin, linux)
 #
 # `check` is the single quality gate and it covers ALL THREE packages —
-# cargo check/fmt/clippy/test for ddk-ffi and ddk-ts, prettier, eslint, tsc,
-# jest, vitest, and the bindings feature-parity scripts. It runs on one Linux
-# runner, so a formatting slip or a failing unit test costs one cheap job and
-# never reaches a macOS runner or an emulator.
+# cargo check/fmt/clippy/test for ddk-ffi, prettier, eslint, tsc, jest, vitest,
+# and the check that the committed bindings still match the crate. It runs on one
+# Linux runner, so a formatting slip or a failing unit test costs one cheap job
+# and never reaches a macOS runner or an emulator.
 #
 # The build stage only builds. The e2e stage only tests: it downloads the app
 # that `build-rn` already produced and drives it with Maestro. It re-runs no
@@ -95,55 +95,52 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             ddk-ffi/target
-            ddk-ts/target
           key: ${{ runner.os }}-check-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-      # ---- Rust: ddk-ffi and ddk-ts ----------------------------------------
+      # ---- Rust: ddk-ffi, the only crate in the repo -----------------------
       - name: cargo check
-        run: |
-          cd ddk-ffi && cargo check --all-features
-          cd ../ddk-ts && cargo check
+        run: cd ddk-ffi && cargo check --all-features
 
       - name: cargo fmt
-        run: |
-          cd ddk-ffi && cargo fmt -- --check
-          cd ../ddk-ts && cargo fmt -- --check
+        run: cd ddk-ffi && cargo fmt -- --check
 
       - name: cargo clippy
-        run: |
-          cd ddk-ffi && cargo clippy --all-features -- -D warnings
-          cd ../ddk-ts && cargo clippy -- -D warnings
+        run: cd ddk-ffi && cargo clippy --all-features -- -D warnings
 
       - name: cargo test
-        run: |
-          cd ddk-ffi && cargo test --all-features
-          cd ../ddk-ts && cargo test
+        run: cd ddk-ffi && cargo test --all-features
 
       # ---- ddk-ts (Node) ---------------------------------------------------
       - name: Install ddk-ts deps
         run: cd ddk-ts && pnpm install --frozen-lockfile
 
-      # format:check:prettier rather than format:check — the latter also runs
-      # `cargo fmt -- --check`, already covered above.
       - name: prettier (ddk-ts)
-        run: cd ddk-ts && pnpm format:check:prettier
+        run: cd ddk-ts && pnpm format:check
 
-      # Debug, not release: vitest imports dist/index.js, so the napi addon has
-      # to exist, but this is a gate — the release builds happen in stage 2.
-      - name: Build ddk-ts for tests (debug)
-        run: cd ddk-ts && pnpm build:debug
+      # Install ubrn: ddk-ts is GENERATED from ddk-ffi, so building it needs the
+      # bindgen, exactly as ddk-rn does.
+      - name: Install uniffi-bindgen-react-native (matches the ddk-rn pin)
+        run: npm install -g uniffi-bindgen-react-native@${{ env.UBRN_VERSION }}
+
+      # Debug, not release: vitest imports dist/index.js, so the cdylib has to
+      # exist, but this is a gate — the release builds happen in stage 2. This
+      # also regenerates ddk-ts/src, which the next step checks.
+      - name: Generate + build ddk-ts (debug)
+        run: cd ddk-ts && pnpm generate:debug
 
       - name: vitest (ddk-ts)
         run: cd ddk-ts && pnpm test
 
-      # Source analysis, no build needed: these compare ddk-ffi's proc-macro
-      # exports against the hand-written NAPI surface, which drift apart easily
-      # because nothing auto-generates ddk-ts.
-      - name: Bindings feature parity
+      # This is what replaced the hand-maintained parity scripts. The bindings
+      # are generated from the crate and committed, so a ddk-ffi change that was
+      # not regenerated shows up here as a diff — the drift the old
+      # verify-parity.cjs existed to catch cannot happen silently any more.
+      - name: Committed bindings match the crate
         run: |
-          cd ddk-ts
-          pnpm verify:parity
-          pnpm verify:types
+          git diff --exit-code ddk-ts/src || {
+            echo "::error::ddk-ts/src is stale — run 'just ts-build' and commit the result"
+            exit 1
+          }
 
       # ---- ddk-rn (React Native) -------------------------------------------
       # The pnpm workspace covers `.` and `example`, and this is also what
@@ -404,7 +401,7 @@ jobs:
           if-no-files-found: error
 
   # ==========================================================================
-  # STAGE 2b — build the Node/WASM bindings for every published platform.
+  # STAGE 2b — build the Node bindings for every published platform.
   # Runs alongside build-rn; nothing downstream consumes it, but a release
   # cannot ship a platform that does not build.
   # ==========================================================================
@@ -418,18 +415,11 @@ jobs:
           - target: darwin-arm64
             runner: macos-latest
             rust-target: aarch64-apple-darwin
-            script: build:darwin-arm64
-            verify: ddk-ts/dist/index.js
-          - target: linux-x64
+            lib: libddk_ffi.dylib
+          - target: linux-x64-gnu
             runner: ubuntu-latest
             rust-target: x86_64-unknown-linux-gnu
-            script: build:linux-x64
-            verify: ddk-ts/dist/index.js
-          - target: wasm
-            runner: ubuntu-latest
-            rust-target: wasm32-wasip1-threads
-            script: build:wasm
-            verify: ddk-ts/dist/ddk-ts.wasm32-wasi.wasm
+            lib: libddk_ffi.so
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     steps:
@@ -450,43 +440,43 @@ jobs:
         with:
           version: ${{ env.PNPM_VERSION }}
 
-      - name: Setup WASI SDK
-        if: matrix.target == 'wasm'
-        run: |
-          curl -sL -o /tmp/wasi-sdk.tar.gz \
-            https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-33/wasi-sdk-33.0-x86_64-linux.tar.gz
-          sudo mkdir -p /opt/wasi-sdk
-          sudo tar xzf /tmp/wasi-sdk.tar.gz -C /opt/wasi-sdk --strip-components=1
-          echo "WASI_SDK_PATH=/opt/wasi-sdk" >> "$GITHUB_ENV"
-
       - name: Cache cargo
         uses: actions/cache@v3
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            ddk-ts/target
+            ddk-ffi/target
           key: ${{ runner.os }}-build-ts-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install uniffi-bindgen-react-native (matches the ddk-rn pin)
+        run: npm install -g uniffi-bindgen-react-native@${{ env.UBRN_VERSION }}
 
       - name: Install deps
         run: cd ddk-ts && pnpm install --frozen-lockfile
 
+      # Builds the release cdylib for this target, regenerates the bindings from
+      # it, compiles them, and assembles platform/<triple>/ — the package that
+      # carries the library to consumers.
       - name: Build
-        run: cd ddk-ts && pnpm ${{ matrix.script }}
+        run: cd ddk-ts && node scripts/build-release.mjs --target ${{ matrix.rust-target }}
 
       - name: Verify build output
         run: |
-          [ -f "${{ matrix.verify }}" ] || { echo "::error::${{ matrix.verify }} not generated"; exit 1; }
-          if [ "${{ matrix.target }}" != "wasm" ]; then
-            [ -f ddk-ts/dist/index.d.ts ] || { echo "::error::index.d.ts not generated"; exit 1; }
-          fi
+          for f in ddk-ts/dist/index.js ddk-ts/dist/index.d.ts \
+                   ddk-ts/platform/${{ matrix.target }}/${{ matrix.lib }} \
+                   ddk-ts/platform/${{ matrix.target }}/package.json; do
+            [ -f "$f" ] || { echo "::error::$f not generated"; exit 1; }
+          done
           echo "✅ ${{ matrix.target }} build successful"
 
       - name: Upload the build
         uses: actions/upload-artifact@v4
         with:
           name: ddk-ts-${{ matrix.target }}
-          path: ddk-ts/dist/
+          path: |
+            ddk-ts/dist/
+            ddk-ts/platform/
           retention-days: 3
           if-no-files-found: error
 

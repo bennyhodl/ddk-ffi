@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Generated from ddk-ffi, not hand-written
+
+`ddk-ts` no longer contains any Rust. The bindings are generated from the compiled `ddk-ffi` crate by `uniffi-bindgen-react-native`'s N-API target — the same bindgen and the same crate that produce `@bennyblader/ddk-rn` — so both packages expose the same names, the same argument lists and the same types by construction. The napi-rs layer that mirrored ddk-ffi by hand is gone, along with the two scripts that existed to detect it drifting (`verify-parity.cjs`, `verify-types.cjs`): CI now checks that the committed `src/` still matches the crate, which is a stronger guarantee than checking that a human kept up.
+
+Adding a function to ddk-ffi is now the whole job. It appears here on the next `pnpm generate`.
+
+### Breaking
+
+- **Twelve operations gained a record namespace**, matching `@bennyblader/ddk-rn` exactly: `isDust` → `TxOutput.isDust`, `changeOutputAndFees` → `PartyParams.changeOutputAndFees`, `verifyFromOracleInfo` → `AdaptorSignature.verifyFromOracleInfo`, and nine more on `Transaction.*` (`addSignature`, `verifyFundSignature`, `rawFundingInputSignature`, `signFundInput`, `signMultiSigInput`, `signCet`, `cetAdaptorSignatureFromOracleInfo`, `cetAdaptorSignatureInputs`, `cetSighash`). The receiver is still the first argument, so each call site takes a prefix and nothing else. The other 39 names are unchanged.
+- **Byte returns are `Uint8Array`, not `Buffer`.** Arguments are unaffected — a Buffer *is* a Uint8Array — so only code calling Buffer methods on a return value changes: `Buffer.from(ret.buffer, ret.byteOffset, ret.byteLength)` wraps one zero-copy.
+- **Errors carry `error.tag`, not `error.code`**, and are typed variant classes: the message is in `error.inner.message`, and `ContractError_Tags` / `DlcError_Tags` enumerate the variants.
+- **ESM-only.** `require()` no longer works: the generated resolver locates its platform package through `import.meta.url`, which CommonJS has no equivalent for.
+- **No browser build.** The WASI/emnapi fallback (`@bennyblader/ddk-ts-wasm32-wasi`, `example-browser/`) went with napi-rs — the N-API generator cannot produce it, since its runtime dlopens a native cdylib. ubrn's separate `generate wasm` path restores browser support from this same crate and is tracked as follow-up work.
+
 ### The stateless contract API
 
 The whole DLC lifecycle now runs in Node: build an offer, accept it, fund it, sign it, and settle it — either the CET an oracle attestation selects or the refund once its locktime passes. Contracts can also be spliced, rolling one into another that spends its funding output.

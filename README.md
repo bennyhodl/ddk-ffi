@@ -4,7 +4,7 @@
 
 This repository provides high-performance Rust bindings for [dlcdevkit](https://github.com/bennyhodl/dlcdevkit) and [rust-dlc](https://github.com/p2pderivatives/rust-dlc), making DLC functionality available in:
 
-- **Node.js/TypeScript**: [@bennyblader/ddk-ts](./ddk-ts) - NAPI-RS based native bindings
+- **Node.js/TypeScript**: [@bennyblader/ddk-ts](./ddk-ts) - generated N-API native bindings
 - **React Native**: [@bennyblader/ddk-rn](./ddk-rn) - UniFFI-based native bindings with JSI
 
 [![GitHub](https://img.shields.io/github/license/bennyhodl/ddk-ffi)](https://github.com/bennyhodl/ddk-ffi/blob/master/LICENSE)
@@ -15,7 +15,8 @@ Neither package compiles anything on install — both ship prebuilt binaries.
 
 ### [@bennyblader/ddk-ts](./ddk-ts) - Node.js/TypeScript
 
-Native Node.js bindings using NAPI-RS for server-side applications, CLI tools, and desktop apps.
+Native Node.js bindings for server-side applications, CLI tools, and desktop
+apps, generated from the same `ddk-ffi` crate as the React Native package.
 
 ```bash
 npm install @bennyblader/ddk-ts
@@ -23,10 +24,11 @@ npm install @bennyblader/ddk-ts
 
 **Features:**
 
-- Zero-copy data transfer via NAPI
-- Prebuilt binaries for macOS ARM64 and Linux x64, with a `wasm32-wasip1-threads` fallback
+- Generated from `ddk-ffi`, so the API matches `ddk-rn` by construction
+- Prebuilt binaries for macOS ARM64 and Linux x64 — nothing compiles on install
 - Full TypeScript support
 - Synchronous API for performance
+- ESM-only
 
 [View package documentation →](./ddk-ts/README.md)
 
@@ -103,8 +105,8 @@ from decrypting its CET adaptor signature with the oracle signatures.
 ### Walkthrough
 
 Both packages expose these as free functions with identical names and argument
-order. The one difference is how bytes are represented: `ddk-ts` takes and
-returns `Buffer`, `ddk-rn` takes and returns `ArrayBuffer`.
+order, and both represent bytes as `Uint8Array`. In Node a `Buffer` is a
+`Uint8Array`, so it can be passed anywhere bytes are taken.
 
 ```typescript
 import {
@@ -287,14 +289,9 @@ Two worth calling out: a forged or misindexed attestation fails with
 claim to come from), and an attested outcome no CET covers fails with
 `NoMatchingOutcome`.
 
-The variant is discriminated differently per package:
-
-- **`ddk-rn`** throws UniFFI's tagged union — switch on `error.tag`, with any
-  payload (e.g. `{ message }`, `{ inputIndex }`) under `error.inner`
-- **`ddk-ts`** throws a napi error — switch on `error.code`, with the Rust
-  `Display` string as `error.message`
-
-The same holds for the transaction API's `DLCError`.
+Both packages throw UniFFI's tagged union: switch on `error.tag`, with any
+payload (e.g. `{ message }`, `{ inputIndex }`) under `error.inner`. The same
+holds for the transaction API's `DLCError`.
 
 ## 🔧 Transaction API
 
@@ -328,32 +325,23 @@ listed below.
 `convertMnemonicToSeed`, `createExtkeyFromSeed`, `createExtkeyFromParentPath`,
 `createXprivFromParentPath`, `getPubkeyFromExtkey`, `getXpubFromXpriv`.
 
-### Where the two packages differ
+### Record methods
 
-The two bindings expose the same functionality, but UniFFI can attach methods to
-records while NAPI cannot, so a handful of operations are **methods on a record in
-`ddk-rn`** and **free functions in `ddk-ts`**:
+A dozen operations are **methods on a record** rather than free functions,
+because that is how `ddk-ffi` declares them. They are identical in both packages,
+and the receiver is the first argument:
 
-| ddk-rn | ddk-ts |
+| | |
 |---|---|
-| `TxOutput.isDust(output)` | `isDust(output)` |
-| `PartyParams.changeOutputAndFees(params, feeRate)` | `changeOutputAndFees(params, feeRate)` |
-| `AdaptorSignature.verifyFromOracleInfo(sig, …)` | `verifyFromOracleInfo(sig, …)` |
-| `Transaction.addSignature(tx, …)` | `addSignature(tx, …)` |
-| `Transaction.verifyFundSignature(tx, …)` | `verifyFundSignature(tx, …)` |
-| `Transaction.rawFundingInputSignature(tx, …)` | `rawFundingInputSignature(tx, …)` |
-| `Transaction.signFundInput(tx, …)` | `signFundInput(tx, …)` |
-| `Transaction.signMultiSigInput(tx, …)` | `signMultiSigInput(tx, …)` |
-| `Transaction.signCet(cet, …)` | `signCet(cet, …)` |
-| `Transaction.cetAdaptorSignatureFromOracleInfo(cet, …)` | `cetAdaptorSignatureFromOracleInfo(cet, …)` |
-| `Transaction.cetAdaptorSignatureInputs(cet, …)` | `cetAdaptorSignatureInputs(cet, …)` |
-| `Transaction.cetSighash(cet, …)` | `cetSighash(cet, …)` |
+| `TxOutput.isDust(output)` | `Transaction.signFundInput(tx, …)` |
+| `PartyParams.changeOutputAndFees(params, feeRate)` | `Transaction.signMultiSigInput(tx, …)` |
+| `AdaptorSignature.verifyFromOracleInfo(sig, …)` | `Transaction.signCet(cet, …)` |
+| `Transaction.addSignature(tx, …)` | `Transaction.cetAdaptorSignatureFromOracleInfo(cet, …)` |
+| `Transaction.verifyFundSignature(tx, …)` | `Transaction.cetAdaptorSignatureInputs(cet, …)` |
+| `Transaction.rawFundingInputSignature(tx, …)` | `Transaction.cetSighash(cet, …)` |
 
 Everything under the contract API, and every function listed above it, is a free
 function in both.
-
-The other difference is bytes: **`ddk-ts` uses `Buffer`, `ddk-rn` uses
-`ArrayBuffer`.**
 
 ### Type definitions
 
@@ -514,7 +502,9 @@ interface ChangeOutputAndFees {
 }
 ```
 
-`Bytes` is `Buffer` in `ddk-ts` and `ArrayBuffer` in `ddk-rn`.
+`Bytes` is `Uint8Array` in both packages. A Node `Buffer` is a `Uint8Array`, so
+`ddk-ts` takes one anywhere bytes are expected; returns are plain `Uint8Array`,
+and `Buffer.from(b.buffer, b.byteOffset, b.byteLength)` re-wraps one zero-copy.
 
 ## 🏗️ Architecture
 
@@ -530,18 +520,16 @@ Both packages follow a **pure wrapper approach** around dlcdevkit and rust-dlc:
 
 `ddk-ffi/src/` is the single source of truth for the interface. It is annotated
 with UniFFI **proc-macros** (`#[derive(uniffi::Record)]`, `#[uniffi::export]`,
-…) — there is no `.udl` file — and the React Native bindings are generated from
-the compiled library, so the Rust source and the generated TypeScript, C++,
-Swift, and Kotlin cannot drift.
+…) — there is no `.udl` file — and **both** packages are generated from the
+compiled library by `uniffi-bindgen-react-native`: the JSI/C++ bindings for React
+Native, and the N-API bindings for Node. Neither contains hand-written binding
+code, so the Rust source and the generated TypeScript, C++, Swift, and Kotlin
+cannot drift — from the crate or from each other.
 
-`ddk-ts` is hand-written NAPI over the same underlying crates rather than
-generated from `ddk-ffi`, so parity is enforced rather than free:
+That leaves one thing worth checking rather than three:
 
-1. [`verify-parity.cjs`](./ddk-ts/scripts/verify-parity.cjs) checks that every
-   function ddk-ffi exports is exposed by ddk-ts
-2. [`verify-types.cjs`](./ddk-ts/scripts/verify-types.cjs) checks the generated
-   type definitions
-3. `ddk-rn/src/__tests__/contractBindings.test.js` checks that the generated JSI
+1. CI regenerates `ddk-ts/src` and fails if it differs from what is committed
+2. `ddk-rn/src/__tests__/contractBindings.test.js` checks that the generated JSI
    surface is complete — every function, record, and constructor present in both
    the TypeScript and the native symbol layer
 4. `ddk-ts/__test__/contract.spec.ts` drives the full lifecycle end to end,
@@ -568,12 +556,13 @@ generated from `ddk-ffi`, so parity is enforced rather than free:
 │   │   └── contract.rs # stateless contract API
 │   └── Cargo.toml
 │
-├── ddk-ts/             # Node.js/TypeScript package (NAPI-RS)
-│   ├── src/            # Rust NAPI source (lib.rs, contract.rs, conversions.rs…)
-│   ├── dist/           # generated JS + .d.ts + the native .node binary
+├── ddk-ts/             # Node.js/TypeScript package (UniFFI + N-API)
+│   ├── src/            # generated TypeScript (committed, never hand-edited)
+│   ├── dist/           # tsc output — what the package ships
+│   ├── platform/       # one npm package per target, each with its cdylib
 │   ├── __test__/       # vitest suites
 │   ├── example/        # runnable examples
-│   └── scripts/        # parity + type verification
+│   └── scripts/        # build + publish the generated package
 │
 ├── ddk-rn/             # React Native package (UniFFI + JSI)
 │   ├── src/            # generated TypeScript
@@ -637,8 +626,8 @@ Contributions welcome! Please ensure:
 - **GitHub**: https://github.com/bennyhodl/ddk-ffi
 - **dlcdevkit**: https://github.com/bennyhodl/dlcdevkit
 - **rust-dlc**: https://github.com/p2pderivatives/rust-dlc
-- **NAPI-RS**: https://napi.rs
 - **UniFFI**: https://mozilla.github.io/uniffi-rs/
+- **uniffi-bindgen-react-native**: https://jhugman.github.io/uniffi-bindgen-react-native/
 
 ---
 

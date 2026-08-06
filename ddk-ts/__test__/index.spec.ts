@@ -1,6 +1,12 @@
 import { describe, test, expect } from 'vitest'
 import * as ddk from '../dist/index.js'
 
+// The bindings are generated with strictByteArrays, so every `Vec<u8>` is a
+// Uint8Array. A Node Buffer IS a Uint8Array, so arguments need no conversion —
+// only return values do, and only when Buffer's own methods are wanted. This is
+// zero-copy; `Buffer.from(bytes)` would copy.
+const buf = (bytes: Uint8Array) => Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+
 export function getCets(): {
   cets: ddk.Transaction[]
   oracleInfo: ddk.OracleInfo[]
@@ -170,20 +176,20 @@ describe('creates and verifies adaptor signatures', () => {
 
     // Each adaptor point should be a valid 33-byte compressed public key
     result.forEach((adaptorPoint, index) => {
-      expect(Buffer.isBuffer(adaptorPoint)).toBe(true)
+      expect(adaptorPoint instanceof Uint8Array).toBe(true)
       expect(adaptorPoint.length).toBe(33) // Compressed public key length
       expect(adaptorPoint[0]).toBe(0x02) // Compressed public key prefix
     })
 
     // All adaptor points should be different
-    const uniquePoints = new Set(result.map((point) => point.toString('hex')))
+    const uniquePoints = new Set(result.map((point) => buf(point).toString('hex')))
     expect(uniquePoints.size).toBe(result.length)
   })
 })
 
 describe('DDK TypeScript Bindings', () => {
   test('should export all required functions', () => {
-    // These are all the functions from the UDL
+    // Free functions, exported at the top level exactly as ddk-ffi declares them.
     const requiredFunctions = [
       'version',
       'createFundTxLockingScript',
@@ -192,19 +198,30 @@ describe('DDK TypeScript Bindings', () => {
       'createCet',
       'createCets',
       'createRefundTransaction',
-      'isDust',
-      'changeOutputAndFees',
       'getTotalInputVsize',
-      'verifyFundSignature',
-      'rawFundingInputSignature',
-      'signFundInput',
-      'cetAdaptorSignatureFromOracleInfo',
       'createCetAdaptorPointsFromOracleInfo',
     ]
 
     requiredFunctions.forEach((funcName) => {
       expect(ddk[funcName]).toBeDefined()
       expect(typeof ddk[funcName]).toBe('function')
+    })
+
+    // ddk-ffi models these as methods on a record, so the generated bindings
+    // namespace them. The receiver is still the first argument: the migration
+    // from the old flat NAPI surface is a prefix and nothing else.
+    const requiredMethods: [string, string][] = [
+      ['TxOutput', 'isDust'],
+      ['PartyParams', 'changeOutputAndFees'],
+      ['Transaction', 'verifyFundSignature'],
+      ['Transaction', 'rawFundingInputSignature'],
+      ['Transaction', 'signFundInput'],
+      ['Transaction', 'cetAdaptorSignatureFromOracleInfo'],
+    ]
+
+    requiredMethods.forEach(([record, method]) => {
+      expect(ddk[record]).toBeDefined()
+      expect(typeof ddk[record][method]).toBe('function')
     })
   })
 
@@ -288,15 +305,15 @@ describe('DDK TypeScript Bindings', () => {
       scriptPubkey: Buffer.alloc(22),
     }
 
-    expect(ddk.isDust(dustOutput)).toBe(true)
-    expect(ddk.isDust(nonDustOutput)).toBe(false)
+    expect(ddk.TxOutput.isDust(dustOutput)).toBe(true)
+    expect(ddk.TxOutput.isDust(nonDustOutput)).toBe(false)
 
     // Edge case: exactly at dust limit (1000 sats)
     const edgeOutput = {
       value: 1000n,
       scriptPubkey: Buffer.alloc(22),
     }
-    expect(ddk.isDust(edgeOutput)).toBe(false)
+    expect(ddk.TxOutput.isDust(edgeOutput)).toBe(false)
   })
 
   test('getTotalInputVsize calculates correct size', () => {
@@ -394,14 +411,14 @@ describe('DDK TypeScript Bindings', () => {
   test('changeOutputAndFees calculates fees correctly', () => {
     const { partyParams } = createTestData()
 
-    const result = ddk.changeOutputAndFees(
+    const result = ddk.PartyParams.changeOutputAndFees(
       partyParams,
       4n, // feeRate
     )
 
     expect(result.changeOutput).toBeDefined()
     expect(typeof result.changeOutput.value).toBe('bigint')
-    expect(Buffer.isBuffer(result.changeOutput.scriptPubkey)).toBe(true)
+    expect(result.changeOutput.scriptPubkey instanceof Uint8Array).toBe(true)
     expect(typeof result.fundFee).toBe('bigint')
     expect(typeof result.cetFee).toBe('bigint')
   })
@@ -419,13 +436,13 @@ describe('DDK TypeScript Bindings', () => {
     const mockPrivkey = Buffer.alloc(32, 0x01)
 
     // Test that the function exists and has the right signature
-    expect(typeof ddk.rawFundingInputSignature).toBe('function')
-    expect(typeof ddk.signFundInput).toBe('function')
-    expect(typeof ddk.verifyFundSignature).toBe('function')
+    expect(typeof ddk.Transaction.rawFundingInputSignature).toBe('function')
+    expect(typeof ddk.Transaction.signFundInput).toBe('function')
+    expect(typeof ddk.Transaction.verifyFundSignature).toBe('function')
 
     // These would throw with invalid data, but we're testing the API exists
     expect(() => {
-      ddk.rawFundingInputSignature(
+      ddk.Transaction.rawFundingInputSignature(
         mockTx,
         mockPrivkey,
         '0000000000000000000000000000000000000000000000000000000000000000',
@@ -450,11 +467,11 @@ describe('DDK TypeScript Bindings', () => {
     }
 
     // Test that the function exists
-    expect(typeof ddk.cetAdaptorSignatureFromOracleInfo).toBe('function')
+    expect(typeof ddk.Transaction.cetAdaptorSignatureFromOracleInfo).toBe('function')
 
     // This would throw with invalid data, but we're testing the API exists
     expect(() => {
-      ddk.cetAdaptorSignatureFromOracleInfo(
+      ddk.Transaction.cetAdaptorSignatureFromOracleInfo(
         mockTx,
         oracleInfo,
         Buffer.alloc(32), // fundingSk

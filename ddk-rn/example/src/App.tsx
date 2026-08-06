@@ -83,22 +83,24 @@ type DemoResult = {
   refundBytes: number;
 };
 
-function toHex(buffer: ArrayBuffer): string {
-  return Array.from(new Uint8Array(buffer))
+// Every `Vec<u8>` crosses the binding as a Uint8Array (strictByteArrays in
+// ddk-ffi/uniffi.toml), on this platform and in @bennyblader/ddk-ts alike.
+function toHex(bytes: Uint8Array): string {
+  return Array.from(bytes)
     .map((byte) => byte.toString(16).padStart(2, '0'))
     .join('');
 }
 
-function hexToArrayBuffer(hex: string): ArrayBuffer {
+function hexToBytes(hex: string): Uint8Array {
   const bytes = new Uint8Array(hex.length / 2);
   for (let i = 0; i < bytes.length; i++) {
     bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
   }
-  return bytes.buffer;
+  return bytes;
 }
 
-function temporaryContractId(marker: number): ArrayBuffer {
-  return new Uint8Array(32).fill(marker).buffer;
+function temporaryContractId(marker: number): Uint8Array {
+  return new Uint8Array(32).fill(marker);
 }
 
 export default function App() {
@@ -121,21 +123,21 @@ export default function App() {
       );
       const offerTempId = temporaryContractId(0x5c);
       const acceptTempId = temporaryContractId(0xa1);
-      const spk = hexToArrayBuffer(OFFERER_SPK_HEX);
+      const spk = hexToBytes(OFFERER_SPK_HEX);
 
       // 1) Offer — single-funded from the fixture UTXO.
       const funding = fundingInput(
-        hexToArrayBuffer(PREV_TX_HEX),
+        hexToBytes(PREV_TX_HEX),
         0,
         FUNDING_INPUT_SERIAL_ID,
         0xffffffff,
         108,
-        new ArrayBuffer(0)
+        new Uint8Array(0)
       );
       const offer = createOffer({
         chainHash: chainHashFromNetwork('regtest'),
         temporaryContractId: offerTempId,
-        contractInfo: hexToArrayBuffer(CONTRACT_INFO_HEX),
+        contractInfo: hexToBytes(CONTRACT_INFO_HEX),
         offerCollateralSats: TOTAL_COLLATERAL_SATS,
         party: {
           fundingPubkey: offererKeys.fundingPubkey(offerTempId),
@@ -194,7 +196,7 @@ export default function App() {
 
       // 4) Inspect: contract id + payout table.
       const contractId = toHex(computeContractId(offer, accept));
-      const payouts = contractInfoPayouts(hexToArrayBuffer(CONTRACT_INFO_HEX));
+      const payouts = contractInfoPayouts(hexToBytes(CONTRACT_INFO_HEX));
       const payoutRows = payouts.rows.map((row) => ({
         label: row.outcome ?? `${row.rangeStart}–${row.rangeEnd}`,
         offer: `${row.offerPayoutSats.toString()} sats`,
@@ -220,7 +222,7 @@ export default function App() {
         signResult.sign,
         offererKeys,
         offerTempId,
-        [{ oracleIndex: 0, attestation: hexToArrayBuffer(ATTESTATION_UP_HEX) }]
+        [{ oracleIndex: 0, attestation: hexToBytes(ATTESTATION_UP_HEX) }]
       );
       const refund = signContractRefund(
         offer,

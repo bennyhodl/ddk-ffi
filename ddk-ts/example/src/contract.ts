@@ -52,6 +52,10 @@ const PREV_TX_HEX =
 const P2WPKH_SPK_HEX = '00143a4279e9c96f8305f3bc0566f9d8be101c189a83'
 const FUNDING_SERIAL = 100n
 
+// Byte values cross the binding as Uint8Array (strictByteArrays), so reach for
+// Buffer only when a Buffer method is wanted. Wrapping is zero-copy.
+const hex = (bytes: Uint8Array) => Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).toString('hex')
+
 console.log('=== Stateless Contract API (Node) ===\n')
 
 // 1) Derive DLC funding keys (secret keys stay in Rust and never cross the
@@ -61,7 +65,7 @@ const acceptorKeys = ContractKeyProvider.fromMnemonic(ACCEPTOR_MNEMONIC, undefin
 const offerTempId = Buffer.alloc(32, 0x5c)
 const acceptTempId = Buffer.alloc(32, 0xa1)
 const spk = Buffer.from(P2WPKH_SPK_HEX, 'hex')
-console.log(`Offerer funding pubkey: ${offererKeys.fundingPubkey(offerTempId).toString('hex')}`)
+console.log(`Offerer funding pubkey: ${hex(offererKeys.fundingPubkey(offerTempId))}`)
 
 // 2) Build and validate an offer (single-funded: offerer contributes all collateral).
 const funding = fundingInput(Buffer.from(PREV_TX_HEX, 'hex'), 0, FUNDING_SERIAL, 0xffffffff, 108, Buffer.alloc(0))
@@ -129,7 +133,7 @@ const fundingTx = finalizeSign(offer, accept, signResult.sign, fundingPsbt)
 console.log(`✅ finalizeSign -> signed funding transaction (${fundingTx.length} bytes)`)
 
 // 5) Inspect: contract id + the payout table for display.
-console.log(`\nContract id: ${computeContractId(offer, accept).toString('hex')}`)
+console.log(`\nContract id: ${hex(computeContractId(offer, accept))}`)
 const payouts = contractInfoPayouts(Buffer.from(CONTRACT_INFO_HEX, 'hex'))
 console.log(`Payout table (${payouts.isEnum ? 'enum' : 'numeric'}, total ${payouts.totalCollateralSats} sats):`)
 for (const row of payouts.rows) {

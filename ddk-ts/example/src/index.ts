@@ -1,7 +1,6 @@
 import {
   version,
   createFundTxLockingScript,
-  isDust,
   getTotalInputVsize,
   createDlcTransactions,
   createCets,
@@ -11,6 +10,10 @@ import {
   Payout,
   PartyParams,
 } from '@bennyblader/ddk-ts'
+
+// Byte values cross the binding as Uint8Array (strictByteArrays), so reach for
+// Buffer only when a Buffer method is wanted. Wrapping is zero-copy.
+const hex = (bytes: Uint8Array) => Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).toString('hex')
 
 console.log('heyhowareya')
 
@@ -32,7 +35,7 @@ try {
   // Create a funding transaction locking script
   const lockingScript = createFundTxLockingScript(localPubkey, remotePubkey)
   console.log(`✅ Created locking script with length: ${lockingScript.length} bytes`)
-  console.log(`   Locking script (hex): ${lockingScript.toString('hex').substring(0, 60)}...\n`)
+  console.log(`   Locking script (hex): ${hex(lockingScript).substring(0, 60)}...\n`)
 } catch (error) {
   console.error('❌ Error creating locking script:', error)
 }
@@ -49,8 +52,8 @@ const nonDustOutput: TxOutput = {
   scriptPubkey: Buffer.alloc(22, 0),
 }
 
-console.log(`   Is 500 sats dust? ${isDust(dustOutput)}`)
-console.log(`   Is 5000 sats dust? ${isDust(nonDustOutput)}\n`)
+console.log(`   Is 500 sats dust? ${TxOutput.isDust(dustOutput)}`)
+console.log(`   Is 5000 sats dust? ${TxOutput.isDust(nonDustOutput)}\n`)
 
 // Test total input vsize calculation with typed inputs
 console.log('Testing input vsize calculation:')
