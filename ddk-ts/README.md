@@ -1,6 +1,9 @@
 # @bennyblader/ddk-ts
 
-TypeScript/Node.js bindings for the DLC Dev Kit (DDK) - NAPI-RS based native bindings for Node.js applications.
+TypeScript/Node.js bindings for the DLC Dev Kit (DDK), generated from the
+`ddk-ffi` Rust crate by `uniffi-bindgen-react-native`'s N-API target. There is no
+hand-written binding code here — the same crate produces these and
+`@bennyblader/ddk-rn`, so the two cannot drift apart.
 
 ## Installation
 
@@ -15,10 +18,22 @@ Nothing is compiled on install. Prebuilt platform binaries arrive through
 
 - macOS ARM64 (Apple Silicon) — `@bennyblader/ddk-ts-darwin-arm64`
 - Linux x64 (glibc) — `@bennyblader/ddk-ts-linux-x64-gnu`
-- `wasm32-wasip1-threads` — `@bennyblader/ddk-ts-wasm32-wasi`, the fallback for
-  any platform not in the matrix
 
 Prereleases publish to the `next` dist-tag: `npm install @bennyblader/ddk-ts@next`.
+
+The package is **ESM-only**: the generated library resolver uses
+`import.meta.url`, so it cannot be `require`d.
+
+### Bytes
+
+Every `Vec<u8>` crosses the boundary as a `Uint8Array`. Node's `Buffer` is a
+`Uint8Array` subclass, so **arguments take a Buffer unchanged**; only return
+values differ, and wrapping one is zero-copy:
+
+```typescript
+const bytes = createFundTxLockingScript(localPubkey, remotePubkey) // Uint8Array
+Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).toString('hex')
+```
 
 ## Quick Start
 
@@ -79,9 +94,11 @@ For complete API documentation, see the [main README](../README.md#-the-contract
 
 ### Errors
 
-A thrown error exposes the Rust variant as `error.code` (`'InvalidOffer'`,
-`'NoMatchingOutcome'`, `'InvalidPublicKey'`, `'KeyError'`, …) with the `Display`
-string as `error.message`.
+A thrown error is a typed variant class carrying the Rust variant name in
+`error.tag` (`'InvalidOffer'`, `'NoMatchingOutcome'`, `'InvalidPublicKey'`,
+`'KeyError'`, …), with the `Display` string in `error.inner.message`. Switch on
+`ContractError_Tags` / `DlcError_Tags`, or narrow with
+`ContractError.NoMatchingOutcome.instanceOf(e)`.
 
 ## Development
 
@@ -90,7 +107,8 @@ string as `error.message`.
 - Node.js >= 18
 - Rust >= 1.70
 - pnpm
-- NAPI-RS CLI: `npm install -g @napi-rs/cli`
+- `uniffi-bindgen-react-native`, at the version ddk-rn pins:
+  `pnpm add -g uniffi-bindgen-react-native@0.31.0-3`
 
 ### Building from Source
 
@@ -98,14 +116,15 @@ string as `error.message`.
 # Install dependencies
 pnpm install
 
-# Build for current platform
+# Build the ddk-ffi cdylib, generate the bindings from it, compile, and link
+# the host platform package into node_modules
+pnpm generate
+
+# Same, with a debug cdylib — faster, and what the CI gate runs
+pnpm generate:debug
+
+# Build every published platform (needs the cross toolchains; CI does one per host)
 pnpm build
-
-# Build for all supported platforms (Darwin ARM64 and Linux x64)
-pnpm build:all
-
-# Build the WASI fallback
-pnpm build:wasm
 ```
 
 ### Just Commands
@@ -131,37 +150,27 @@ just release <version>
 
 ```
 ddk-ts/
-├── src/                # Rust NAPI-RS source code
-│   ├── lib.rs          # transaction API wrappers
-│   ├── contract.rs     # stateless contract API
-│   ├── types.rs        # type definitions
-│   ├── conversions.rs  # Rust ↔ JS type conversions
-│   └── error.rs        # DLCError/ContractError → JS error codes
-├── dist/               # Generated output (git-ignored, shipped in the tarball)
-│   ├── index.js        # main entry point (generated)
-│   ├── index.d.ts      # TypeScript definitions (generated)
-│   └── *.node / *.wasm # the native binary for this platform
+├── src/                # GENERATED bindings — committed, never hand-edited
+│   ├── ddk_ffi.ts      # the public API
+│   ├── ddk_ffi-ffi.ts  # the FFI layer + the cdylib resolver
+│   └── index.ts        # entry point
+├── dist/               # tsc output (git-ignored, shipped in the tarball)
+├── platform/           # one npm package per target (git-ignored)
+│   └── darwin-arm64/   # package.json + libddk_ffi.dylib
 ├── example/            # Example TypeScript application
-├── example-browser/    # Vite example against the WASM build
-├── __test__/           # vitest suites
-└── scripts/            # Verification scripts
-    ├── verify-parity.cjs # every ddk-ffi export is exposed here
-    └── verify-types.cjs  # the generated type definitions are complete
+├── __test__/           # vitest suites, run against dist/
+└── scripts/
+    ├── build-release.mjs   # cargo build → generate → tsc → platform packages
+    ├── publish-release.mjs # platform packages first, then the main package
+    ├── fix-esm-imports.mjs # ubrn emits extensionless imports; Node ESM rejects them
+    └── verify-package.mjs  # prepublishOnly guard
 ```
 
 ### Testing
 
 ```bash
-# Run all tests
+pnpm generate:debug  # the tests import dist/, so build it first
 pnpm test
-
-# Rust unit tests, verification, and the vitest suites together
-pnpm test:all
-
-# Run verification scripts
-pnpm verify        # Run all verification checks
-pnpm verify:parity # Check API parity with the ddk-ffi interface
-pnpm verify:types  # Verify TypeScript types
 ```
 
 `__test__/contract.spec.ts` drives the complete lifecycle offer-to-settlement,
@@ -171,14 +180,15 @@ party's prior contract.
 
 ### Platform Support
 
-| Platform | Architecture          | Status                |
-| -------- | --------------------- | --------------------- |
-| macOS    | ARM64 (Apple Silicon) | ✅ Native binary      |
-| Linux    | x64 (glibc)           | ✅ Native binary      |
-| Any      | WASI                  | ✅ WASM fallback      |
-| macOS    | x64 (Intel)           | ⚠️ WASM fallback only |
-| Windows  | x64                   | ⚠️ WASM fallback only |
-| Linux    | ARM64                 | ⚠️ WASM fallback only |
+| Platform | Architecture          | Status           |
+| -------- | --------------------- | ---------------- |
+| macOS    | ARM64 (Apple Silicon) | ✅ Native binary |
+| Linux    | x64 (glibc)           | ✅ Native binary |
+
+Other targets (macOS x64, Windows x64, Linux ARM64) are already mapped in
+`scripts/build-release.mjs`; adding one means listing it there under `PUBLISHED`
+and in the publish workflow's build matrix. The browser is a separate question —
+see the note below.
 
 ### Release Process
 
@@ -196,43 +206,49 @@ This will:
 
 Publishing happens in CI. Pushing the tag triggers
 [`.github/workflows/publish.yml`](../.github/workflows/publish.yml), which builds
-each napi platform binary on its own runner, verifies parity and types, and
-publishes. Nothing is published from a developer machine — no single host can
-build every platform this repo ships.
+one cdylib per platform on its own runner and then runs
+`scripts/publish-release.mjs`: platform packages first, then the main package
+with its `optionalDependencies` filled in. Nothing is published from a developer
+machine — no single host can build every platform this repo ships, and
+`prepublishOnly` refuses a hand-run `npm publish` that would ship no library.
 
 A prerelease version (`just release 0.5.0-rc1`) publishes to the `next`
 dist-tag rather than `latest`.
 
 ### API Compatibility
 
-These bindings are hand-written NAPI over the same crates `ddk-ffi` wraps, so
-parity with `@bennyblader/ddk-rn` is enforced rather than free. The
-[verify-parity.cjs](scripts/verify-parity.cjs) script checks that every function
-`ddk-ffi` exports is exposed here; `verify-types.cjs` checks the generated type
-definitions. Both run in CI and in `pnpm verify`.
+Parity with `@bennyblader/ddk-rn` is now structural rather than enforced: both
+packages are generated from the same `ddk-ffi` crate by the same bindgen, so the
+same names, the same argument lists and the same `Uint8Array` byte type appear on
+both. The old `verify-parity.cjs` / `verify-types.cjs` scripts are gone with the
+drift they existed to catch; CI instead checks that the committed `src/` still
+matches the crate.
 
-Two intentional differences from `ddk-rn`: bytes are `Buffer` here and
-`ArrayBuffer` there, and a dozen transaction operations that UniFFI attaches to
-records (`TxOutput.isDust`, `Transaction.signCet`, …) are free functions here,
-because NAPI has no equivalent. See the [comparison
-table](../README.md#where-the-two-packages-differ).
+### The browser
+
+There is no browser build at the moment. It previously came from napi-rs plus
+`wasm32-wasip1-threads` and emnapi, which the N-API generator structurally cannot
+produce — `@ubjs/node` dlopens a native cdylib, and neither dlopen nor native
+addons exist in a browser. ubrn has a separate `generate wasm` path
+(wasm-bindgen, `wasm32-unknown-unknown`) that restores it from this same crate;
+that is tracked as follow-up work, not a dead end.
 
 ## Troubleshooting
 
 ### Missing Binary
 
-If you get an error about missing binaries, ensure your platform is supported or build from source:
+A `ResolveLibPathError` at the first call means npm installed no platform
+package for this machine — check the table above, and check that the
+`@bennyblader/ddk-ts-<triple>` optionalDependency was not skipped by an
+`--omit=optional` install. From a checkout, `pnpm generate` builds and links the
+host one.
 
-```bash
-pnpm build
-```
+### ESM only
 
-### ESM imports
-
-The package is CommonJS. `require` and a default `import` from an ESM file both
-work; the browser/WASM entries (`dist/browser.js`,
-`dist/ddk-ts.wasi-browser.js`) are ESM and will not resolve under it — the Node
-bindings are the supported path.
+`require('@bennyblader/ddk-ts')` will not work. The generated resolver locates
+the platform package through `import.meta.url`, which has no CommonJS equivalent,
+so a dual build would break it. Use `import`, and set `"type": "module"` (or use
+`.mjs`) in a consuming package.
 
 ### BigInt Support
 

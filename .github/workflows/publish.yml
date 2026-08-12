@@ -10,7 +10,8 @@ permissions:
   id-token: write
 
 env:
-  APP_NAME: ddk-ts
+  # Read by cargo when building the ddk-ts cdylib on macOS. APP_NAME lived here
+  # too; it was napi-rs's, and nothing reads it now that ddk-ts is generated.
   MACOSX_DEPLOYMENT_TARGET: '10.13'
   # Keep in sync with ci.yml's NDK_VERSION and the example app's ndkVersion.
   NDK_VERSION: '27.1.12297006'
@@ -45,11 +46,13 @@ jobs:
           fi
 
           # The Cargo side too. ddk-ffi's version is consumer-visible — its
-          # `version()` binding returns env!("CARGO_PKG_VERSION") — and the
-          # lockfiles record each crate's own version, so a stale one makes the
-          # next `cargo build` dirty the tree and blocks the following release.
-          # Checking only the package.json files is how ddk-ts/Cargo.toml sat at
-          # 0.3.43 through the v0.4.0 release without anything noticing.
+          # `version()` binding returns env!("CARGO_PKG_VERSION"), to BOTH
+          # packages — and the lockfile records the crate's own version, so a
+          # stale one makes the next `cargo build` dirty the tree and blocks the
+          # following release. Checking only the package.json files is how
+          # ddk-ts/Cargo.toml sat at 0.3.43 through the v0.4.0 release without
+          # anything noticing; ddk-ts has no Cargo.toml now, because it is
+          # generated from this crate.
           check_toml() {
             local file="$1" actual
             actual=$(grep -m1 '^version = ' "$file" | sed 's/version = "\(.*\)"/\1/')
@@ -69,13 +72,15 @@ jobs:
             fi
           }
           check_toml ddk-ffi/Cargo.toml
-          check_toml ddk-ts/Cargo.toml
           check_lock ddk-ffi/Cargo.lock ddk_ffi
-          check_lock ddk-ts/Cargo.lock ddk_ts
-          check_lock ddk-ts/Cargo.lock ddk_ffi
 
           echo "version=$TAG_VERSION" >> "$GITHUB_OUTPUT"
 
+  # ddk-ts is GENERATED from ddk-ffi (see ddk-ts/DEVELOPMENT.md): each host
+  # builds the release cdylib for its own target, regenerates the bindings from
+  # it, and assembles platform/<node-triple>/ — a complete npm package carrying
+  # that one library. dist/ (the compiled TypeScript) is identical from either
+  # host; publish-ddk-ts takes whichever arrives.
   build-ddk-ts:
     name: Build ddk-ts (${{ matrix.short }})
     needs: [verify-version]
@@ -86,19 +91,11 @@ jobs:
           - host: macos-latest
             target: aarch64-apple-darwin
             short: darwin-arm64
-            build: pnpm build:darwin-arm64
-            artifact_path: ddk-ts/dist/ddk-ts.*.node
+            lib: libddk_ffi.dylib
           - host: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             short: linux-x64-gnu
-            build: pnpm build:linux-x64
-            artifact_path: ddk-ts/dist/ddk-ts.*.node
-          - host: ubuntu-latest
-            target: wasm32-wasip1-threads
-            short: wasm32-wasi
-            build: pnpm build:wasm
-            wasi: true
-            artifact_path: ddk-ts/dist/ddk-ts.wasm32-wasi.wasm
+            lib: libddk_ffi.so
     runs-on: ${{ matrix.host }}
     steps:
       - uses: actions/checkout@v4
@@ -111,23 +108,24 @@ jobs:
       - uses: pnpm/action-setup@v2
         with:
           version: 10
-      - name: Setup WASI SDK
-        if: matrix.wasi
-        run: |
-          curl -sL -o /tmp/wasi-sdk.tar.gz \
-            https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-33/wasi-sdk-33.0-x86_64-linux.tar.gz
-          sudo mkdir -p /opt/wasi-sdk
-          sudo tar xzf /tmp/wasi-sdk.tar.gz -C /opt/wasi-sdk --strip-components=1
-          echo "WASI_SDK_PATH=/opt/wasi-sdk" >> "$GITHUB_ENV"
+      - name: Install uniffi-bindgen-react-native
+        run: npm install -g uniffi-bindgen-react-native@0.31.0-3
       - name: Install dependencies
         run: cd ddk-ts && pnpm install --frozen-lockfile
       - name: Build
-        run: cd ddk-ts && ${{ matrix.build }}
+        run: cd ddk-ts && node scripts/build-release.mjs --target ${{ matrix.target }}
+      - name: Verify the platform package carries its library
+        run: |
+          F=ddk-ts/platform/${{ matrix.short }}/${{ matrix.lib }}
+          [ -f "$F" ] || { echo "::error::$F was not produced"; exit 1; }
+          ls -la "ddk-ts/platform/${{ matrix.short }}"
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4
         with:
           name: ddk-ts-bindings-${{ matrix.target }}
-          path: ${{ matrix.artifact_path }}
+          path: |
+            ddk-ts/dist/
+            ddk-ts/platform/
           if-no-files-found: error
 
   test-ddk-ts:
@@ -145,16 +143,18 @@ jobs:
       - uses: pnpm/action-setup@v2
         with:
           version: 10
+      - name: Install uniffi-bindgen-react-native
+        run: npm install -g uniffi-bindgen-react-native@0.31.0-3
       - name: Install dependencies
         run: cd ddk-ts && pnpm install --frozen-lockfile
-      - name: Build
-        run: cd ddk-ts && pnpm build:linux-x64
+      - name: Generate + build
+        run: cd ddk-ts && pnpm generate
       - name: Test
         run: cd ddk-ts && pnpm test
-      - name: Verify parity
-        run: cd ddk-ts && pnpm verify:parity
-      - name: Verify types
-        run: cd ddk-ts && pnpm verify:types
+      # The bindings are generated, so ddk-ts cannot drift from ddk-ffi — but a
+      # stale committed copy can, and that is what would ship.
+      - name: Committed bindings match the crate
+        run: git diff --exit-code ddk-ts/src
 
   test-ddk-rn:
     name: Test ddk-rn
@@ -183,51 +183,44 @@ jobs:
       - name: Test
         run: cd ddk-rn && pnpm test
 
+  # Nothing is built here: this job only assembles what the two build hosts
+  # produced and publishes it. No Rust toolchain, no bindgen.
   publish-ddk-ts:
     name: Publish @bennyblader/ddk-ts
     needs: [test-ddk-ts, build-ddk-ts]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: x86_64-unknown-linux-gnu
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
-      - uses: pnpm/action-setup@v2
-        with:
-          version: 10
-      - name: Install dependencies
-        run: cd ddk-ts && pnpm install --frozen-lockfile
-      - name: Build main package (dist/index.js + dist/index.d.ts)
-        run: cd ddk-ts && pnpm build:linux-x64
-      - name: Download platform binaries
+      # merge-multiple: both artifacts carry the same dist/ (the compiled
+      # bindings are host-independent) and one platform/<triple>/ each, so they
+      # overlay into a single tree.
+      - name: Download the builds
         uses: actions/download-artifact@v4
         with:
-          path: ddk-ts/artifacts
+          path: ddk-ts
           pattern: ddk-ts-bindings-*
-      - name: Create sub-package directories
-        run: cd ddk-ts && npx napi create-npm-dirs
-      # --build-output-dir dist: the wasm32-wasi sibling's JS glue (*.wasi.cjs,
-      # *.wasi-browser.js, wasi-worker*.mjs) is emitted into dist/ by the build
-      # above; the .wasm/.node binaries come from the downloaded artifacts.
-      - name: Move binaries into sub-package directories
-        run: cd ddk-ts && npx napi artifacts --build-output-dir dist
-      # Main package must not ship .node binaries; each sibling package carries its own.
-      - name: Strip binaries from main package dist/
-        run: rm -f ddk-ts/dist/*.node
-      # NPM_CONFIG_TAG rather than `npm publish --tag`: napi's prepublishOnly
-      # publishes each platform sibling with a bare `npm publish` of its own
-      # (@napi-rs/cli, src/api/pre-publish.ts), which takes no tag argument but
-      # does inherit the environment. Setting the config env var covers the
-      # siblings and the main package in one place.
+          merge-multiple: true
+      - name: Show what will be published
+        run: |
+          ls -la ddk-ts/dist ddk-ts/platform
+          for d in ddk-ts/platform/*/; do echo "--- $d"; ls -la "$d"; done
+      # NPM_CONFIG_TAG rather than `npm publish --tag`: publish-release.mjs
+      # publishes each platform package with a bare `npm publish` of its own,
+      # which takes no tag argument but does inherit the environment. Setting the
+      # config env var covers the platform packages and the main package at once.
       #
       # Without it every publish lands on `latest` — npm does not infer a tag
       # from a prerelease version — so a `v1.0.0-rc1` tag would make the RC the
       # default install for everyone.
-      - name: Publish (siblings via prepublishOnly, then main)
+      #
+      # Platform packages go FIRST; the main package's optionalDependencies point
+      # at them, and npm resolves those at install time. publish-release.mjs
+      # enforces the order and injects the optionalDependencies.
+      - name: Publish (platform packages, then main)
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
@@ -236,7 +229,7 @@ jobs:
           case "$VERSION" in *-*) export NPM_CONFIG_TAG=next ;; *) export NPM_CONFIG_TAG=latest ;; esac
           echo "Publishing $VERSION to dist-tag $NPM_CONFIG_TAG"
           npm config set provenance true
-          npm publish --access public
+          node scripts/publish-release.mjs
 
   # ddk-rn ships PREBUILT native binaries so that `npm install` never compiles
   # anything on a consumer's machine. That requires two build hosts: the iOS

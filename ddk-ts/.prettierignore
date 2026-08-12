@@ -1,19 +1,13 @@
-target
-.yarn
-index.js
+# Generated: ubrn writes src/ on every `pnpm generate`, and it runs prettier
+# over its own output. Checking it here would only ever produce a loop — prettier
+# rewrites a file that the next generation puts straight back. Same reason
+# ddk-rn's eslintIgnore lists its generated files.
+src
 
-# Build output, not source. `napi build` writes dist/ (the .node/.wasm binaries
-# plus generated index.js/index.d.ts and the wasi glue), and Vite writes
-# example-browser/dist. Both are gitignored, so prettier was reformatting files
-# that are regenerated on every build — and reporting them as failures.
+# Build output. tsc writes dist/ and build-release.mjs writes platform/; both
+# are gitignored, and prettier was reporting them as failures.
 dist
-example-browser/dist
+platform
 
 # Lockfile: pnpm owns the formatting.
 pnpm-lock.yaml
-
-package-template.wasi-browser.js
-package-template.wasi.cjs
-wasi-worker-browser.mjs
-wasi-worker.mjs
-.yarnrc.yml

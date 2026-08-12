@@ -1,0 +1,16 @@
+# ubrn project config for ddk-ts.
+#
+# The N-API generator runs against the compiled ddk-ffi cdylib and writes the
+# TypeScript in src/. scripts/build-release.mjs passes the same values on the
+# command line, so this file documents the wiring rather than driving the build.
+#
+# Note that the *bindings* config (logLevel, strictByteArrays, …) does not live
+# here: ubrn's TS pipeline auto-discovers ddk-ffi/uniffi.toml and ignores
+# --config, so that file applies to the Node bindings and the React Native
+# bindings alike.
+rust:
+  directory: ../ddk-ffi
+  manifestPath: Cargo.toml
+
+bindings:
+  ts: src

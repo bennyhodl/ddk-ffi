@@ -1,14 +1,24 @@
 {
   "name": "@bennyblader/ddk-ts",
   "version": "1.0.0-rc1",
-  "description": "dlcdevkit typescript bindings",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "browser": "dist/browser.js",
-  "repository": "https://github.com/bennyhodl/ddk-ffi",
+  "description": "dlcdevkit typescript bindings, generated from ddk-ffi via uniffi",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bennyhodl/ddk-ffi.git"
+  },
   "license": "MIT",
   "keywords": [
-    "napi-rs",
+    "uniffi",
     "rust",
     "rust-dlc",
     "ddk",
@@ -17,15 +27,6 @@
   "files": [
     "dist/"
   ],
-  "napi": {
-    "binaryName": "ddk-ts",
-    "packageName": "@bennyblader/ddk-ts",
-    "targets": [
-      "aarch64-apple-darwin",
-      "x86_64-unknown-linux-gnu",
-      "wasm32-wasip1-threads"
-    ]
-  },
   "engines": {
     "node": ">= 18"
   },
@@ -34,42 +35,22 @@
     "access": "public"
   },
   "scripts": {
-    "artifacts": "napi artifacts",
-    "build": "napi build --platform --release --js index.js --dts index.d.ts --output-dir dist",
-    "build:darwin-arm64": "napi build --platform --release --js index.js --dts index.d.ts --output-dir dist --target aarch64-apple-darwin",
-    "build:linux-x64": "napi build --platform --release --js index.js --dts index.d.ts --output-dir dist --target x86_64-unknown-linux-gnu",
-    "build:wasm": "napi build --platform --release --js index.js --dts index.d.ts --output-dir dist --target wasm32-wasip1-threads",
-    "build:debug": "napi build --platform --js index.js --dts index.d.ts --output-dir dist",
-    "build:all": "napi build --release --js index.js --dts index.d.ts --output-dir dist --target aarch64-apple-darwin --target x86_64-unknown-linux-gnu",
-    "prepublishOnly": "napi prepublish -t npm",
-    "format": "run-p format:prettier format:rs",
-    "format:prettier": "prettier . -w",
-    "format:rs": "cargo fmt",
-    "format:check": "run-p format:check:prettier format:check:rs",
-    "format:check:prettier": "prettier . --check",
-    "format:check:rs": "cargo fmt -- --check",
+    "generate": "node scripts/build-release.mjs --local",
+    "generate:debug": "node scripts/build-release.mjs --local --debug",
+    "build": "node scripts/build-release.mjs",
+    "format": "prettier . -w",
+    "format:check": "prettier . --check",
     "test": "vitest run",
     "test:watch": "vitest watch",
-    "test:all": "pnpm verify && cargo test && pnpm test",
-    "verify": "node scripts/verify-parity.cjs && node scripts/verify-types.cjs",
-    "verify:parity": "node scripts/verify-parity.cjs",
-    "verify:types": "node scripts/verify-types.cjs",
-    "version": "napi version"
+    "prepublishOnly": "node scripts/verify-package.mjs"
+  },
+  "dependencies": {
+    "@ubjs/core": "0.31.0-3",
+    "@ubjs/node": "0.31.0-3"
   },
   "devDependencies": {
-    "@emnapi/core": "^1.11.2",
-    "@emnapi/runtime": "^1.11.2",
-    "@napi-rs/cli": "~3.7.4",
-    "@napi-rs/wasm-runtime": "^1.1.6",
-    "@tybys/wasm-util": "^0.10.0",
     "@types/node": "^20.0.0",
-    "ava": "^6.4.1",
-    "chalk": "^5.4.1",
-    "emnapi": "^1.11.2",
-    "lint-staged": "^16.1.2",
-    "npm-run-all2": "^8.0.4",
     "prettier": "^3.6.2",
-    "tinybench": "^4.0.1",
     "tsx": "^4.20.4",
     "typescript": "^5.8.3",
     "vitest": "^3.2.4"
@@ -84,10 +65,5 @@
   "workspaces": [
     "example"
   ],
-  "packageManager": "pnpm@10.14.0",
-  "optionalDependencies": {
-    "@bennyblader/ddk-ts-darwin-arm64": "0.3.43",
-    "@bennyblader/ddk-ts-linux-x64-gnu": "0.3.43",
-    "@bennyblader/ddk-ts-wasm32-wasi": "0.3.43"
-  }
+  "packageManager": "pnpm@10.14.0"
 }

@@ -27,12 +27,11 @@ Desktop.ini
 # Rust/Cargo
 # ====================
 target/
-# Both crates ship compiled native artifacts (xcframework, .node, jniLibs), so
-# their lockfiles are committed for reproducible builds. Stray copies (e.g. a
-# stale ddk-rn/ddk-ffi) stay ignored.
+# ddk-ffi ships compiled native artifacts (xcframework, cdylib, jniLibs), so its
+# lockfile is committed for reproducible builds. It is the only Rust crate in the
+# repo; stray copies (e.g. a stale ddk-rn/ddk-ffi) stay ignored.
 Cargo.lock
 !/ddk-ffi/Cargo.lock
-!/ddk-ts/Cargo.lock
 **/*.rs.bk
 *.pdb
 
@@ -141,6 +140,8 @@ ddk-rn/ddk-ffi/
 # Release artifacts
 release-archives/
 release-artifacts/
+# One assembled npm package per platform, built by ddk-ts/scripts/build-release.mjs.
+ddk-ts/platform/
 
 # Ruby
 .bundle/

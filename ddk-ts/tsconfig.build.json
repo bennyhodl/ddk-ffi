@@ -1,0 +1,22 @@
+{
+  // Compiles the generated bindings in src/ to the ESM the package ships.
+  //
+  // NodeNext keeps `import.meta.url` intact — the generated resolver needs it to
+  // locate the platform package — which makes this package ESM-only. A CJS build
+  // would break resolveLibPath, so there is deliberately no dual build.
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "strict": true,
+    "skipLibCheck": true
+  },
+  "include": ["src/**/*.ts"]
+}
