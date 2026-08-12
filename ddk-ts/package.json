@@ -1,6 +1,6 @@
 {
   "name": "@bennyblader/ddk-ts",
-  "version": "1.0.0-rc1",
+  "version": "1.0.0-rc2",
   "description": "dlcdevkit typescript bindings, generated from ddk-ffi via uniffi",
   "type": "module",
   "main": "./dist/index.js",
