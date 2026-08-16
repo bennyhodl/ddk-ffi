@@ -6,7 +6,7 @@
 
 The whole DLC lifecycle now runs on device: build an offer, accept it, fund it, sign it, and settle it — either the CET an oracle attestation selects or the refund once its locktime passes. Contracts can also be spliced, rolling one into another that spends its funding output.
 
-Nothing is persisted. Every transaction is rebuilt from the offer/accept/sign wire messages at the moment it is needed, so there is no contract store to keep in sync, and funding secret keys stay in Rust behind a `ContractKeyProvider` and never cross the FFI boundary. Either party can settle on its own. Built on the published `ddk` / `ddk-dlc` / `ddk-messages` 2.0.0-rc.1 crates.
+Nothing is persisted. Every transaction is rebuilt from the offer/accept/sign wire messages at the moment it is needed, so there is no contract store to keep in sync, and funding secret keys stay in Rust behind a `ContractKeyProvider` and never cross the FFI boundary. Either party can settle on its own. Built on the published `ddk` / `ddk-dlc` / `ddk-messages` 2.0.0-rc.2 crates.
 
 ### Installing no longer builds anything
 
@@ -22,6 +22,7 @@ CI installs the example app on an iOS simulator and an Android emulator and driv
 
 - **Free functions are now record methods.** `isDustOutput` → `TxOutput.isDust`; `getChangeOutputAndFees` → `PartyParams.changeOutputAndFees`; `verifyCetAdaptorSigFromOracleInfo` → `AdaptorSignature.verifyFromOracleInfo`; and nine transaction functions (`addSignatureToTransaction`, `verifyFundTxSignature`, `getRawFundingTransactionInputSignature`, `signFundTransactionInput`, `signMultiSigInput`, `signCet`, `createCetAdaptorSignatureFromOracleInfo`, `getCetAdaptorSignatureInputs`, `getCetSighash`) → `Transaction.*`. This comes with UniFFI 0.29 → 0.31, a migration from UDL to proc-macros, and library-based binding generation — the Rust source is now the single source of truth for the interface.
 - **`DLCError` is structured.** `InvalidArgument`/`Secp256k1Error` carry a typed `message` and `KeyError` carries a nested `ExtendedKey` enum, where every variant used to be a flat string.
+- **`DlcTransactions.fundingScriptPubkey` is now `fundingWitnessScript`.** The field holds the funding witness script, not a script pubkey; the name follows the same rename in `ddk-dlc` 2.0.0-rc.2. The bytes are unchanged.
 - **Bytes are `Uint8Array`, not `ArrayBuffer`.** Every `Vec<u8>` argument and return type moves. This comes from `strictByteArrays` in `ddk-ffi/uniffi.toml`, which was turned on for `@bennyblader/ddk-ts` — a Node `Buffer` is a `Uint8Array`, so its consumers pass byte arguments unchanged — and ubrn reads that one file for every binding it generates. The two packages now agree on the byte type, which they never did before.
 
 ## [0.1.4] - 2025-01-15

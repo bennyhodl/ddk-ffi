@@ -1831,7 +1831,7 @@ export type DlcTransactions = {
   fund: Transaction
   cets: Array<Transaction>
   refund: Transaction
-  fundingScriptPubkey: Uint8Array
+  fundingWitnessScript: Uint8Array
 }
 
 /**
@@ -1857,21 +1857,21 @@ const FfiConverterTypeDlcTransactions = (() => {
         fund: FfiConverterTypeTransaction.read(from),
         cets: FfiConverterSequenceTypeTransaction.read(from),
         refund: FfiConverterTypeTransaction.read(from),
-        fundingScriptPubkey: FfiConverterUint8Array.read(from),
+        fundingWitnessScript: FfiConverterUint8Array.read(from),
       }
     }
     write(value: TypeName, into: RustBuffer): void {
       FfiConverterTypeTransaction.write(value.fund, into)
       FfiConverterSequenceTypeTransaction.write(value.cets, into)
       FfiConverterTypeTransaction.write(value.refund, into)
-      FfiConverterUint8Array.write(value.fundingScriptPubkey, into)
+      FfiConverterUint8Array.write(value.fundingWitnessScript, into)
     }
     allocationSize(value: TypeName): number {
       return (
         FfiConverterTypeTransaction.allocationSize(value.fund) +
         FfiConverterSequenceTypeTransaction.allocationSize(value.cets) +
         FfiConverterTypeTransaction.allocationSize(value.refund) +
-        FfiConverterUint8Array.allocationSize(value.fundingScriptPubkey)
+        FfiConverterUint8Array.allocationSize(value.fundingWitnessScript)
       )
     }
   }

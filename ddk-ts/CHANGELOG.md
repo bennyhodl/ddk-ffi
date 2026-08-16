@@ -12,6 +12,7 @@ Adding a function to ddk-ffi is now the whole job. It appears here on the next `
 
 - **Twelve operations gained a record namespace**, matching `@bennyblader/ddk-rn` exactly: `isDust` → `TxOutput.isDust`, `changeOutputAndFees` → `PartyParams.changeOutputAndFees`, `verifyFromOracleInfo` → `AdaptorSignature.verifyFromOracleInfo`, and nine more on `Transaction.*` (`addSignature`, `verifyFundSignature`, `rawFundingInputSignature`, `signFundInput`, `signMultiSigInput`, `signCet`, `cetAdaptorSignatureFromOracleInfo`, `cetAdaptorSignatureInputs`, `cetSighash`). The receiver is still the first argument, so each call site takes a prefix and nothing else. The other 39 names are unchanged.
 - **Byte returns are `Uint8Array`, not `Buffer`.** Arguments are unaffected — a Buffer _is_ a Uint8Array — so only code calling Buffer methods on a return value changes: `Buffer.from(ret.buffer, ret.byteOffset, ret.byteLength)` wraps one zero-copy.
+- **`DlcTransactions.fundingScriptPubkey` is now `fundingWitnessScript`.** The field holds the funding witness script, not a script pubkey; the name follows the same rename in `ddk-dlc` 2.0.0-rc.2. The bytes are unchanged.
 - **Errors carry `error.tag`, not `error.code`**, and are typed variant classes: the message is in `error.inner.message`, and `ContractError_Tags` / `DlcError_Tags` enumerate the variants.
 - **ESM-only.** `require()` no longer works: the generated resolver locates its platform package through `import.meta.url`, which CommonJS has no equivalent for.
 - **No browser build.** The WASI/emnapi fallback (`@bennyblader/ddk-ts-wasm32-wasi`, `example-browser/`) went with napi-rs — the N-API generator cannot produce it, since its runtime dlopens a native cdylib. ubrn's separate `generate wasm` path restores browser support from this same crate and is tracked as follow-up work.
@@ -20,7 +21,7 @@ Adding a function to ddk-ffi is now the whole job. It appears here on the next `
 
 The whole DLC lifecycle now runs in Node: build an offer, accept it, fund it, sign it, and settle it — either the CET an oracle attestation selects or the refund once its locktime passes. Contracts can also be spliced, rolling one into another that spends its funding output.
 
-Nothing is persisted. Every transaction is rebuilt from the offer/accept/sign wire messages at the moment it is needed, so there is no contract store to keep in sync, and funding secret keys stay in Rust behind a `ContractKeyProvider` and never cross into JS. Either party can settle on its own. Built on the published `ddk` / `ddk-dlc` 2.0.0-rc.1 crates, and in parity with `@bennyblader/ddk-rn`.
+Nothing is persisted. Every transaction is rebuilt from the offer/accept/sign wire messages at the moment it is needed, so there is no contract store to keep in sync, and funding secret keys stay in Rust behind a `ContractKeyProvider` and never cross into JS. Either party can settle on its own. Built on the published `ddk` / `ddk-dlc` 2.0.0-rc.2 crates, and in parity with `@bennyblader/ddk-rn`.
 
 ### The published package actually loads
 
