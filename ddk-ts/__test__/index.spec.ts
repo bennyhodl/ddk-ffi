@@ -251,7 +251,7 @@ describe('DDK TypeScript Bindings', () => {
     // expect(dlcTxs.fund).toBeDefined()
     // expect(dlcTxs.cets).toBeDefined()
     // expect(dlcTxs.refund).toBeDefined()
-    // expect(dlcTxs.fundingScriptPubkey).toBeDefined()
+    // expect(dlcTxs.fundingWitnessScript).toBeDefined()
     // // Validate fund transaction
     // expect(dlcTxs.fund.version).toBeDefined()
     // expect(typeof dlcTxs.fund.lockTime).toBe('number')
@@ -270,7 +270,7 @@ describe('DDK TypeScript Bindings', () => {
     // expect(typeof dlcTxs.refund.lockTime).toBe('number')
     // expect(dlcTxs.refund.lockTime).toBe(100) // Should match refundLocktime
     // // Validate funding script
-    // expect(Buffer.isBuffer(dlcTxs.fundingScriptPubkey)).toBe(true)
+    // expect(Buffer.isBuffer(dlcTxs.fundingWitnessScript)).toBe(true)
     expect(true).toBe(true)
   })
 

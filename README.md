@@ -482,7 +482,7 @@ interface DlcTransactions {
   fund: Transaction;
   cets: Transaction[];
   refund: Transaction;
-  fundingScriptPubkey: Bytes;
+  fundingWitnessScript: Bytes;
 }
 
 interface OracleInfo {

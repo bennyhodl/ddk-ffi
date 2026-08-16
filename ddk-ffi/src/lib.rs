@@ -192,7 +192,7 @@ pub struct DlcTransactions {
     pub fund: Transaction,
     pub cets: Vec<Transaction>,
     pub refund: Transaction,
-    pub funding_script_pubkey: Vec<u8>,
+    pub funding_witness_script: Vec<u8>,
 }
 
 #[derive(Clone, uniffi::Record)]
@@ -784,7 +784,7 @@ pub fn rust_dlc_transactions_to_uniffi(dlc_txs: RustDlcTransactions) -> DlcTrans
         fund: btc_tx_to_transaction(&dlc_txs.fund),
         cets: dlc_txs.cets.iter().map(btc_tx_to_transaction).collect(),
         refund: btc_tx_to_transaction(&dlc_txs.refund),
-        funding_script_pubkey: dlc_txs.funding_script_pubkey.to_bytes(),
+        funding_witness_script: dlc_txs.funding_witness_script.to_bytes(),
     }
 }
 

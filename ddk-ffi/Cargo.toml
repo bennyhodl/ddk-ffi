@@ -14,9 +14,9 @@ crate-type = ["cdylib", "staticlib", "rlib"]
 
 [dependencies]
 uniffi = { version = "=0.31.0", features = ["cli"] }
-ddk = { version = "2.0.0-rc.1", default-features = false }
-ddk-dlc = { version = "2.0.0-rc.1", features = ["std", "use-serde"] }
-ddk-messages = { version = "2.0.0-rc.1", features = ["std", "use-serde"] }
+ddk = { version = "2.0.0-rc.2", default-features = false }
+ddk-dlc = { version = "2.0.0-rc.2", features = ["std", "use-serde"] }
+ddk-messages = { version = "2.0.0-rc.2", features = ["std", "use-serde"] }
 lightning = { version = "0.2", features = ["std"] }
 bitcoin = "0.32.7"
 thiserror = "2.0.12"
