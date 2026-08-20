@@ -359,6 +359,37 @@ ts-test:
     cd {{justfile_directory()}}/ddk-ts && pnpm test
 
 # ====================
+# BAL compatibility suite (compat/)
+# ====================
+#
+# Tests ddk's wire messages and contract lifecycle against
+# bitcoin-abstraction-layer + @node-dlc — the stack lygos is migrating away
+# from. The BAL side installs from npm (latest published @atomicfinance
+# release + the ddk-ts 0.3.42 engine production pairs it with); locally it
+# only needs a built ddk-ts (`just ts-build`). The lifecycle/splice suites use
+# a regtest bitcoind: a throwaway node is spawned automatically when none is
+# reachable; point DDK_COMPAT_RPC_URL/_USER/_PASS at an existing one (e.g. the
+# lygos-dev stack on :18443) to reuse it instead. Details in compat/README.md.
+
+# Install the compat suite's dependencies
+compat-install:
+    cd {{justfile_directory()}}/compat && pnpm install
+
+# Full compat suite: message parity + lifecycle + splice + vectors
+compat-test:
+    cd {{justfile_directory()}}/compat && pnpm test
+
+# Offline suites only — message parity + committed vectors, no bitcoind
+compat-test-messages:
+    cd {{justfile_directory()}}/compat && pnpm test:messages
+
+# Regenerate the committed compat vectors AND their ddk-rn example copies
+# (example/src/compatVectors.ts + compatReplay.ts). Run after a Rust core
+# change makes compat/__test__/vectors.spec.ts fail, then commit all three.
+compat-vectors:
+    cd {{justfile_directory()}}/compat && pnpm vectors
+
+# ====================
 # Release
 # ====================
 

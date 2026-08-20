@@ -1,0 +1,58 @@
+# E2E: BAL compatibility replay on device. Taps the compat button, which runs
+# compat/src/replay.ts (copied verbatim into the example) against the committed
+# vectors in compatVectors.ts through the real JSI -> Rust bindings, and
+# byte-compares every deterministic artifact — funding PSBT, funding txs,
+# contract ids, CET, refund, splice input — against values that were validated
+# against bitcoin-abstraction-layer's @node-dlc codec when the vectors were
+# generated (see compat/ at the repo root). A green run proves the on-device
+# bindings produce BAL-compatible bytes for the enter / close / splice
+# lifecycle.
+appId: ddkrn.example
+---
+# Same retry + ANR-dialog dismissal wrapper as contract-flow.yaml — see the
+# long comment there for why it wraps everything and why iOS skips it.
+- retry:
+    maxRetries: 1
+    commands:
+      - runFlow:
+          when:
+            visible:
+              id: 'android:id/aerr_close'
+          commands:
+            - tapOn:
+                id: 'android:id/aerr_close'
+
+      - launchApp
+
+      # Cold start + Hermes bundle load; extendedWaitUntil because `timeout`
+      # is not an element-selector property (see contract-flow.yaml).
+      - extendedWaitUntil:
+          visible:
+            text: 'DDK · DLC'
+          timeout: 60000
+
+      # The compat button sits below the demo results; scroll to it.
+      - scrollUntilVisible:
+          element:
+            id: 'run-compat'
+      - tapOn:
+          id: 'run-compat'
+
+      # The replay runs two full contracts (dual-funded + spliced successor)
+      # natively; generous timeout for the crypto work.
+      - scrollUntilVisible:
+          element:
+            id: 'compat-success'
+          timeout: 60000
+      # `(?i)` because the card title is styled with textTransform: uppercase
+      # and Maestro full-matches `text` as a regex (see contract-flow.yaml).
+      - assertVisible: '(?i)✓ BAL compat verified'
+      # The artifact count is asserted loosely — the exact set is pinned by
+      # compat/__test__/vectors.spec.ts; here it only needs to be non-empty.
+      - assertVisible: '.*[0-9]+ of [0-9]+.*'
+      - assertVisible: '.*oracle attested "repaid".*'
+      - assertVisible: '.*settled "up".*'
+
+      # And the compat error card must never have appeared.
+      - assertNotVisible:
+          id: 'compat-error'

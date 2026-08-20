@@ -1,0 +1,35 @@
+{
+  "name": "@bennyblader/ddk-bal-compat",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Compatibility test suite: ddk-ts / ddk-rn wire messages and contract lifecycle against bitcoin-abstraction-layer (BAL) + @node-dlc",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:messages": "vitest run __test__/messages.spec.ts __test__/vectors.spec.ts",
+    "test:lifecycle": "vitest run __test__/lifecycle.spec.ts __test__/splice.spec.ts",
+    "vectors": "tsx scripts/generate-vectors.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@atomicfinance/bitcoin-ddk-provider": "4.3.6",
+    "@atomicfinance/bitcoin-js-wallet-provider": "4.3.6",
+    "@atomicfinance/bitcoin-rpc-provider": "4.3.6",
+    "@atomicfinance/client": "4.3.6",
+    "@atomicfinance/types": "4.3.6",
+    "@bennyblader/ddk-ts": "link:../ddk-ts",
+    "@node-dlc/bitcoin": "1.2.1",
+    "@node-dlc/messaging": "1.2.1",
+    "@noble/curves": "^1.6.0",
+    "bal-ddk-ts": "npm:@bennyblader/ddk-ts@0.3.42",
+    "bitcoin-network": "0.1.0",
+    "bitcoinjs-lib": "6.1.7",
+    "bs58check": "^2.1.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  }
+}

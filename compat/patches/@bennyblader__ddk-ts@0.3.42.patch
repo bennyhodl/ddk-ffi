@@ -1,0 +1,12 @@
+diff --git a/package.json b/package.json
+index 7aa3729a3d54ced75ccbaacb04ebb825bef39984..d00cd565cb502a286966d11aaf67fe15f6d641db 100644
+--- a/package.json
++++ b/package.json
+@@ -4,7 +4,6 @@
+   "description": "dlcdevkit typescript bindings",
+   "main": "dist/index.js",
+   "types": "dist/index.d.ts",
+-  "type": "module",
+   "repository": "https://github.com/bennyhodl/ddk-ffi",
+   "license": "MIT",
+   "keywords": [
