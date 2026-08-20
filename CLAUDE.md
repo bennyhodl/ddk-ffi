@@ -337,10 +337,55 @@ platform as `@bennyblader/ddk-ts-<node-triple>` packages, pulled in through
   `wasm32-unknown-unknown`) restores it from this same crate; it is follow-up
   work, not a dead end.
 
+## BAL compatibility suite (`compat/`)
+
+`compat/` tests ddk's contract/message API against **bitcoin-abstraction-layer
+(BAL) + @node-dlc 1.2.1** — the stack lygos is migrating from. Full docs in
+`compat/README.md`; the parts that bite:
+
+- Everything installs from npm: the BAL party is the **latest published
+  release** (`@atomicfinance/* 4.3.6`) paired with `@bennyblader/ddk-ts@0.3.42`
+  as its engine — the exact combination production ships. Only a current
+  `just ts-build` is needed locally. Two wiring details: 0.3.42 is installed
+  under the **`bal-ddk-ts` alias** (it must coexist with `link:../ddk-ts`),
+  and it carries a **pnpm patch** (`compat/patches/`, wired in
+  `compat/pnpm-workspace.yaml`) removing its mislabeled `"type": "module"` —
+  its dist is CJS; same patch orange-grove ships. `@node-dlc` is pinned to
+  exactly `1.2.1` (what all BAL packages pin) so message-class identity is
+  shared with BAL's internals — do not loosen those pins.
+- `just compat-test` runs everything (message byte-parity, cross-party
+  enter/close/splice on regtest, vector guard). Lifecycle suites spawn a
+  throwaway regtest bitcoind on :18543 unless `DDK_COMPAT_RPC_URL` points at
+  one. `just compat-test-messages` is the offline subset.
+- **Vectors couple three files.** `just compat-vectors` rewrites
+  `compat/vectors/compat-vectors.json` AND the generated
+  `ddk-rn/example/src/compatVectors.ts` + `compatReplay.ts` (a verbatim copy
+  of `compat/src/replay.ts`, which is dependency-free and parameterized by the
+  ddk module exactly so device and Node run identical code). If
+  `compat/__test__/vectors.spec.ts` fails after a Rust change, regenerate and
+  commit all three. Both files are in ddk-rn's `eslintIgnore` — generated, do
+  not hand-edit or "fix" lint there.
+- **Adaptor signatures are randomized** (secp256k1-zkp), so accept/sign
+  messages are NOT byte-reproducible; the vectors commit the transcript as
+  input and byte-compare only the deterministic derivations (PSBT, funding
+  txs, contract ids, CET, refund, splice input).
+- Two BAL divergences are worked around in `compat/src/cross.ts` and pinned by
+  tests that FAIL when BAL fixes them (that is the signal to delete the
+  workaround): (1) BAL's `acceptDlcOffer` puts `sha256(offer)` in
+  `temporaryContractId` instead of echoing the offer's, which spec-conforming
+  counterparties reject; (2) for splice (DLC) funding inputs, BAL requires
+  `[signature, pubkey]` witness elements in the sign message where ddk emits
+  `[signature]`.
+- The on-device half: the example app's "Run the BAL compat replay" button +
+  `.maestro/compat-flow.yaml` replay the committed vectors through the real
+  JSI bindings — that is ddk-rn's compat coverage, since JSI cannot run under
+  Node.
+
 ## Testing
 
 - Rust tests: `cargo test` (in ddk-ffi/)
 - TypeScript tests: `pnpm test` (in ddk-rn/)
+- BAL compatibility: `just compat-test` (see above)
 - Integration testing via example app
 
 ### Run the Maestro E2E locally before pushing

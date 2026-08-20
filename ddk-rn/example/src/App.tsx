@@ -25,6 +25,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import * as ddk from '@bennyblader/ddk-rn';
 import {
   ContractKeyProvider,
   chainHashFromNetwork,
@@ -44,6 +45,9 @@ import {
   signContractRefund,
   version,
 } from '@bennyblader/ddk-rn';
+
+import { runDdkReplay } from './compatReplay';
+import compatVectors from './compatVectors';
 
 // Fixtures (generated from the ddk-ffi Rust tests). The offerer's wpkh descriptor
 // drives both its wallet (funding-input signing) and, via fromDescriptor, its DLC
@@ -103,10 +107,57 @@ function temporaryContractId(marker: number): Uint8Array {
   return new Uint8Array(32).fill(marker);
 }
 
+type CompatResult = {
+  verifiedArtifacts: number;
+  contractId: string;
+  spliceContractId: string;
+  attestedOutcome: string;
+  spliceOutcome: string;
+  generatedWith: string;
+};
+
 export default function App() {
   const [result, setResult] = useState<DemoResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [compatResult, setCompatResult] = useState<CompatResult | null>(null);
+  const [compatError, setCompatError] = useState<string | null>(null);
+  const [compatLoading, setCompatLoading] = useState(false);
+
+  // Replays the committed BAL/@node-dlc-verified transcript through the
+  // ddk-rn bindings and byte-compares every deterministic artifact. The
+  // vectors were cross-checked against bitcoin-abstraction-layer's message
+  // codec at generation time (see compat/ in the repo root), so a green run
+  // here proves the on-device bindings produce BAL-compatible bytes.
+  async function runCompat() {
+    setCompatLoading(true);
+    setCompatError(null);
+    setCompatResult(null);
+    try {
+      const produced = runDdkReplay(ddk, compatVectors);
+      const mismatches: string[] = [];
+      for (const [key, expected] of Object.entries(compatVectors.expected)) {
+        if (produced[key] !== expected) {
+          mismatches.push(key);
+        }
+      }
+      if (mismatches.length > 0) {
+        throw new Error(`artifact mismatch: ${mismatches.join(', ')}`);
+      }
+      setCompatResult({
+        verifiedArtifacts: Object.keys(compatVectors.expected).length,
+        contractId: compatVectors.expected.contractIdHex,
+        spliceContractId: compatVectors.expected.contractId2Hex,
+        attestedOutcome: compatVectors.contract.attestedOutcome,
+        spliceOutcome: compatVectors.splice.attestedOutcome,
+        generatedWith: `ddk-ts ${compatVectors.meta.ddkTsVersion} · node-dlc ${compatVectors.meta.nodeDlcVersion}`,
+      });
+    } catch (e) {
+      setCompatError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setCompatLoading(false);
+    }
+  }
 
   async function runDemo() {
     setLoading(true);
@@ -356,6 +407,67 @@ export default function App() {
             </View>
           </>
         )}
+
+        <Pressable
+          testID="run-compat"
+          accessibilityLabel="Run the BAL compat replay"
+          style={({ pressed }) => [
+            styles.button,
+            styles.compatButton,
+            pressed && styles.buttonPressed,
+          ]}
+          disabled={compatLoading}
+          onPress={runCompat}
+        >
+          {compatLoading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.compatButtonText}>
+              Run the BAL compat replay
+            </Text>
+          )}
+        </Pressable>
+
+        {compatError != null && (
+          <View testID="compat-error" style={[styles.card, styles.errorCard]}>
+            <Text style={styles.cardTitle}>Compat error</Text>
+            <Text style={styles.mono}>{compatError}</Text>
+          </View>
+        )}
+
+        {compatResult != null && (
+          <View
+            testID="compat-success"
+            style={[styles.card, styles.successCard]}
+          >
+            <Text style={styles.cardTitle}>✓ BAL compat verified</Text>
+            <Field
+              label="Byte-identical artifacts"
+              value={`${compatResult.verifiedArtifacts} of ${compatResult.verifiedArtifacts}`}
+            />
+            <Field label="Contract id" value={compatResult.contractId} mono />
+            <Field
+              label={`Splice contract id · settled "${compatResult.spliceOutcome}"`}
+              value={compatResult.spliceContractId}
+              mono
+            />
+            <Field
+              label="Loan contract settled"
+              value={`oracle attested "${compatResult.attestedOutcome}"`}
+            />
+            <Field
+              label="Vectors verified against"
+              value={compatResult.generatedWith}
+            />
+            <Text style={styles.note}>
+              The committed transcript was validated against
+              bitcoin-abstraction-layer's @node-dlc codec at generation time;
+              this device reproduced every deterministic artifact from it —
+              funding PSBT, funding txs, contract ids, CET, refund, and the
+              splice input — byte for byte.
+            </Text>
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -399,6 +511,8 @@ const styles = StyleSheet.create({
   },
   buttonPressed: { opacity: 0.8 },
   buttonText: { color: '#0b0f1a', fontSize: 16, fontWeight: '700' },
+  compatButton: { backgroundColor: '#1e2942' },
+  compatButtonText: { color: '#e6e9ef', fontSize: 16, fontWeight: '700' },
   card: {
     backgroundColor: '#131a2a',
     borderRadius: 14,

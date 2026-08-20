@@ -164,7 +164,9 @@
     "src/ddk_ffi.ts",
     "src/ddk_ffi-ffi.ts",
     "src/NativeDdkRn.ts",
-    "src/index.tsx"
+    "src/index.tsx",
+    "example/src/compatReplay.ts",
+    "example/src/compatVectors.ts"
   ],
   "prettier": {
     "quoteProps": "consistent",
