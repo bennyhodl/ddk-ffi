@@ -357,6 +357,15 @@ platform as `@bennyblader/ddk-ts-<node-triple>` packages, pulled in through
   enter/close/splice on regtest, vector guard). Lifecycle suites spawn a
   throwaway regtest bitcoind on :18543 unless `DDK_COMPAT_RPC_URL` points at
   one. `just compat-test-messages` is the offline subset.
+- **The full suite runs in CI, in the `check` job** — including the regtest
+  half. It lives there because `pnpm generate:debug` has already built the
+  cdylib and symlinked the platform package that `resolveLibPath()` needs, and
+  `compat/` resolves it through `link:../ddk-ts`. Ubuntu has no bitcoind
+  package, so Core comes from a bitcoincore.org tarball pinned **and
+  checksummed** by `BITCOIN_VERSION` / `BITCOIN_SHA256` in `ci.yml`; bump the
+  two together and keep them on the version you run locally. Same reasoning as
+  the NDK and Maestro pins, with one extra edge: an unpinned consensus node
+  means CI proves compatibility against whatever Core released last.
 - **Vectors couple three files.** `just compat-vectors` rewrites
   `compat/vectors/compat-vectors.json` AND the generated
   `ddk-rn/example/src/compatVectors.ts` + `compatReplay.ts` (a verbatim copy

@@ -60,6 +60,14 @@ env:
   # ("Unknown Property"), which silently changed what the flow check could
   # detect. Bump deliberately, and re-run `just e2e-flows` locally when you do.
   MAESTRO_VERSION: "2.7.0"
+  # The compat suite's lifecycle/splice suites spawn a regtest bitcoind. Ubuntu
+  # ships no bitcoind package, so it comes from a bitcoincore.org tarball —
+  # pinned and checksummed for the same reason as everything above, plus one
+  # specific to consensus software: an unpinned node means a green run proves
+  # compatibility against whatever Core released last, not against what the
+  # suite was written for. Bump together with the checksum below.
+  BITCOIN_VERSION: "28.1"
+  BITCOIN_SHA256: "07f77afd326639145b9ba9562912b2ad2ccec47b8a305bd075b4f4cb127b7ed7"
 
 jobs:
   # ==========================================================================
@@ -141,6 +149,36 @@ jobs:
             echo "::error::ddk-ts/src is stale — run 'just ts-build' and commit the result"
             exit 1
           }
+
+      # ---- BAL compatibility (compat/) --------------------------------------
+      # Runs here rather than in its own job because the expensive prerequisite
+      # is already satisfied: `pnpm generate:debug` above builds the cdylib AND
+      # symlinks node_modules/@bennyblader/ddk-ts-<triple>, which is what
+      # resolveLibPath() needs. compat/ reaches it through `link:../ddk-ts`, so
+      # it tests the ddk-ts built from this commit. The BAL half is all npm.
+      - name: Install Bitcoin Core (for the regtest suites)
+        run: |
+          set -euo pipefail
+          tarball="bitcoin-${{ env.BITCOIN_VERSION }}-x86_64-linux-gnu.tar.gz"
+          curl -fsSLO "https://bitcoincore.org/bin/bitcoin-core-${{ env.BITCOIN_VERSION }}/$tarball"
+          echo "${{ env.BITCOIN_SHA256 }}  $tarball" | sha256sum --check --strict
+          tar xzf "$tarball"
+          # bitcoind only; the suite talks JSON-RPC and needs no other binary.
+          sudo install -m 0755 \
+            "bitcoin-${{ env.BITCOIN_VERSION }}/bin/bitcoind" /usr/local/bin/bitcoind
+          bitcoind --version | head -1
+
+      - name: Install compat deps
+        run: cd compat && pnpm install --frozen-lockfile
+
+      # The full suite, not `test:messages` — the regtest lifecycle and splice
+      # suites are the ones that prove ddk and BAL can actually fund and settle
+      # each other's contracts. global-setup.ts spawns its own throwaway node on
+      # :18543; when none is reachable it only warns, but the regtest suites then
+      # fail on the connection, so a broken bitcoind step surfaces as a red job
+      # rather than as suites that silently stopped running.
+      - name: BAL compatibility suite
+        run: cd compat && pnpm test
 
       # ---- ddk-rn (React Native) -------------------------------------------
       # The pnpm workspace covers `.` and `example`, and this is also what

@@ -105,6 +105,22 @@ into its own wallet (`ddk-compat`) and never touches other wallets.
   (`offerCollateral == totalCollateral`, no wire field), and ddk accepts a
   zero-input accepter.
 
+## CI
+
+The whole suite runs in the `check` job of `ci.yml` — the gate, so nothing else
+builds unless ddk and BAL still agree. It sits there rather than in a job of its
+own because the expensive prerequisite is already met: `pnpm generate:debug`
+builds the debug cdylib and symlinks `node_modules/@bennyblader/ddk-ts-<triple>`,
+which is what `resolveLibPath()` resolves through. `compat/` reaches that via
+`link:../ddk-ts`, so CI tests the ddk-ts built from the commit under test, while
+the BAL side installs from npm like any other dependency.
+
+Bitcoin Core is installed from a pinned, checksummed bitcoincore.org tarball
+(`BITCOIN_VERSION` / `BITCOIN_SHA256` in `ci.yml`) because Ubuntu packages no
+bitcoind. Pin them together, and prefer the version you run locally — an
+unpinned node would mean a green run proved compatibility against whatever Core
+shipped last rather than against what these suites were written for.
+
 ## What is intentionally out of scope
 
 - **Mutual close (`DlcClose`)**: a BAL-only extension message; ddk has no
@@ -113,7 +129,5 @@ into its own wallet (`ddk-compat`) and never touches other wallets.
 - **Numeric (digit-decomposition) contracts**: lygos uses enum contracts
   exclusively. `contractInfoPayouts` numeric rows exist in ddk, but no numeric
   lifecycle is exercised here.
-- **CI wiring**: everything installs from npm, so a CI job only needs
-  `pnpm install` in `compat/`, a `just ts-build`, and Bitcoin Core on the
-  runner (the offline suites need neither BAL setup nor bitcoind). Not wired
-  yet — run `just compat-test` locally before a release.
+- **Numeric contracts in CI**: see above — nothing numeric is exercised
+  anywhere, CI included.
