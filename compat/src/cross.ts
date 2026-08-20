@@ -75,6 +75,7 @@ export function spliceWitnessShimNeeded(): boolean {
  * with) so BAL can finalize. Nothing signs over the sign message, so the
  * rewrite invalidates nothing. Drop it when BAL derives the pubkey from the
  * DlcInput instead (spliceWitnessShimNeeded() pins the divergence).
+ * Upstream: AtomicFinance/bitcoin-abstraction-layer#216. Tracked here by #27.
  */
 export function shimSpliceSignForBal(sign: Uint8Array, balOffer: any): Uint8Array {
   const balSign = nodeDlc.DlcSign.deserialize(bytes(sign))
@@ -142,6 +143,7 @@ export async function enterDdkOfferBalAccept(
   // can be exercised; balAcceptTempIdBugPresent() lets a test pin the bug so
   // we notice when BAL fixes it and this patch can be dropped. Nothing signs
   // over this field, so patching does not invalidate any signature.
+  // Upstream: AtomicFinance/bitcoin-abstraction-layer#215. Tracked here by #26.
   if (!balAccept.temporaryContractId.equals(balOffer.temporaryContractId)) {
     balAcceptTempIdBug = true
     balAccept.temporaryContractId = balOffer.temporaryContractId

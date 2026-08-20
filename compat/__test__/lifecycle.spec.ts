@@ -133,6 +133,7 @@ describe('known BAL divergences', () => {
     // the offer's temporary contract id; the cross harness patches it (see
     // src/cross.ts). When BAL fixes this, this test fails on purpose: delete
     // it together with the patch in enterDdkOfferBalAccept.
+    // Upstream: AtomicFinance/bitcoin-abstraction-layer#215. Tracked here by #26.
     expect(balAcceptTempIdBugPresent()).toBe(true)
   })
 })

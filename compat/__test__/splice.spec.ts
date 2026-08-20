@@ -261,6 +261,7 @@ describe('known BAL divergences (splice)', () => {
     // The harness appends it (shimSpliceSignForBal). When BAL learns to
     // derive the pubkey from the DlcInput, this fails on purpose: remove the
     // shim with it.
+    // Upstream: AtomicFinance/bitcoin-abstraction-layer#216. Tracked here by #27.
     expect(spliceWitnessShimNeeded()).toBe(true)
   })
 })

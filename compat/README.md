@@ -85,11 +85,13 @@ into its own wallet (`ddk-compat`) and never touches other wallets.
    (ddk, rust-dlc) reject such accepts. The harness patches the field (nothing
    signs over it); `lifecycle.spec.ts › known BAL divergences` fails when BAL
    fixes it, which is the signal to drop the patch in `src/cross.ts`.
+   Upstream: AtomicFinance/bitcoin-abstraction-layer#215; tracked here by #26.
 2. **Splice funding-signature witness framing**: ddk puts `[signature]` in the
    sign message for a DLC input; BAL requires `[signature, publicKey]` and
    crashes on the one-element form (ddk itself accepts both — it reads only
    the first element). `shimSpliceSignForBal` in `src/cross.ts` appends the
    pubkey; `splice.spec.ts › known BAL divergences (splice)` pins it.
+   Upstream: AtomicFinance/bitcoin-abstraction-layer#216; tracked here by #27.
 
 ## Findings worth knowing (asserted, not worked around)
 

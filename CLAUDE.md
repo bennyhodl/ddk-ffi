@@ -384,7 +384,8 @@ platform as `@bennyblader/ddk-ts-<node-triple>` packages, pulled in through
   `temporaryContractId` instead of echoing the offer's, which spec-conforming
   counterparties reject; (2) for splice (DLC) funding inputs, BAL requires
   `[signature, pubkey]` witness elements in the sign message where ddk emits
-  `[signature]`.
+  `[signature]`. Both are filed upstream (AtomicFinance/bitcoin-abstraction-layer#215, AtomicFinance/bitcoin-abstraction-layer#216) and tracked here by
+  #26 and #27, which list exactly what to delete when each is fixed.
 - The on-device half: the example app's "Run the BAL compat replay" button +
   `.maestro/compat-flow.yaml` replay the committed vectors through the real
   JSI bindings — that is ddk-rn's compat coverage, since JSI cannot run under
