@@ -1,0 +1,2 @@
+patchedDependencies:
+  '@bennyblader/ddk-ts@0.3.42': patches/@bennyblader__ddk-ts@0.3.42.patch
