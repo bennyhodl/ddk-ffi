@@ -66,8 +66,8 @@ env:
   # specific to consensus software: an unpinned node means a green run proves
   # compatibility against whatever Core released last, not against what the
   # suite was written for. Bump together with the checksum below.
-  BITCOIN_VERSION: "28.1"
-  BITCOIN_SHA256: "07f77afd326639145b9ba9562912b2ad2ccec47b8a305bd075b4f4cb127b7ed7"
+  BITCOIN_VERSION: "31.1"
+  BITCOIN_SHA256: "b80d9c3e04da78fb6f0569685673418cf686fadba9042d926d13fb87ff503f9e"
 
 jobs:
   # ==========================================================================
