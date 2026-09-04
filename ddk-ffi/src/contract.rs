@@ -19,7 +19,7 @@ use bitcoin::bip32::Xpriv;
 use bitcoin::psbt::Psbt;
 use bitcoin::{Amount, Network, ScriptBuf, Transaction};
 use lightning::util::ser::{Readable, Writeable};
-use secp256k1_zkp::PublicKey;
+use secp256k1_zkp::{PublicKey, SecretKey};
 
 use ddk::contract as ddk_contract;
 use ddk::ddk_manager;
@@ -218,11 +218,57 @@ fn decode_psbt(bytes: &[u8]) -> Result<Psbt, ContractError> {
     })
 }
 
+/// The provider's funding secret key for a contract that already exists,
+/// selected by the funding public key published for it.
+///
+/// ddk 2.0.0-rc.3 changed the funding-key derivation scheme. `funding_secret_key`
+/// always derives the current scheme, so re-deriving that way would strand every
+/// contract funded by an earlier release: its 2-of-2 output, CETs and refund are
+/// all bound to the key the offer or accept message already published. Selecting
+/// the scheme that reproduces that key is what keeps those contracts signable
+/// across the upgrade, and costs a contract made under the current scheme
+/// nothing — it matches first.
+///
+/// `candidates` holds the funding public keys this party could own: one when the
+/// side is known from the operation, both when it is not.
+fn funding_secret_key_for(
+    keys: &ContractKeyProvider,
+    temporary_contract_id: &[u8],
+    candidates: &[PublicKey],
+) -> Result<SecretKey, ContractError> {
+    let temp_id = to_array_32(temporary_contract_id, "temporary_contract_id")?;
+    candidates
+        .iter()
+        .find_map(|pubkey| {
+            keys.inner
+                .funding_secret_key_for_pubkey(temp_id, pubkey)
+                .ok()
+        })
+        .ok_or_else(|| ContractError::Key {
+            message: "no derivation scheme reproduces this contract's funding public key from \
+                      the given temporary contract id"
+                .to_string(),
+        })
+}
+
+/// Which of a splice input's two prior funding public keys is the local party's.
+///
+/// A DLC funding input names both. ddk requires the offering party to sign with
+/// `local_fund_pubkey` and the accepting party with `remote_fund_pubkey`, and
+/// rejects a key that matches the other side.
+#[derive(Clone, Copy)]
+enum SpliceSide {
+    Offer,
+    Accept,
+}
+
 /// Re-derives each splice input's previous-contract funding secret key from the
 /// provider, keyed by (prior temporary id, input serial id). Secret keys stay
 /// inside Rust — only the temporary ids cross the FFI boundary.
 fn resolve_splice_keys(
     keys: &ContractKeyProvider,
+    offer: &OfferDlc,
+    side: SpliceSide,
     refs: &[SpliceKeyRef],
 ) -> Result<Vec<DlcInputSigningKey>, ContractError> {
     refs.iter()
@@ -231,11 +277,39 @@ fn resolve_splice_keys(
                 &r.prior_temporary_contract_id,
                 "prior_temporary_contract_id",
             )?;
+            let prior_funding_pubkey = prior_funding_pubkey(offer, side, r.input_serial_id)?;
             keys.inner
-                .dlc_input_signing_key(prior, r.input_serial_id)
+                .dlc_input_signing_key(prior, &prior_funding_pubkey, r.input_serial_id)
                 .map_err(ContractError::from)
         })
         .collect()
+}
+
+/// The local party's prior funding public key for one splice input, read from
+/// the offer message that carries it.
+///
+/// ddk needs this key to pick the derivation scheme the previous contract was
+/// made under, so contracts funded before ddk 2.0.0-rc.3 still splice. It is not
+/// a parameter of the FFI: the offer already carries both parties' prior funding
+/// public keys, and ddk checks the re-derived key against exactly this value.
+/// Splice inputs only ever appear on the offer side.
+fn prior_funding_pubkey(
+    offer: &OfferDlc,
+    side: SpliceSide,
+    input_serial_id: u64,
+) -> Result<PublicKey, ContractError> {
+    let dlc_input = offer
+        .funding_inputs
+        .iter()
+        .find(|input| input.input_serial_id == input_serial_id)
+        .and_then(|input| input.dlc_input.as_ref())
+        .ok_or_else(|| ContractError::InvalidFundingInput {
+            message: format!("offer has no DLC funding input with serial id {input_serial_id}"),
+        })?;
+    Ok(match side {
+        SpliceSide::Offer => dlc_input.local_fund_pubkey,
+        SpliceSide::Accept => dlc_input.remote_fund_pubkey,
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -775,10 +849,10 @@ pub fn sign_accept_spliced(
 ) -> Result<SignResult, ContractError> {
     let offer: OfferDlc = decode_msg(&offer, "offer")?;
     let accept: AcceptDlc = decode_msg(&accept, "accept")?;
-    let temp_id = to_array_32(&temporary_contract_id, "temporary_contract_id")?;
-    let funding_secret_key = keys.inner.funding_secret_key(temp_id)?;
+    let funding_secret_key =
+        funding_secret_key_for(&keys, &temporary_contract_id, &[offer.funding_pubkey])?;
     let psbt = decode_psbt(&signed_funding_psbt)?;
-    let dlc_input_keys = resolve_splice_keys(&keys, &splice_keys)?;
+    let dlc_input_keys = resolve_splice_keys(&keys, &offer, SpliceSide::Offer, &splice_keys)?;
     let result = ddk_contract::sign_accept_spliced(
         &offer,
         &accept,
@@ -822,7 +896,7 @@ pub fn finalize_sign_spliced(
     let accept: AcceptDlc = decode_msg(&accept, "accept")?;
     let sign: SignDlc = decode_msg(&sign, "sign")?;
     let psbt = decode_psbt(&signed_funding_psbt)?;
-    let dlc_input_keys = resolve_splice_keys(&keys, &splice_keys)?;
+    let dlc_input_keys = resolve_splice_keys(&keys, &offer, SpliceSide::Accept, &splice_keys)?;
     let tx = ddk_contract::finalize_sign_spliced(&offer, &accept, &sign, &psbt, &dlc_input_keys)?;
     Ok(bitcoin::consensus::serialize(&tx))
 }
@@ -872,8 +946,11 @@ pub fn sign_contract_cet(
     let offer: OfferDlc = decode_msg(&offer, "offer")?;
     let accept: AcceptDlc = decode_msg(&accept, "accept")?;
     let sign: SignDlc = decode_msg(&sign, "sign")?;
-    let temp_id = to_array_32(&temporary_contract_id, "temporary_contract_id")?;
-    let funding_secret_key = keys.inner.funding_secret_key(temp_id)?;
+    let funding_secret_key = funding_secret_key_for(
+        &keys,
+        &temporary_contract_id,
+        &[offer.funding_pubkey, accept.funding_pubkey],
+    )?;
     let attestations = attestations
         .into_iter()
         .map(OracleAttestationRef::into_rust)
@@ -902,8 +979,11 @@ pub fn sign_contract_refund(
     let offer: OfferDlc = decode_msg(&offer, "offer")?;
     let accept: AcceptDlc = decode_msg(&accept, "accept")?;
     let sign: SignDlc = decode_msg(&sign, "sign")?;
-    let temp_id = to_array_32(&temporary_contract_id, "temporary_contract_id")?;
-    let funding_secret_key = keys.inner.funding_secret_key(temp_id)?;
+    let funding_secret_key = funding_secret_key_for(
+        &keys,
+        &temporary_contract_id,
+        &[offer.funding_pubkey, accept.funding_pubkey],
+    )?;
     let refund = ddk_contract::sign_refund(&offer, &accept, &sign, &funding_secret_key)?;
     Ok(bitcoin::consensus::serialize(&refund))
 }
@@ -1047,6 +1127,12 @@ mod tests {
     const ORACLE_SECRET: [u8; 32] = [88; 32];
     const ORACLE_NONCE_SECRET: [u8; 32] = [90; 32];
     const EVENT_ID: &str = "ddk-ffi-test";
+    /// The fixture announcement's maturity. `validate_offer` pins an offer's
+    /// `cet_locktime` to the closest maturity date, so the two must stay equal.
+    const EVENT_MATURITY_EPOCH: u32 = 750;
+    /// Far enough past the maturity to sit inside the 100..=100_000 timeout
+    /// interval the tests accept offers with.
+    const REFUND_LOCKTIME: u32 = 1_000;
 
     fn oracle_keypair(secp: &Secp256k1<All>) -> Keypair {
         Keypair::from_secret_key(secp, &SecretKey::from_slice(&ORACLE_SECRET).unwrap())
@@ -1091,7 +1177,7 @@ mod tests {
             Keypair::from_secret_key(&secp, &SecretKey::from_slice(&ORACLE_NONCE_SECRET).unwrap());
         let oracle_event = OracleEvent {
             oracle_nonces: vec![XOnlyPublicKey::from_keypair(&nonce_key).0],
-            event_maturity_epoch: 750,
+            event_maturity_epoch: EVENT_MATURITY_EPOCH,
             event_descriptor: EventDescriptor::EnumEvent(EnumEventDescriptor {
                 outcomes: vec!["up".to_string(), "down".to_string()],
             }),
@@ -1225,8 +1311,8 @@ mod tests {
             party: offerer.rust.clone(),
             fund_output_serial_id: Some(500),
             fee_rate_per_vb: 2,
-            cet_locktime: 500,
-            refund_locktime: 1_000,
+            cet_locktime: EVENT_MATURITY_EPOCH,
+            refund_locktime: REFUND_LOCKTIME,
             contract_flags: 0,
         };
         let direct = ddk_contract::create_offer(rust_params).unwrap();
@@ -1239,8 +1325,8 @@ mod tests {
             party: ffi_party(&offerer),
             fund_output_serial_id: Some(500),
             fee_rate_per_vb: 2,
-            cet_locktime: 500,
-            refund_locktime: 1_000,
+            cet_locktime: EVENT_MATURITY_EPOCH,
+            refund_locktime: REFUND_LOCKTIME,
             contract_flags: 0,
         };
         let ffi_offer = create_offer(ffi_params).unwrap();
@@ -1264,8 +1350,8 @@ mod tests {
             party: offerer.rust,
             fund_output_serial_id: Some(500),
             fee_rate_per_vb: 2,
-            cet_locktime: 500,
-            refund_locktime: 1_000,
+            cet_locktime: EVENT_MATURITY_EPOCH,
+            refund_locktime: REFUND_LOCKTIME,
             contract_flags: 0,
         })
         .unwrap();
@@ -1365,8 +1451,8 @@ mod tests {
             },
             fund_output_serial_id: Some(3),
             fee_rate_per_vb: 2,
-            cet_locktime: 500,
-            refund_locktime: 1_000,
+            cet_locktime: EVENT_MATURITY_EPOCH,
+            refund_locktime: REFUND_LOCKTIME,
             contract_flags: 0,
         };
 
@@ -1492,8 +1578,8 @@ mod tests {
             },
             fund_output_serial_id: Some(3),
             fee_rate_per_vb: 2,
-            cet_locktime: 500,
-            refund_locktime: 1_000,
+            cet_locktime: EVENT_MATURITY_EPOCH,
+            refund_locktime: REFUND_LOCKTIME,
             contract_flags: 0,
         })
         .unwrap();
@@ -1554,6 +1640,159 @@ mod tests {
             acceptor_keys,
             accept_temp_id,
         }
+    }
+
+    /// A contract funded before ddk 2.0.0-rc.3 published funding keys from the
+    /// V0 derivation scheme. The provider derives V1 now, so such a contract can
+    /// only still be signed if the sign paths select the scheme from the key the
+    /// contract actually published — which is what `funding_secret_key_for`
+    /// does. Without it every contract created before the upgrade would become
+    /// unsignable at settlement, long after the upgrade shipped.
+    // Naming V0 is a deprecation diagnostic; unlocking old contracts is exactly
+    // what it is still there for.
+    #[allow(deprecated)]
+    #[test]
+    fn settles_a_contract_funded_under_the_previous_key_scheme() {
+        use ddk_contract::KeyScheme;
+
+        let secp = Secp256k1::new();
+        let path = DerivationPath::from_str("84h/1h/0h/0/0").unwrap();
+
+        let offerer_master = Xpriv::new_master(NETWORK, &[3u8; 64]).unwrap();
+        let offerer_script = p2wpkh_script(&secp, &offerer_master, &path);
+        let offerer_descriptor = format!("wpkh({offerer_master}/84h/1h/0h/0/*)");
+        let prev = previous_transaction(Amount::from_sat(200_000), offerer_script.clone());
+        let funding = funding_input(
+            bitcoin::consensus::serialize(&prev),
+            0,
+            Some(100),
+            0xffff_ffff,
+            108,
+            Vec::new(),
+        )
+        .unwrap();
+        let offerer_keys =
+            ContractKeyProvider::from_xprv(offerer_master.encode().to_vec()).unwrap();
+        let offer_temp_id = vec![0x5c; 32];
+
+        let acceptor_master = Xpriv::new_master(NETWORK, &[4u8; 64]).unwrap();
+        let acceptor_keys =
+            ContractKeyProvider::from_xprv(acceptor_master.encode().to_vec()).unwrap();
+        let accept_temp_id = vec![0xa1; 32];
+        let acceptor_script = p2wpkh_script(&secp, &acceptor_master, &path)
+            .as_bytes()
+            .to_vec();
+
+        // Both parties' keys as the old release would have derived them.
+        let legacy_key = |keys: &ContractKeyProvider, temp_id: &[u8]| {
+            keys.inner
+                .funding_secret_key_with_scheme(
+                    to_array_32(temp_id, "temporary_contract_id").unwrap(),
+                    KeyScheme::V0,
+                )
+                .unwrap()
+        };
+        let offerer_secret = legacy_key(&offerer_keys, &offer_temp_id);
+        let acceptor_secret = legacy_key(&acceptor_keys, &accept_temp_id);
+        assert_ne!(
+            offerer_secret.public_key(&secp).serialize().to_vec(),
+            offerer_keys.funding_pubkey(offer_temp_id.clone()).unwrap(),
+            "the fixture is only meaningful while V0 and V1 disagree"
+        );
+
+        let offer = create_offer(CreateOfferParams {
+            chain_hash: chain_hash_from_network("regtest".to_string()).unwrap(),
+            temporary_contract_id: Some(offer_temp_id.clone()),
+            contract_info: encode_msg(&enum_contract_info()),
+            offer_collateral_sats: 100_000,
+            party: ContractPartyParams {
+                funding_pubkey: offerer_secret.public_key(&secp).serialize().to_vec(),
+                funding_inputs: vec![funding],
+                payout_spk: offerer_script.as_bytes().to_vec(),
+                payout_serial_id: Some(1),
+                change_spk: offerer_script.as_bytes().to_vec(),
+                change_serial_id: Some(2),
+            },
+            fund_output_serial_id: Some(3),
+            fee_rate_per_vb: 2,
+            cet_locktime: EVENT_MATURITY_EPOCH,
+            refund_locktime: REFUND_LOCKTIME,
+            contract_flags: 0,
+        })
+        .unwrap();
+
+        // Accepted through ddk directly: the FFI `accept_offer` derives the
+        // current scheme, which is right for a new contract and wrong for this
+        // fixture, whose accept message predates it.
+        let decoded_offer: OfferDlc = decode_msg(&offer, "offer").unwrap();
+        let accept = encode_msg(
+            &ddk_contract::accept_offer(
+                &decoded_offer,
+                RustAcceptOfferParams {
+                    party: RustPartyParams {
+                        funding_pubkey: acceptor_secret.public_key(&secp),
+                        funding_inputs: vec![],
+                        payout_spk: ScriptBuf::from_bytes(acceptor_script.clone()),
+                        payout_serial_id: Some(4),
+                        change_spk: ScriptBuf::from_bytes(acceptor_script),
+                        change_serial_id: Some(5),
+                    },
+                    min_timeout_interval: 100,
+                    max_timeout_interval: 100_000,
+                },
+                &acceptor_secret,
+            )
+            .unwrap()
+            .accept,
+        );
+
+        let funding_psbt = create_funding_psbt(offer.clone(), accept.clone()).unwrap();
+        let signed_psbt = sign_funding_psbt_with_descriptor(
+            offer.clone(),
+            accept.clone(),
+            funding_psbt,
+            offerer_descriptor,
+            vec![DescriptorInput {
+                input_serial_id: 100,
+                derivation_index: 0,
+            }],
+        )
+        .unwrap();
+
+        // The three paths that sign an existing contract, each given only the
+        // provider and a temporary id — exactly what a consumer stores.
+        let sign = sign_accept(
+            offer.clone(),
+            accept.clone(),
+            offerer_keys.clone(),
+            offer_temp_id.clone(),
+            signed_psbt,
+        )
+        .unwrap()
+        .sign;
+
+        let cet = sign_contract_cet(
+            offer.clone(),
+            accept.clone(),
+            sign.clone(),
+            offerer_keys,
+            offer_temp_id,
+            vec![attestation_ref("up")],
+        )
+        .unwrap();
+        let refund =
+            sign_contract_refund(offer, accept, sign, acceptor_keys, accept_temp_id).unwrap();
+
+        let cet: Transaction = bitcoin::consensus::deserialize(&cet).unwrap();
+        let refund: Transaction = bitcoin::consensus::deserialize(&refund).unwrap();
+        assert!(
+            !cet.input[0].witness.is_empty(),
+            "the CET's 2-of-2 witness is complete"
+        );
+        assert!(
+            !refund.input[0].witness.is_empty(),
+            "the refund's 2-of-2 witness is complete"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -1822,8 +2061,8 @@ mod tests {
             party: ffi_party(&offerer_a),
             fund_output_serial_id: Some(3),
             fee_rate_per_vb: 2,
-            cet_locktime: 500,
-            refund_locktime: 1_000,
+            cet_locktime: EVENT_MATURITY_EPOCH,
+            refund_locktime: REFUND_LOCKTIME,
             contract_flags: 0,
         })
         .unwrap();
@@ -1872,8 +2111,8 @@ mod tests {
             },
             fund_output_serial_id: Some(3),
             fee_rate_per_vb: 2,
-            cet_locktime: 500,
-            refund_locktime: 1_000,
+            cet_locktime: EVENT_MATURITY_EPOCH,
+            refund_locktime: REFUND_LOCKTIME,
             contract_flags: 0,
         })
         .unwrap();
