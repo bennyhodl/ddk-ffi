@@ -84,7 +84,9 @@ const offer = createOffer({
   },
   fundOutputSerialId: 3n,
   feeRatePerVb: 2n,
-  cetLocktime: 500,
+  // Must equal the maturity epoch of the announcement in CONTRACT_INFO_HEX:
+  // acceptOffer pins the CET locktime to the closest maturity date.
+  cetLocktime: 750,
   refundLocktime: 1_000,
   contractFlags: 0,
 })

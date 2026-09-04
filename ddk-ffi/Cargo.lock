@@ -343,9 +343,9 @@ checksum = "c8d4a3bb8b1e0c1050499d1815f5ab16d04f0959b233085fb31653fbfc9d98f9"
 
 [[package]]
 name = "ddk"
-version = "2.0.0-rc.2"
+version = "2.0.0-rc.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a56f93278b6cc35eab9b54254fdb21a07bccd85afa66ae0fb71956357f044b4"
+checksum = "375e46b5a8087d47c1d6228f0c859495196422a484840c7b40c08175495d569d"
 dependencies = [
  "bdk_chain",
  "bdk_wallet",
@@ -360,13 +360,14 @@ dependencies = [
  "serde",
  "thiserror",
  "tracing",
+ "zeroize",
 ]
 
 [[package]]
 name = "ddk-dlc"
-version = "2.0.0-rc.2"
+version = "2.0.0-rc.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6b261e02ec07fed874996f6bc6a238da94b1a2b778280d66fbe050410d4cf333"
+checksum = "bd2bd5c4e49ace90299cc2b607ce71b146f2ac6df716b690c735ad235e9b7e2a"
 dependencies = [
  "bitcoin",
  "miniscript",
@@ -377,9 +378,9 @@ dependencies = [
 
 [[package]]
 name = "ddk-manager"
-version = "2.0.0-rc.2"
+version = "2.0.0-rc.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a13db894acebe345636084051b00d51073815644e805df042510444ed21a7d4"
+checksum = "6d80a1d0266a42185aed874612b9a0996b84fbb25943f9469c1772a08fcc109e"
 dependencies = [
  "async-trait",
  "bitcoin",
@@ -397,9 +398,9 @@ dependencies = [
 
 [[package]]
 name = "ddk-messages"
-version = "2.0.0-rc.2"
+version = "2.0.0-rc.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "328bf7922b9940cef466802216b4014ff0bf151be440b4f32db2fd85ede5cdb6"
+checksum = "f5042db04fc8671f281acfcbe843400162238aae73ace0740795ed12e4b00aec"
 dependencies = [
  "bitcoin",
  "ddk-dlc",
@@ -410,9 +411,9 @@ dependencies = [
 
 [[package]]
 name = "ddk-trie"
-version = "2.0.0-rc.2"
+version = "2.0.0-rc.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c2b318912f67f3518672daf1c0bc4b632a96184608c8d09532d686a614e5e8e1"
+checksum = "e50dc2679a4f5158cc8972f94db639ad007c3ce368bc7160db23351745fdfbd3"
 dependencies = [
  "bitcoin",
  "ddk-dlc",
@@ -1424,6 +1425,12 @@ dependencies = [
  "quote",
  "syn 2.0.119",
 ]
+
+[[package]]
+name = "zeroize"
+version = "1.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e13c156562582aa81c60cb29407084cdb54c4164760106ab78e6c5b0858cf64e"
 
 [[package]]
 name = "zmij"

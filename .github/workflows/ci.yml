@@ -559,6 +559,16 @@ jobs:
         if: matrix.platform == 'ios'
         env:
           SIMULATOR_NAME: "iPhone 15"
+          # Maestro starts its XCUITest driver with `xcodebuild
+          # test-without-building`, then polls a local port until the driver
+          # answers. The default limit is 120s, and on this runner the driver
+          # needs almost exactly that: the last green run came up at ~120s, and
+          # the next run — same workflow, same Maestro, only a newer macos-14
+          # image — timed out with "iOS driver not ready in time" before a
+          # single flow started. The limit was always the problem, not the app;
+          # Android passed both times. 5 minutes puts the driver start back
+          # inside the budget. The value is in milliseconds.
+          MAESTRO_DRIVER_STARTUP_TIMEOUT: "300000"
         run: |
           set -euo pipefail
           tar xzf artifact/DdkRnExample.app.tar.gz -C artifact
