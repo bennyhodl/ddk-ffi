@@ -5,6 +5,7 @@ on:
     tags:
       - 'v*.*.*'
 
+# id-token: write is for npm trusted publishing (OIDC); there is no NPM_TOKEN.
 permissions:
   contents: read
   id-token: write
@@ -13,6 +14,8 @@ env:
   # Read by cargo when building the ddk-ts cdylib on macOS. APP_NAME lived here
   # too; it was napi-rs's, and nothing reads it now that ddk-ts is generated.
   MACOSX_DEPLOYMENT_TARGET: '10.13'
+  # Keep in sync with ddk-rn/package.json and ci.yml's UBRN_VERSION.
+  UBRN_VERSION: '0.31.0-5'
   # Keep in sync with ci.yml's NDK_VERSION and the example app's ndkVersion.
   NDK_VERSION: '27.1.12297006'
 
@@ -109,7 +112,7 @@ jobs:
         with:
           version: 10
       - name: Install uniffi-bindgen-react-native
-        run: npm install -g uniffi-bindgen-react-native@0.31.0-3
+        run: npm install -g uniffi-bindgen-react-native@${{ env.UBRN_VERSION }}
       - name: Install dependencies
         run: cd ddk-ts && pnpm install --frozen-lockfile
       - name: Build
@@ -144,7 +147,7 @@ jobs:
         with:
           version: 10
       - name: Install uniffi-bindgen-react-native
-        run: npm install -g uniffi-bindgen-react-native@0.31.0-3
+        run: npm install -g uniffi-bindgen-react-native@${{ env.UBRN_VERSION }}
       - name: Install dependencies
         run: cd ddk-ts && pnpm install --frozen-lockfile
       - name: Generate + build
@@ -170,7 +173,7 @@ jobs:
         with:
           version: 10
       - name: Install uniffi-bindgen-react-native
-        run: npm install -g uniffi-bindgen-react-native@0.31.0-3
+        run: npm install -g uniffi-bindgen-react-native@${{ env.UBRN_VERSION }}
       - uses: extractions/setup-just@v1
       - name: Generate JSI bindings
         run: just uniffi-jsi
@@ -191,10 +194,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # Trusted publishing needs npm >= 11.5.1 on Node >= 22.14. No registry-url:
+      # it writes an .npmrc that expects NODE_AUTH_TOKEN.
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          registry-url: 'https://registry.npmjs.org'
+          node-version: '22'
+      - name: Upgrade npm for trusted publishing
+        run: |
+          npm install -g npm@11
+          npm --version
       # merge-multiple: both artifacts carry the same dist/ (the compiled
       # bindings are host-independent) and one platform/<triple>/ each, so they
       # overlay into a single tree.
@@ -221,8 +229,6 @@ jobs:
       # at them, and npm resolves those at install time. publish-release.mjs
       # enforces the order and injects the optionalDependencies.
       - name: Publish (platform packages, then main)
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           cd ddk-ts
           VERSION="${GITHUB_REF_NAME#v}"
@@ -252,7 +258,7 @@ jobs:
         with:
           version: 10
       - name: Install uniffi-bindgen-react-native
-        run: npm install -g uniffi-bindgen-react-native@0.31.0-3
+        run: npm install -g uniffi-bindgen-react-native@${{ env.UBRN_VERSION }}
       - uses: extractions/setup-just@v1
       - name: Install ddk-rn dependencies
         run: cd ddk-rn && pnpm install
@@ -296,7 +302,7 @@ jobs:
         with:
           version: 10
       - name: Install uniffi-bindgen-react-native
-        run: npm install -g uniffi-bindgen-react-native@0.31.0-3
+        run: npm install -g uniffi-bindgen-react-native@${{ env.UBRN_VERSION }}
       - name: Install cargo-ndk
         run: cargo install cargo-ndk
       - uses: extractions/setup-just@v1
@@ -344,10 +350,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # See publish-ddk-ts.
       - uses: actions/setup-node@v4
         with:
-          node-version: '18.17'
-          registry-url: 'https://registry.npmjs.org'
+          node-version: '22'
+      - name: Upgrade npm for trusted publishing
+        run: |
+          npm install -g npm@11
+          npm --version
       - uses: pnpm/action-setup@v2
         with:
           version: 10
@@ -404,8 +414,6 @@ jobs:
       # See the note on the ddk-ts publish step: a prerelease version must not
       # take over the `latest` dist-tag.
       - name: Publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           cd ddk-rn
           VERSION="${GITHUB_REF_NAME#v}"
