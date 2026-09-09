@@ -61,7 +61,7 @@ uniffi-turbo:
 # ddk-rn/package.json), so their size is a download every consumer pays.
 #
 # `--release` applies to both platforms and must stay: a debug static archive is
-# ~320MB per slice against ~44MB release, and omitting it is what produced the
+# ~320MB per slice against ~8MB release, and omitting it is what produced the
 # 915MB xcframework.
 #
 # Stripping applies to iOS ONLY. iOS must link a static archive (a React Native
@@ -105,6 +105,11 @@ build-android targets="":
     --config {{justfile_directory()}}/ddk-rn/ubrn.config.yaml --release --and-generate \
     {{ if targets == "" { "" } else { "--targets " + targets } }}
   just binary-sizes
+
+# List the contents of the built iOS device slice by crate
+archive-crate-sizes top="25":
+  {{justfile_directory()}}/scripts/archive-crate-sizes.sh \
+    {{justfile_directory()}}/ddk-rn/ios/DdkRn.xcframework/ios-arm64/libddk_ffi.a {{top}}
 
 # Report the size of every binary destined for the npm package
 binary-sizes:

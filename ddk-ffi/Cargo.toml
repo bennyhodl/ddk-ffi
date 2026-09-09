@@ -10,10 +10,15 @@ readme = "README.md"
 
 [lib]
 name = "ddk_ffi"
-crate-type = ["cdylib", "staticlib", "rlib"]
+# No rlib: cargo skips LTO for a unit that also produces one.
+crate-type = ["cdylib", "staticlib"]
+
+[features]
+# uniffi's CLI is a code generator; the staticlib would ship it otherwise.
+uniffi-bindgen = ["uniffi/cli", "uniffi/cargo-metadata"]
 
 [dependencies]
-uniffi = { version = "=0.31.0", features = ["cli"] }
+uniffi = { version = "=0.31.0", default-features = false }
 ddk = { version = "2.0.0-rc.3", default-features = false }
 ddk-dlc = { version = "2.0.0-rc.3", features = ["std", "use-serde"] }
 ddk-messages = { version = "2.0.0-rc.3", features = ["std", "use-serde"] }
@@ -24,8 +29,7 @@ secp256k1-zkp = "0.11.0"
 bip39 = "2.2.0"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-uniffi = { version = "=0.31.0", features = [
-  "cli",
+uniffi = { version = "=0.31.0", default-features = false, features = [
   "wasm-unstable-single-threaded",
 ] }
 
@@ -35,3 +39,10 @@ bip39 = { version = "2.2.0", features = ["rand"] }
 [[bin]]
 name = "uniffi-bindgen"
 path = "src/uniffi-bindgen.rs"
+required-features = ["uniffi-bindgen"]
+
+# No `strip`: ubrn's Android codegen needs the .so's symbol table.
+# No `panic = "abort"`: uniffi turns caught panics into caller-side errors.
+[profile.release]
+lto = true
+codegen-units = 1

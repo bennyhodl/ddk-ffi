@@ -137,7 +137,10 @@ not `ddk-rn/node_modules`. A version skew shows up as TypeScript errors like
 
 ubrn pins an exact `uniffi_core` version (e.g. ubrn `0.31.0-5` requires `uniffi_core =0.31.0`),
 so pin the Rust crate to that exact patch. Update the global binary with
-`pnpm add -g uniffi-bindgen-react-native@<version>`.
+`pnpm add -g uniffi-bindgen-react-native@<version>`. CI installs the version in
+`UBRN_VERSION`, which is declared in **both** `ci.yml` and `publish.yml`; bump
+the two together with the package pin, or releases generate with a different
+ubrn than PR CI tested.
 
 > Note: as of uniffi 0.31, the old manual fix for `#include "/ddk_ffi.hpp"` is no longer
 > needed — the generator emits the correct `#include "ddk_ffi.hpp"`.
@@ -174,8 +177,18 @@ Rules to preserve:
   binaries, but it does not apply here: npm only consults ignore files inside the
   package directory, and `ddk-rn/` has none. Verify with `npm pack --dry-run`.
 - The Rust source (`ddk-ffi/`) is **not** shipped in the package.
+- **`uniffi`'s `cli` feature is opt-in** — `ddk-ffi`'s `uniffi-bindgen` cargo
+  feature — never a plain dependency feature. A static archive keeps every
+  object file of every dependency, referenced or not, and `cli` pulls in the
+  whole bindgen (uniffi_bindgen, clap, goblin, weedle, toml, cargo_metadata):
+  with it on unconditionally, ~14MB of every iOS slice in the published package
+  was a code generator. ubrn brings its own bindgen, so nothing here needs the
+  crate's `uniffi-bindgen` bin; it is gated with `required-features` and only
+  CI's `--all-features` builds it. After touching `[dependencies]`, re-measure
+  with `scripts/archive-crate-sizes.sh` (`just archive-crate-sizes` after a
+  `just build-ios`), which lists the archive's contents by crate.
 - Always build with `--release`; a debug static archive is ~320MB per slice
-  against ~44MB release, and it ships to every consumer. `just build-ios` and
+  against ~7.6MB release (LTO, stripped), and it ships to every consumer. `just build-ios` and
   `just build-android` apply the right flags; use them rather than calling ubrn
   directly.
 - The two platforms link differently, and the difference is load-bearing:
@@ -186,8 +199,21 @@ Rules to preserve:
     the linker drops unreferenced code and the `.so` is roughly a tenth of the
     equivalent archive. It must **not** be stripped — that breaks ubrn's
     turbo-module and native-bindings generation — so there is deliberately no
-    strip step for Android, and `ddk-ffi` must declare no `[profile.release]`
-    `strip` setting.
+    strip step for Android, and `ddk-ffi`'s `[profile.release]` must never gain
+    a `strip` setting. CI asserts the built `.so` still has its `.symtab`.
+- **`[profile.release]` is `lto = true` + `codegen-units = 1`, and `crate-type`
+  has no `rlib`.** The two go together: cargo will not run LTO for a unit that
+  also produces an rlib, so listing `rlib` turns `lto` into a silent no-op that
+  *grows* the archive (bitcode gets embedded in every object). Nothing consumes
+  ddk-ffi as a Rust library — unit tests compile `lib.rs` directly and there are
+  no integration tests or doctests — so it was removed. LTO is what makes the
+  iOS archive small: a static archive ships every object of every dependency,
+  and LTO prunes to what the exported symbols reach, the way the linker already
+  does for the Android `.so`. Measured on the stripped device slice, with the
+  uniffi CLI already gated out: 36.8MB → 7.6MB. `opt-level = "z"` (-6%) and
+  `panic = "abort"` (-8%) were measured and left out; the reasons are in
+  `Cargo.toml`. Re-measure with `just archive-crate-sizes` after touching
+  either the profile or the crate types.
 - `/.cargo/config.toml` passes `-Wl,-z,max-page-size=16384` to the Android
   targets. Android 15+ requires every `.so` in an APK to be 16KB-page aligned;
   `android/CMakeLists.txt` sets this only for the C++ library it builds, and
@@ -225,6 +251,19 @@ Rules to preserve:
   modified `build.gradle` that must never be committed — a single-ABI
   `build.gradle` ships an app that only runs on one architecture. After running it
   with an argument: `git checkout ddk-rn/android/build.gradle`.
+- **`just build-android` can fail locally with `can't find crate for core` /
+  "the `aarch64-linux-android` target may not be installed" while `just
+  build-ios` works and `rustup show` lists the target.** `ddk-ffi/rust-toolchain.toml`
+  pins `stable`, but the ubrn shim starts with `cargo run` from `ddk-rn/`, where
+  no `rust-toolchain.toml` applies, so the rustup proxy resolves the *default*
+  toolchain and exports it as `RUSTUP_TOOLCHAIN` to every child — including the
+  `cargo ndk` that builds the crate. If the default is a versioned toolchain
+  (`1.98.0-…`) rather than `stable`, it needs the Android targets too:
+  `rustup target add aarch64-linux-android armv7-linux-androideabi
+  i686-linux-android x86_64-linux-android`, or run with
+  `RUSTUP_TOOLCHAIN=stable just build-android`. iOS only works by luck — the
+  iOS targets happen to be installed on both. CI has one toolchain, so it never
+  sees this.
 - Generation runs prettier over `ddk-rn/src/`, which reformats hand-written files
   living there (e.g. `src/__tests__/contractBindings.test.js`). Committing the
   prettier-formatted version keeps that from churning on every build.
@@ -254,6 +293,19 @@ what publishes. There is deliberately no local publish path — no single host c
 build every platform this repo ships — and `ddk-rn`'s `prepublishOnly` runs
 `scripts/verify-package.js` to refuse a hand-run `npm publish` that would ship
 without binaries.
+
+**npm auth is trusted publishing (OIDC), not a token.** There is no `NPM_TOKEN`
+secret: each publish job exchanges the workflow's GitHub id-token for a
+short-lived npm token, and provenance comes with it. That works only while all
+four packages the workflow publishes — `@bennyblader/ddk-rn`,
+`@bennyblader/ddk-ts` and the platform packages
+`@bennyblader/ddk-ts-darwin-arm64` / `@bennyblader/ddk-ts-linux-x64-gnu` — list
+`bennyhodl/ddk-ffi` + `publish.yml` as a trusted publisher on npmjs.com. A
+platform package added to the `build-ddk-ts` matrix has to be published once by
+hand before npm lets a trusted publisher be configured for it. npm documents
+the floor as npm 11.5.1 on Node 22.14, so the two publish jobs run Node 22 and
+upgrade npm; no other job is affected. A missing trusted publisher fails at
+`npm publish`, after every build job has already passed.
 
 **Prereleases go to the `next` dist-tag.** `just release 1.0.0-rc1` works end to
 end — `prep-release.js` accepts `X.Y.Z[-tag]`, the workflow's `v*.*.*` trigger

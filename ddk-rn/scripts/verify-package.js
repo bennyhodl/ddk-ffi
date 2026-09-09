@@ -14,6 +14,9 @@
  * from a working tree that never built either — the one path no workflow can
  * gate. It hangs off `prepublishOnly` because that hook fires on every publish
  * regardless of how it was invoked.
+ *
+ * Presence only, not hashes: integrity is the registry's (dist.integrity,
+ * signature, provenance).
  */
 
 const { execSync } = require('child_process');
