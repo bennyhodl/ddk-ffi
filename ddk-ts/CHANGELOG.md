@@ -8,6 +8,10 @@
 
 Adding a function to ddk-ffi is now the whole job. It appears here on the next `pnpm generate`.
 
+### Smaller native library
+
+The `ddk-ffi` cdylib each platform package carries is now built with link-time optimisation (`lto = true`, `codegen-units = 1` in the crate's release profile). `darwin-arm64` went from 5.7MB in 1.0.0-rc4 to 4.8MB. No API change.
+
 ### Breaking
 
 - **Twelve operations gained a record namespace**, matching `@bennyblader/ddk-rn` exactly: `isDust` → `TxOutput.isDust`, `changeOutputAndFees` → `PartyParams.changeOutputAndFees`, `verifyFromOracleInfo` → `AdaptorSignature.verifyFromOracleInfo`, and nine more on `Transaction.*` (`addSignature`, `verifyFundSignature`, `rawFundingInputSignature`, `signFundInput`, `signMultiSigInput`, `signCet`, `cetAdaptorSignatureFromOracleInfo`, `cetAdaptorSignatureInputs`, `cetSighash`). The receiver is still the first argument, so each call site takes a prefix and nothing else. The other 39 names are unchanged.
