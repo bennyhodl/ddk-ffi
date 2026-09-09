@@ -9,11 +9,11 @@ importers:
   .:
     dependencies:
       '@ubjs/core':
-        specifier: 0.31.0-3
-        version: 0.31.0-3
+        specifier: 0.31.0-5
+        version: 0.31.0-5
       '@ubjs/node':
-        specifier: 0.31.0-3
-        version: 0.31.0-3
+        specifier: 0.31.0-5
+        version: 0.31.0-5
     devDependencies:
       '@types/node':
         specifier: ^20.0.0
@@ -463,51 +463,51 @@ packages:
   '@types/node@20.19.13':
     resolution: {integrity: sha512-yCAeZl7a0DxgNVteXFHt9+uyFbqXGy/ShC4BlcHkoE0AfGXYv/BUiplV72DjMYXHDBXFjhvr6DD1NiRVfB4j8g==}
 
-  '@ubjs/core@0.31.0-3':
-    resolution: {integrity: sha512-39XrJgUZ2VVb561sSnkXPhczNoeBsNiSRArecsV0JE7CJq69ajFkcn9/tBAUS2NpgHkLIDU+z6Ks2+1wXnboxg==}
+  '@ubjs/core@0.31.0-5':
+    resolution: {integrity: sha512-oRBRtyYOhaodiOY3rLMZFgAHGFMmD44XefMpsAx4Ja0/rO+45kVdQB1VZsblQMLYxP965i3IHm56eymgo3I5eQ==}
 
-  '@ubjs/node-darwin-arm64@0.31.0-3':
-    resolution: {integrity: sha512-GGQVPLkVo4Gc8qVLW4IGvS8bjl8eHXyeP4a97ntGmsAdXwE5gsS29o8xUEFROjhwHKD+9sgVeblCSWVG3CpHsw==}
+  '@ubjs/node-darwin-arm64@0.31.0-5':
+    resolution: {integrity: sha512-ZefUcOgW0UkPZe9aav021m1hBfBzzhj75gOS/gc85g2PkmWDctz+D+tKQYs/gwM44vu1We2WTGcitf8yrZJGyA==}
     cpu: [arm64]
     os: [darwin]
 
-  '@ubjs/node-darwin-x64@0.31.0-3':
-    resolution: {integrity: sha512-2sc47u4XFYOsbmP5EW+Gx8m/yGrYnfFDFQm6+kz7goSWTNg84eEiz3COs9HKJDVuNJ5Khv5XipTO8CFadMLXCw==}
+  '@ubjs/node-darwin-x64@0.31.0-5':
+    resolution: {integrity: sha512-K4A5k8hsLeOtgG4tT73u/XKfxUUOjWxwjRf3e4v3sggG6b7q3yoSFUwPjf12la6VSgD/E9sRjrTAT7MNdENaww==}
     cpu: [x64]
     os: [darwin]
 
-  '@ubjs/node-linux-arm64-gnu@0.31.0-3':
-    resolution: {integrity: sha512-YStVXhYz/5jvlWf/p4fhiVT72unYAbGugifFC9QmO/+hnroQDAQ5t8SARbsc15G4olMcamdIB+GETiUB7gmaYg==}
+  '@ubjs/node-linux-arm64-gnu@0.31.0-5':
+    resolution: {integrity: sha512-m4S96owMdh53G6w6hALi7nfsUhB+Y6bAcjVJnRdzVe5WJ+o2dMTbj9u/IxtcJaENtLLEMDPHhLAZmxQS9Licew==}
     cpu: [arm64]
     os: [linux]
 
-  '@ubjs/node-linux-arm64-musl@0.31.0-3':
-    resolution: {integrity: sha512-Izp4nvfy/LmibzFowAztkoDOksCR2fb2zl6fh1ojR1HEsg0rAGruxtI8d3fn8DI0lBXwqmn6SF///oD4mFNJPQ==}
+  '@ubjs/node-linux-arm64-musl@0.31.0-5':
+    resolution: {integrity: sha512-VVkXe8We9ka8FZqJfsbl4DEkbn4nt4htSCd2Vr39L9kOrBtNZ8SR0s+BiMQ8xBQnP6u+O95TrhOviROCDj2VSw==}
     cpu: [arm64]
     os: [linux]
 
-  '@ubjs/node-linux-x64-gnu@0.31.0-3':
-    resolution: {integrity: sha512-Xdm21blyg5U/kW6s7OMvgrr8coGTkUlt26DVR9x8gKISif+E3YwdEskbFScWqystAiJnfjw7xHEc8UMu0Qlz7Q==}
+  '@ubjs/node-linux-x64-gnu@0.31.0-5':
+    resolution: {integrity: sha512-xFvl3iGWBVqghmz9lC4qij+ezLHV5V11O/6G+0rM7a/nAQdweCSCeZ65QsiVoqC/bYJ7fKIyKCXFMy5ldhSQvw==}
     cpu: [x64]
     os: [linux]
 
-  '@ubjs/node-linux-x64-musl@0.31.0-3':
-    resolution: {integrity: sha512-fFQ9BWS6i2LUH9SJgD9oEiKXXo/say59vHy7usFe1t7C2xvwvP34f5SuxXmWP9R8fHyA0aC4kIZ+TTwyHSv1Kw==}
+  '@ubjs/node-linux-x64-musl@0.31.0-5':
+    resolution: {integrity: sha512-R3HzFVI+v9G5CVOFOSxhF9SYX1o/6llA9mQbaANYMANuybE6LNJ8fgj51CTRrhobjWmgA24swq24DqbVsqypZg==}
     cpu: [x64]
     os: [linux]
 
-  '@ubjs/node-win32-arm64-msvc@0.31.0-3':
-    resolution: {integrity: sha512-ID6rSz1NmPsWTNBBNAw4OnJ5Dj8pcbtNJtdPB3OxcGigLBd/e0x7buhSI7os6Mo5iYtEdCynBRQHFJwub5XSPg==}
+  '@ubjs/node-win32-arm64-msvc@0.31.0-5':
+    resolution: {integrity: sha512-A7Z6lYqY0QQF4j3ce/3k1iIjgJIMWje3wTU9RfOTDSl0hcKKHDezvwvLiLBbVjagwJQOKWO5zwWLBAw6KTUDHQ==}
     cpu: [arm64]
     os: [win32]
 
-  '@ubjs/node-win32-x64-msvc@0.31.0-3':
-    resolution: {integrity: sha512-wevs+Y+szwcCUT8IJFbB4/1nfxyRv/51l8oG7FGUPWD1xLPyuHfJBG27C+PDeC7KRzes/2n6aLo4DGZbr/LYTw==}
+  '@ubjs/node-win32-x64-msvc@0.31.0-5':
+    resolution: {integrity: sha512-rqaH2YZBjUphSV8nFseeTG5vJMToDt8QhoY4wKULGZr2OF/HM52Ggt/9yb+gsuJ1l4ekz2biJrlN/HlhyV3CZw==}
     cpu: [x64]
     os: [win32]
 
-  '@ubjs/node@0.31.0-3':
-    resolution: {integrity: sha512-qNMpi2LICNwxGXZyRF8fSDBSpbezyZbEsydrbiMPJOmtOWr4tmZIEl7jkWGHVGShoBvHfFo4eHp5B4UVP928Cg==}
+  '@ubjs/node@0.31.0-5':
+    resolution: {integrity: sha512-w1gyA/1H7TiJIQfHD6Zjr673IDfG+1a4hpM0f0krxJr9jlTkrwouFCoNTwpLmSxSWJXtUxkB19Bk0ekxAepOHQ==}
 
   '@vitest/expect@3.2.4':
     resolution: {integrity: sha512-Io0yyORnB6sikFlt8QW5K7slY4OjqNX9jmJQ02QDda8lyM6B5oNgVWoSoKPac8/kgnCUzuHQKrSLtu/uOqqrig==}
@@ -1043,42 +1043,42 @@ snapshots:
     dependencies:
       undici-types: 6.21.0
 
-  '@ubjs/core@0.31.0-3': {}
+  '@ubjs/core@0.31.0-5': {}
 
-  '@ubjs/node-darwin-arm64@0.31.0-3':
+  '@ubjs/node-darwin-arm64@0.31.0-5':
     optional: true
 
-  '@ubjs/node-darwin-x64@0.31.0-3':
+  '@ubjs/node-darwin-x64@0.31.0-5':
     optional: true
 
-  '@ubjs/node-linux-arm64-gnu@0.31.0-3':
+  '@ubjs/node-linux-arm64-gnu@0.31.0-5':
     optional: true
 
-  '@ubjs/node-linux-arm64-musl@0.31.0-3':
+  '@ubjs/node-linux-arm64-musl@0.31.0-5':
     optional: true
 
-  '@ubjs/node-linux-x64-gnu@0.31.0-3':
+  '@ubjs/node-linux-x64-gnu@0.31.0-5':
     optional: true
 
-  '@ubjs/node-linux-x64-musl@0.31.0-3':
+  '@ubjs/node-linux-x64-musl@0.31.0-5':
     optional: true
 
-  '@ubjs/node-win32-arm64-msvc@0.31.0-3':
+  '@ubjs/node-win32-arm64-msvc@0.31.0-5':
     optional: true
 
-  '@ubjs/node-win32-x64-msvc@0.31.0-3':
+  '@ubjs/node-win32-x64-msvc@0.31.0-5':
     optional: true
 
-  '@ubjs/node@0.31.0-3':
+  '@ubjs/node@0.31.0-5':
     optionalDependencies:
-      '@ubjs/node-darwin-arm64': 0.31.0-3
-      '@ubjs/node-darwin-x64': 0.31.0-3
-      '@ubjs/node-linux-arm64-gnu': 0.31.0-3
-      '@ubjs/node-linux-arm64-musl': 0.31.0-3
-      '@ubjs/node-linux-x64-gnu': 0.31.0-3
-      '@ubjs/node-linux-x64-musl': 0.31.0-3
-      '@ubjs/node-win32-arm64-msvc': 0.31.0-3
-      '@ubjs/node-win32-x64-msvc': 0.31.0-3
+      '@ubjs/node-darwin-arm64': 0.31.0-5
+      '@ubjs/node-darwin-x64': 0.31.0-5
+      '@ubjs/node-linux-arm64-gnu': 0.31.0-5
+      '@ubjs/node-linux-arm64-musl': 0.31.0-5
+      '@ubjs/node-linux-x64-gnu': 0.31.0-5
+      '@ubjs/node-linux-x64-musl': 0.31.0-5
+      '@ubjs/node-win32-arm64-msvc': 0.31.0-5
+      '@ubjs/node-win32-x64-msvc': 0.31.0-5
 
   '@vitest/expect@3.2.4':
     dependencies:

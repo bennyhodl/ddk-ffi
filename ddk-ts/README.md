@@ -108,7 +108,7 @@ A thrown error is a typed variant class carrying the Rust variant name in
 - Rust >= 1.70
 - pnpm
 - `uniffi-bindgen-react-native`, at the version ddk-rn pins:
-  `pnpm add -g uniffi-bindgen-react-native@0.31.0-3`
+  `pnpm add -g uniffi-bindgen-react-native@0.31.0-5`
 
 ### Building from Source
 

@@ -296,19 +296,6 @@ there, and a dozen transaction operations are methods on a record here
    - iOS: Set `RCT_NEW_ARCH_ENABLED=1`
    - Android: Set `newArchEnabled=true` in `gradle.properties`
 
-2. **Android C++ builds need an unreleased ubrn fix.** The generated
-   `android/CMakeLists.txt` resolves the ubrn package with
-   `require.resolve('uniffi-bindgen-react-native/package.json')`, which throws
-   `ERR_PACKAGE_PATH_NOT_EXPORTED` because ubrn's `exports` map doesn't expose
-   that subpath. The include dir silently becomes `/cpp/includes` and the build
-   dies with `'UniffiCallInvoker.h' file not found`. This repo patches it
-   (`patches/uniffi-bindgen-react-native@0.31.0-3.patch`, applied by
-   `pnpm install`), but a pnpm patch only applies to this repo — building an
-   Android app against the published package hits the original error until ubrn
-   ships the fix ([#404](https://github.com/jhugman/uniffi-bindgen-react-native/issues/404),
-   fixed on `main`, release tracked in
-   [#421](https://github.com/jhugman/uniffi-bindgen-react-native/issues/421)).
-
 ## Troubleshooting
 
 ### iOS Build Issues

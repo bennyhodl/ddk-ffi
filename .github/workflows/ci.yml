@@ -44,7 +44,7 @@ concurrency:
 
 env:
   # Must match ddk-rn/package.json — see the version-lockstep note in CLAUDE.md.
-  UBRN_VERSION: "0.31.0-3"
+  UBRN_VERSION: "0.31.0-5"
   # Tied to the example's React Native release; see the environment table in
   # CLAUDE.md.
   NODE_VERSION: "20"
