@@ -1,6 +1,6 @@
 PODS:
   - boost (1.84.0)
-  - DdkRn (1.0.0-rc3):
+  - DdkRn (1.0.0-rc4):
     - boost
     - DoubleConversion
     - fast_float
@@ -28,7 +28,7 @@ PODS:
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
     - SocketRocket
-    - uniffi-bindgen-react-native (= 0.31.0-3)
+    - uniffi-bindgen-react-native (= 0.31.0-5)
     - Yoga
   - DoubleConversion (1.1.6)
   - fast_float (8.0.0)
@@ -2153,7 +2153,7 @@ PODS:
     - React-utils (= 0.80.0)
     - SocketRocket
   - SocketRocket (0.7.1)
-  - uniffi-bindgen-react-native (0.31.0-3):
+  - uniffi-bindgen-react-native (0.31.0-5):
     - React-Core
   - Yoga (0.0.0)
 
@@ -2232,12 +2232,12 @@ DEPENDENCIES:
   - ReactCodegen (from `build/generated/ios`)
   - ReactCommon/turbomodule/core (from `../node_modules/react-native/ReactCommon`)
   - SocketRocket (~> 0.7.1)
-  - uniffi-bindgen-react-native (from `../../node_modules/uniffi-bindgen-react-native`)
   - Yoga (from `../node_modules/react-native/ReactCommon/yoga`)
 
 SPEC REPOS:
   trunk:
     - SocketRocket
+    - uniffi-bindgen-react-native
 
 EXTERNAL SOURCES:
   boost:
@@ -2385,14 +2385,12 @@ EXTERNAL SOURCES:
     :path: build/generated/ios
   ReactCommon:
     :path: "../node_modules/react-native/ReactCommon"
-  uniffi-bindgen-react-native:
-    :path: "../../node_modules/uniffi-bindgen-react-native"
   Yoga:
     :path: "../node_modules/react-native/ReactCommon/yoga"
 
 SPEC CHECKSUMS:
   boost: 7e761d76ca2ce687f7cc98e698152abd03a18f90
-  DdkRn: ceafecb7a35ff859bf01db049e448d9ba83bcca5
+  DdkRn: 7691dff7a26916dba974ee8e176913db8f5a7c09
   DoubleConversion: cb417026b2400c8f53ae97020b2be961b59470cb
   fast_float: b32c788ed9c6a8c584d114d0047beda9664e7cc6
   FBLazyVector: 778b815a6fb3fa1599f581ffb9a5e85fad313c1d
@@ -2464,9 +2462,9 @@ SPEC CHECKSUMS:
   ReactCodegen: 337879ca019caf752f38013908e774af7fb14e20
   ReactCommon: b028d09a66e60ebd83ca59d8cc9a1216360db147
   SocketRocket: d4aabe649be1e368d1318fdf28a022d714d65748
-  uniffi-bindgen-react-native: 5a59022841548d4c890e8f259016bdb8a797208a
+  uniffi-bindgen-react-native: 598913d7e1654cc6f58d58afcbe40f4b682b7169
   Yoga: 0c4b7d2aacc910a1f702694fa86be830386f4ceb
 
-PODFILE CHECKSUM: 5bacd2e5b90f57d3ef8009c980b936601b9da80e
+PODFILE CHECKSUM: b198993fb97fbb3dea36c3341620344ff687643a
 
 COCOAPODS: 1.16.2

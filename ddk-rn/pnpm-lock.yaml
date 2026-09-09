@@ -7,11 +7,6 @@ settings:
 overrides:
   '@types/react': ^19.1.0
 
-patchedDependencies:
-  uniffi-bindgen-react-native@0.31.0-3:
-    hash: 53974ea656337ff2a02b8dc39dc4719d5ae3fd793c6bec3b2720075df98d61d9
-    path: patches/uniffi-bindgen-react-native@0.31.0-3.patch
-
 importers:
 
   .:
@@ -20,11 +15,11 @@ importers:
         specifier: ^7.20.0
         version: 7.29.7
       '@ubjs/core':
-        specifier: 0.31.0-3
-        version: 0.31.0-3
+        specifier: 0.31.0-5
+        version: 0.31.0-5
       uniffi-bindgen-react-native:
-        specifier: 0.31.0-3
-        version: 0.31.0-3(patch_hash=53974ea656337ff2a02b8dc39dc4719d5ae3fd793c6bec3b2720075df98d61d9)
+        specifier: 0.31.0-5
+        version: 0.31.0-5
     devDependencies:
       '@commitlint/config-conventional':
         specifier: ^17.0.2
@@ -1380,8 +1375,8 @@ packages:
     resolution: {integrity: sha512-cDF0/Gf81QpY3xYyJKDV14Zwdmid5+uuENhjH2EqFaF0ni+yAyq/LzMaIJdhNJXZI7uLzwIlA+V7oWoyn6Curg==}
     engines: {node: ^18.18.0 || >=20.0.0}
 
-  '@ubjs/core@0.31.0-3':
-    resolution: {integrity: sha512-39XrJgUZ2VVb561sSnkXPhczNoeBsNiSRArecsV0JE7CJq69ajFkcn9/tBAUS2NpgHkLIDU+z6Ks2+1wXnboxg==}
+  '@ubjs/core@0.31.0-5':
+    resolution: {integrity: sha512-oRBRtyYOhaodiOY3rLMZFgAHGFMmD44XefMpsAx4Ja0/rO+45kVdQB1VZsblQMLYxP965i3IHm56eymgo3I5eQ==}
 
   '@ungap/structured-clone@1.3.1':
     resolution: {integrity: sha512-mUFwbeTqrVgDQxFveS+df2yfap6iuP20NAKAsBt5jDEoOTDew+zwLAOilHCeQJOVSvmgCX4ogqIrA0mnyr08yQ==}
@@ -4310,8 +4305,8 @@ packages:
     resolution: {integrity: sha512-hpbDzxUY9BFwX+UeBnxv3Sh1q7HFxj48DTmXchNgRa46lO8uj3/1iEn3MiNUYTg1g9ctIqXCCERn8gYZhHC5lQ==}
     engines: {node: '>=4'}
 
-  uniffi-bindgen-react-native@0.31.0-3:
-    resolution: {integrity: sha512-br7giBJRr/j00rdMXhOZGMGuDWMAVUcxC9O3lco0KRqzEAxUz00+gegPW5tKamvKbrnj7NB682XUCYrcagtxFA==}
+  uniffi-bindgen-react-native@0.31.0-5:
+    resolution: {integrity: sha512-YtL3gTe+RVXAQx/2P2Iuypic/CunRZC65Cs47v//YRfwWNYU4Ufd1jT3rqxSrH5b5QFCYblP89Nf/9ssZRvNgg==}
     hasBin: true
 
   universalify@0.1.2:
@@ -6304,7 +6299,7 @@ snapshots:
       '@typescript-eslint/types': 7.18.0
       eslint-visitor-keys: 3.4.3
 
-  '@ubjs/core@0.31.0-3': {}
+  '@ubjs/core@0.31.0-5': {}
 
   '@ungap/structured-clone@1.3.1': {}
 
@@ -9977,7 +9972,7 @@ snapshots:
 
   unicode-property-aliases-ecmascript@2.2.0: {}
 
-  uniffi-bindgen-react-native@0.31.0-3(patch_hash=53974ea656337ff2a02b8dc39dc4719d5ae3fd793c6bec3b2720075df98d61d9): {}
+  uniffi-bindgen-react-native@0.31.0-5: {}
 
   universalify@0.1.2: {}
 

@@ -5,7 +5,7 @@
  * a build compatible with our uniffi-bindgen-react-native (ubrn) version.
  *
  * Why it's disabled: bdk-rn (every release — 0.30, 1.0, 2.x, 3.0-rc) pins
- * `uniffi-bindgen-react-native "0.30.0-1"`, while ddk-rn is on `0.31.0-3`. An app
+ * `uniffi-bindgen-react-native "0.30.0-1"`, while ddk-rn is on `0.31.0-5`. An app
  * can only resolve ONE ubrn pod version, so bdk-rn and ddk-rn can't coexist. Also
  * bdk-rn 0.30 (npm `latest`) doesn't build under RN new architecture, and 1.0+
  * isn't published to npm. See the tracking issue filed against bitcoindevkit/bdk-rn.
