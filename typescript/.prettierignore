@@ -1,0 +1,16 @@
+# Generated: ubrn writes src/*/generated/ on every build, and it runs prettier
+# over its own output. Checking it here would only ever produce a loop — prettier
+# rewrites a file that the next generation puts straight back. Same reason
+# ddk-rn's eslintIgnore lists its generated files.
+src/node/generated
+src/wasm/generated
+
+# Build output. tsc writes dist/, build-release.mjs writes
+# platform/, and vite writes example-browser/dist/; all are gitignored, and
+# prettier was reporting them as failures.
+dist
+platform
+example-browser/dist
+
+# Lockfile: pnpm owns the formatting.
+pnpm-lock.yaml

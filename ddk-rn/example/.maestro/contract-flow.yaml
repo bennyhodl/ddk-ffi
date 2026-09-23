@@ -2,7 +2,7 @@
 # funding AND settlement — on a simulator, asserting the on-device JSI -> Rust
 # bindings produce the expected result. This is the only layer that exercises the
 # real React Native bindings (the Rust logic itself is covered by the ddk-ffi +
-# ddk-ts suites).
+# ddk suites).
 appId: ddkrn.example
 ---
 # The whole flow runs inside a retry, and the retry opens by dismissing an

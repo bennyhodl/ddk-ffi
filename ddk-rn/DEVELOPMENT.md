@@ -32,7 +32,7 @@ From the repo root, with a clean working tree:
 just release 0.2.0
 ```
 
-That bumps `ddk-ts/package.json`, `ddk-rn/package.json` and `ddk-ffi/Cargo.toml`,
+That bumps `typescript/package.json`, `ddk-rn/package.json` and `ddk-ffi/Cargo.toml`,
 commits, tags `v0.2.0` and pushes. Pushing the tag is what publishes —
 `.github/workflows/publish.yml` builds the XCFramework on macOS, the JNI libraries
 on Linux, verifies both are in the tarball, and runs `npm publish`.

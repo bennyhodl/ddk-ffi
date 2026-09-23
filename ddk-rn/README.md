@@ -74,7 +74,7 @@ const offer = createOffer({
 //   signContractCet / signContractRefund
 ```
 
-Bytes cross the JSI boundary as `ArrayBuffer` (`ddk-ts` uses `Buffer`).
+Bytes cross the JSI boundary as `Uint8Array`, as they do in `@bennyblader/ddk`.
 
 `example/src/App.tsx` runs the complete flow on device — offline, deterministic,
 and asserted by the Maestro E2E.
@@ -112,7 +112,7 @@ just build
 ### Just Commands
 
 ```bash
-# JSI + TurboModule bindings, the iOS XCFramework, and ddk-ts
+# JSI + TurboModule bindings, the iOS XCFramework, and @bennyblader/ddk (N-API)
 just build
 
 # Generate JSI bindings only (TypeScript + C++)
@@ -192,8 +192,8 @@ bindings can't execute under Node, so it asserts instead that generation was
 complete — every function, record, and constructor present in both the
 TypeScript surface and the native symbol layer. It catches the classic
 regression where `ddk-ffi` changed but `ddk-rn` wasn't regenerated. Runtime
-behavior is covered by the shared Rust (`ddk-ffi` unit tests and the `ddk-ts`
-suite exercise the same functions).
+behavior is covered by the shared Rust (`ddk-ffi` unit tests and the `ddk`
+suites exercise the same functions).
 
 ### End-to-end, on a device
 
@@ -255,7 +255,7 @@ npx react-native run-android
 
 ### Release Process
 
-`ddk-ts` and `ddk-rn` are versioned and released together, from the repo root:
+`ddk` and `ddk-rn` are versioned and released together, from the repo root:
 
 ```bash
 just release 0.5.0
@@ -264,7 +264,7 @@ just release 0.5.0
 This will:
 
 1. Check the working directory is clean
-2. Set the version in `ddk-ts/package.json`, `ddk-rn/package.json` and `ddk-ffi/Cargo.toml`
+2. Set the version in `typescript/package.json`, `ddk-rn/package.json` and `ddk-ffi/Cargo.toml`
 3. Commit, tag as `v0.5.0` and push
 
 Publishing happens in CI — pushing the tag is what publishes. The iOS
@@ -284,11 +284,10 @@ All bindings are generated from the compiled `ddk-ffi` library, whose Rust
 source — annotated with UniFFI proc-macros, with no `.udl` file — is the single
 source of truth for the interface.
 
-`@bennyblader/ddk-ts` is hand-written NAPI over the same crates and is kept in
-parity by CI. Two differences to know: bytes are `ArrayBuffer` here and `Buffer`
-there, and a dozen transaction operations are methods on a record here
-(`TxOutput.isDust`, `Transaction.signCet`, …) but free functions there. See the
-[comparison table](../README.md#where-the-two-packages-differ).
+`@bennyblader/ddk` (Node and browsers) is generated from the same library by the
+same bindgen, so it has the same names, the same argument lists and the same
+`Uint8Array` byte type. The one difference: its browser build needs
+`await init()` before the first call.
 
 ### Known Issues
 

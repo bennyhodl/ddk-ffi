@@ -1,0 +1,19 @@
+{
+  "name": "ddk-example-browser",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Browser smoke test for @bennyblader/ddk (browser condition -> wasm)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "smoke": "vite build && node smoke.mjs"
+  },
+  "dependencies": {
+    "@bennyblader/ddk": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "^7.1.0"
+  }
+}
