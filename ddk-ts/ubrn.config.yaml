@@ -2,15 +2,25 @@
 #
 # The N-API generator runs against the compiled ddk-ffi cdylib and writes the
 # TypeScript in src/. scripts/build-release.mjs passes the same values on the
-# command line, so this file documents the wiring rather than driving the build.
+# command line, so for N-API this file documents the wiring rather than driving
+# the build. The wasm2 section at the bottom is different: `ubrn build wasm2`
+# reads it, and the rust section above, directly.
 #
 # Note that the *bindings* config (logLevel, strictByteArrays, …) does not live
 # here: ubrn's TS pipeline auto-discovers ddk-ffi/uniffi.toml and ignores
-# --config, so that file applies to the Node bindings and the React Native
-# bindings alike.
+# --config, so that file applies to the Node, wasm and React Native bindings
+# alike.
 rust:
   directory: ../ddk-ffi
   manifestPath: Cargo.toml
 
 bindings:
   ts: src
+
+# The wasm build (`pnpm build:wasm` -> scripts/build-wasm.mjs). ubrn's wasm2
+# target loads the ddk-ffi cdylib, built for wasm32-unknown-unknown, through the
+# @ubjs/wasm player — no shim crate, and the same public API as N-API. It writes
+# its TypeScript and the staged ddk_ffi.wasm here; src-wasm/index.ts, one level
+# up, is the hand-written entry that adds a default for the .wasm location.
+wasm2:
+  ts: src-wasm/generated

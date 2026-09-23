@@ -131,6 +131,42 @@ jobs:
             ddk-ts/platform/
           if-no-files-found: error
 
+  # The `./wasm` entry. One build serves every platform, so it is its own job
+  # rather than a matrix row.
+  build-ddk-ts-wasm:
+    name: Build ddk-ts (wasm)
+    needs: [verify-version]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 10
+      - name: Install uniffi-bindgen-react-native
+        run: npm install -g uniffi-bindgen-react-native@${{ env.UBRN_VERSION }}
+      - name: Install clang (wasm32 C toolchain)
+        run: sudo apt-get update && sudo apt-get install -y clang llvm
+      - name: Install dependencies
+        run: cd ddk-ts && pnpm install --frozen-lockfile
+      - name: Build
+        run: cd ddk-ts && pnpm build:wasm
+      - name: Test the release build
+        run: cd ddk-ts && pnpm test:wasm
+      - name: Committed wasm bindings match the crate
+        run: git diff --exit-code ddk-ts/src-wasm
+      - name: Upload wasm artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ddk-ts-wasm
+          path: ddk-ts/dist-wasm/
+          if-no-files-found: error
+
   test-ddk-ts:
     name: Test ddk-ts
     needs: [verify-version]
@@ -190,7 +226,7 @@ jobs:
   # produced and publishes it. No Rust toolchain, no bindgen.
   publish-ddk-ts:
     name: Publish @bennyblader/ddk-ts
-    needs: [test-ddk-ts, build-ddk-ts]
+    needs: [test-ddk-ts, build-ddk-ts, build-ddk-ts-wasm]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -212,9 +248,17 @@ jobs:
           path: ddk-ts
           pattern: ddk-ts-bindings-*
           merge-multiple: true
+      # Its own download, not part of the pattern above: a single-directory
+      # artifact stores that directory's CONTENTS at its root, so it has to be
+      # put back under dist-wasm/ explicitly.
+      - name: Download the wasm build
+        uses: actions/download-artifact@v4
+        with:
+          name: ddk-ts-wasm
+          path: ddk-ts/dist-wasm
       - name: Show what will be published
         run: |
-          ls -la ddk-ts/dist ddk-ts/platform
+          ls -la ddk-ts/dist ddk-ts/dist-wasm ddk-ts/dist-wasm/generated ddk-ts/platform
           for d in ddk-ts/platform/*/; do echo "--- $d"; ls -la "$d"; done
       # NPM_CONFIG_TAG rather than `npm publish --tag`: publish-release.mjs
       # publishes each platform package with a bare `npm publish` of its own,

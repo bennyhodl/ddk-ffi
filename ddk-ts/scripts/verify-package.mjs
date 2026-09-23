@@ -23,6 +23,10 @@ const problems = []
 
 if (!existsSync(join(PKG, 'dist', 'index.js'))) problems.push('dist/index.js is missing (nothing was built)')
 if (!existsSync(join(PKG, 'dist', 'index.d.ts'))) problems.push('dist/index.d.ts is missing (no types)')
+if (!existsSync(join(PKG, 'dist-wasm', 'index.js'))) problems.push('dist-wasm/index.js is missing (no ./wasm entry)')
+if (!existsSync(join(PKG, 'dist-wasm', 'generated', 'ddk_ffi.wasm'))) {
+  problems.push('dist-wasm/generated/ddk_ffi.wasm is missing — ./wasm would install and fail in init()')
+}
 
 const optional = manifest.optionalDependencies ?? {}
 const names = Object.keys(optional)
@@ -42,4 +46,6 @@ if (problems.length > 0) {
   process.exit(1)
 }
 
-console.log(`✅ ${manifest.name}@${manifest.version} — dist/ present, ${names.length} platform package(s) referenced`)
+console.log(
+  `✅ ${manifest.name}@${manifest.version} — dist/ + dist-wasm/ present, ${names.length} platform package(s) referenced`,
+)

@@ -1,5 +1,9 @@
 #![allow(clippy::too_many_arguments)]
 #![allow(deprecated)]
+// Supplies the allocator and panic hook ubrn's wasm2 player calls. Nothing
+// references it by name, so without this the linker drops its exports.
+#[cfg(target_arch = "wasm32")]
+extern crate uniffi_runtime_wasm as _;
 use bip39::{Language, Mnemonic};
 use bitcoin::bip32::{IntoDerivationPath, Xpriv, Xpub};
 use bitcoin::hashes::Hash;

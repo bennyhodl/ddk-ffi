@@ -1,0 +1,20 @@
+{
+  // Compiles the wasm binding in src-wasm/ to the ESM `./wasm` ships.
+  // DOM is in lib because the same output runs in browsers (fetch, Response).
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "types": [],
+    "allowJs": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "outDir": "dist-wasm",
+    "rootDir": "src-wasm",
+    "strict": true,
+    "skipLibCheck": true
+  },
+  "include": ["src-wasm/**/*.ts"]
+}

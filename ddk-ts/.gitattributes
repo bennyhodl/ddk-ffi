@@ -12,3 +12,5 @@
 src/ddk_ffi.ts       linguist-generated=true
 src/ddk_ffi-ffi.ts   linguist-generated=true
 src/index.ts         linguist-generated=true
+src-wasm/generated/*.ts       linguist-generated=true
+src-wasm/generated/*.js       linguist-generated=true

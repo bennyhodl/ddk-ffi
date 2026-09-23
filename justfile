@@ -6,6 +6,7 @@
 check:
     cd {{justfile_directory()}}/ddk-ffi && cargo test --all-features
     cd {{justfile_directory()}}/ddk-ts && pnpm generate:debug && pnpm test
+    cd {{justfile_directory()}}/ddk-ts && pnpm build:wasm:debug && pnpm test:wasm
     cd {{justfile_directory()}}/ddk-rn && pnpm typecheck
 
 # Lint the Rust crate (rustfmt + clippy) and the React Native bindings (eslint)
@@ -334,7 +335,7 @@ clean:
   cd {{justfile_directory()}}/ddk-rn && rm -rf cpp/ddk_ffi.* cpp/ddk-rn.* cpp/UniffiCallInvoker.h src/ddk_ffi*.ts src/NativeDdkRn.ts ios/DdkRn.xcframework android/src/main/jniLibs lib ios/build android/build example/ios/build example/android/build example/android/app/build example/ios/Pods example/ios/Podfile.lock example/ios/DdkRnExample.xcworkspace src/index.tsx
 
   # Clean TypeScript/Node.js bindings
-  cd {{justfile_directory()}}/ddk-ts && rm -rf node_modules dist platform src
+  cd {{justfile_directory()}}/ddk-ts && rm -rf node_modules dist platform src dist-wasm src-wasm/generated example-browser/dist
   cd {{justfile_directory()}}/ddk-ts/example && rm -rf node_modules dist
 
 # ====================
@@ -362,6 +363,23 @@ ts-example:
 # Run TypeScript tests
 ts-test:
     cd {{justfile_directory()}}/ddk-ts && pnpm test
+
+# The wasm binding, shipped as `@bennyblader/ddk-ts/wasm`: ddk-ffi built for
+# wasm32-unknown-unknown and loaded by ubrn's wasm2 player (@ubjs/wasm), so it
+# runs in browsers and in Node on any platform. Needs the wasm32-unknown-unknown
+# rust target and a clang that can target wasm (macOS: `brew install llvm`).
+#
+# Build the wasm binding into ddk-ts/dist-wasm (release)
+ts-wasm-build:
+    cd {{justfile_directory()}}/ddk-ts && pnpm install && pnpm build:wasm
+
+# Run the ddk-ts vitest suites against the wasm binding
+ts-wasm-test:
+    cd {{justfile_directory()}}/ddk-ts && pnpm test:wasm
+
+# Load the wasm binding in headless Chrome through a Vite production build
+ts-wasm-smoke:
+    cd {{justfile_directory()}}/ddk-ts/example-browser && pnpm smoke
 
 # ====================
 # BAL compatibility suite (compat/)

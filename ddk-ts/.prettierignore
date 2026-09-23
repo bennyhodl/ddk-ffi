@@ -3,11 +3,15 @@
 # rewrites a file that the next generation puts straight back. Same reason
 # ddk-rn's eslintIgnore lists its generated files.
 src
+src-wasm/generated
 
-# Build output. tsc writes dist/ and build-release.mjs writes platform/; both
-# are gitignored, and prettier was reporting them as failures.
+# Build output. tsc writes dist/ and dist-wasm/, build-release.mjs writes
+# platform/, and vite writes example-browser/dist/; all are gitignored, and
+# prettier was reporting them as failures.
 dist
+dist-wasm
 platform
+example-browser/dist
 
 # Lockfile: pnpm owns the formatting.
 pnpm-lock.yaml
