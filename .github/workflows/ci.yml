@@ -81,10 +81,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Rust (+ rustfmt, clippy)
+      - name: Setup Rust (+ rustfmt, clippy, wasm32)
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
+          targets: wasm32-unknown-unknown
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -149,6 +150,33 @@ jobs:
             echo "::error::ddk-ts/src is stale — run 'just ts-build' and commit the result"
             exit 1
           }
+
+      # ---- ddk-ts wasm (`@bennyblader/ddk-ts/wasm`) --------------------------
+      # ddk-ffi built for wasm32-unknown-unknown and loaded by ubrn's wasm2
+      # player. secp256k1-sys and secp256k1-zkp-sys compile vendored C, so this
+      # needs a clang with a wasm backend; build-wasm.mjs finds /usr/bin/clang
+      # and /usr/bin/llvm-ar. Before compat/: vectors.spec replays through it.
+      - name: Install clang (wasm32 C toolchain)
+        run: sudo apt-get update && sudo apt-get install -y clang llvm
+
+      - name: Build ddk-ts wasm (debug)
+        run: cd ddk-ts && pnpm build:wasm:debug
+
+      - name: vitest (ddk-ts, wasm)
+        run: cd ddk-ts && pnpm test:wasm
+
+      - name: Committed wasm bindings match the crate
+        run: |
+          git diff --exit-code ddk-ts/src-wasm || {
+            echo "::error::ddk-ts/src-wasm is stale — run 'just ts-wasm-build' and commit the result"
+            exit 1
+          }
+
+      # A Vite production build of example-browser, loaded in the runner's
+      # Chrome: proves the package's `new URL(..., import.meta.url)` survives a
+      # bundler and the module instantiates in a real browser.
+      - name: Browser smoke test (ddk-ts wasm)
+        run: cd ddk-ts/example-browser && CHROME=$(command -v google-chrome) pnpm smoke
 
       # ---- BAL compatibility (compat/) --------------------------------------
       # Runs here rather than in its own job because the expensive prerequisite
@@ -515,6 +543,69 @@ jobs:
           path: |
             ddk-ts/dist/
             ddk-ts/platform/
+          retention-days: 3
+          if-no-files-found: error
+
+  # The `./wasm` entry, release profile — what publish.yml's build-ddk-ts-wasm
+  # ships. Not a build-ts matrix row: that matrix is one native cdylib per host
+  # through build-release.mjs, while this is one build for every platform
+  # through a different script. `check` already gates on a debug build; this
+  # catches what only the release profile (LTO) can break, before a tag does.
+  build-ts-wasm:
+    name: Build ddk-ts (wasm)
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust (+ wasm32)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Cache cargo
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ddk-ffi/target
+          key: ${{ runner.os }}-build-ts-wasm-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install uniffi-bindgen-react-native (matches the ddk-rn pin)
+        run: npm install -g uniffi-bindgen-react-native@${{ env.UBRN_VERSION }}
+
+      - name: Install clang (wasm32 C toolchain)
+        run: sudo apt-get update && sudo apt-get install -y clang llvm
+
+      - name: Install deps
+        run: cd ddk-ts && pnpm install --frozen-lockfile
+
+      - name: Build
+        run: cd ddk-ts && pnpm build:wasm
+
+      - name: vitest (release wasm)
+        run: cd ddk-ts && pnpm test:wasm
+
+      - name: Browser smoke test (release wasm)
+        run: cd ddk-ts/example-browser && CHROME=$(command -v google-chrome) pnpm smoke
+
+      - name: Upload the build
+        uses: actions/upload-artifact@v4
+        with:
+          name: ddk-ts-wasm
+          path: ddk-ts/dist-wasm/
           retention-days: 3
           if-no-files-found: error
 

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
+import * as ddkWasm from '@bennyblader/ddk-ts/wasm'
 import { describe, expect, test } from 'vitest'
 
 import { REPO_ROOT } from '../src/config.js'
@@ -25,6 +26,15 @@ describe('committed compat vectors', () => {
     for (const [key, value] of Object.entries(vectors.expected)) {
       expect(produced[key], key).toBe(value)
     }
+  })
+
+  // The same replay through the wasm binding. Beyond byte parity with native,
+  // it drives the randomized adaptor-signature path, which is where the wasm
+  // build's getrandom backend is exercised.
+  test('the wasm binding reproduces every committed artifact', async () => {
+    await ddkWasm.init()
+    const produced = runDdkReplay(ddkWasm, vectors)
+    expect(produced).toEqual(vectors.expected)
   })
 
   test('the ddk-rn copy of the vectors is in sync', () => {

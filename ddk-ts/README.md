@@ -187,8 +187,8 @@ party's prior contract.
 
 Other targets (macOS x64, Windows x64, Linux ARM64) are already mapped in
 `scripts/build-release.mjs`; adding one means listing it there under `PUBLISHED`
-and in the publish workflow's build matrix. The browser is a separate question —
-see the note below.
+and in the publish workflow's build matrix. Browsers, and platforms with no
+native binary, use the wasm entry — see below.
 
 ### Release Process
 
@@ -224,14 +224,37 @@ both. The old `verify-parity.cjs` / `verify-types.cjs` scripts are gone with the
 drift they existed to catch; CI instead checks that the committed `src/` still
 matches the crate.
 
-### The browser
+### Browsers and wasm: `@bennyblader/ddk-ts/wasm`
 
-There is no browser build at the moment. It previously came from napi-rs plus
-`wasm32-wasip1-threads` and emnapi, which the N-API generator structurally cannot
-produce — `@ubjs/node` dlopens a native cdylib, and neither dlopen nor native
-addons exist in a browser. ubrn has a separate `generate wasm` path
-(wasm-bindgen, `wasm32-unknown-unknown`) that restores it from this same crate;
-that is tracked as follow-up work, not a dead end.
+The same package ships a WebAssembly build of the same crate, with the same API.
+It runs in browsers, and in Node on any platform, including the ones with no
+native binary above. Use the native entry where you can: wasm is slower.
+
+```typescript
+import { init, version, createFundTxLockingScript } from '@bennyblader/ddk-ts/wasm'
+
+await init() // once, before any other call
+console.log(version())
+```
+
+`init()` is the one difference from the native entry. It fetches and
+instantiates `ddk_ffi.wasm` (4.8MB, 2.9MB gzipped), which the package locates
+through `new URL(..., import.meta.url)`; Vite, webpack 5, Rollup and Parcel copy
+the file and rewrite that URL at build time. To serve the file from somewhere
+else, pass its location: `init(url | path | Response | bytes)`. No
+cross-origin isolation (COOP/COEP headers) is needed.
+
+Under **Vite's dev server**, exclude the package from dependency pre-bundling —
+pre-bundling moves it into `.vite/deps`, where the relative URL no longer
+resolves. `vite build` needs nothing:
+
+```typescript
+// vite.config.ts
+export default defineConfig({ optimizeDeps: { exclude: ['@bennyblader/ddk-ts'] } })
+```
+
+`example-browser/` is a working Vite app; `pnpm smoke` there builds it and loads
+it in headless Chrome.
 
 ## Troubleshooting
 

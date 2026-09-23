@@ -103,6 +103,42 @@ does that, after every generation and before `tsc`. It is not optional.
 Also note `version()` returns the **Rust crate** version, not the npm version, so
 keeping those in lockstep is still `just release`'s job.
 
+## The wasm build (`./wasm`)
+
+```bash
+pnpm build:wasm        # release; build:wasm:debug for the CI gate
+pnpm test:wasm         # the same vitest specs, against dist-wasm/
+cd example-browser && pnpm smoke   # Vite build, loaded in headless Chrome
+```
+
+`scripts/build-wasm.mjs` runs `ubrn build wasm2`, which reads the `wasm2`
+section of `ubrn.config.yaml`: it builds ddk-ffi for `wasm32-unknown-unknown`,
+generates the TypeScript from that same `.wasm`, and stages the module in
+`src-wasm/generated/`. That TypeScript is committed and diffed in CI, like
+`src/`; the `.wasm` is not. `src-wasm/index.ts` is the one hand-written file: it
+adds `init()`, which defaults the module's location.
+
+What it needs, and why:
+
+- **A clang with a wasm backend.** secp256k1-sys and secp256k1-zkp-sys compile
+  vendored C, and Apple's `/usr/bin/cc` cannot target wasm32. macOS:
+  `brew install llvm`; Linux: `apt install clang llvm`. The script finds either,
+  or takes `WASM_CC` / `WASM_AR`.
+- **In ddk-ffi, for wasm32 only:** `uniffi-runtime-wasm` (the allocator and
+  panic hook the player calls) plus `extern crate uniffi_runtime_wasm as _;` in
+  `lib.rs` — without that line nothing references the crate, the linker drops
+  its exports, and `init()` fails with `required export "__ubrn_alloc" not
+found`; and getrandom's `js` backend, for entropy.
+- **wasm-bindgen pinned to `=0.2.100`.** The getrandom backend pulls in
+  wasm-bindgen, so ubrn runs its built-in wasm-bindgen over the module, and the
+  two must be the same schema version. ubrn 0.31.0-5 embeds 0.2.100. A skew
+  fails the build with "rust Wasm file schema version: X / this binary schema
+  version: 0.2.100"; after a ubrn bump, read ubrn's `Cargo.lock` for
+  `wasm-bindgen-cli-support` and pin to that.
+- **`// @ts-nocheck` added to the generated `index.ts`.** ubrn puts it on the
+  other two generated files but not this one, which then fails tsc inside
+  ubrn's own types. The script adds it.
+
 ## Releasing
 
 ```bash

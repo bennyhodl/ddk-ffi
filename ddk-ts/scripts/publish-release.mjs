@@ -41,6 +41,9 @@ const fail = (msg) => {
 }
 
 if (!existsSync(join(PKG, 'dist', 'index.js'))) fail('dist/index.js is missing — run scripts/build-release.mjs first')
+if (!existsSync(join(PKG, 'dist-wasm', 'generated', 'ddk_ffi.wasm'))) {
+  fail('dist-wasm/generated/ddk_ffi.wasm is missing — run scripts/build-wasm.mjs first')
+}
 
 const platformRoot = join(PKG, 'platform')
 if (!existsSync(platformRoot)) fail('platform/ is missing — run scripts/build-release.mjs first')

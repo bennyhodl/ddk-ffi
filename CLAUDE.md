@@ -142,6 +142,12 @@ so pin the Rust crate to that exact patch. Update the global binary with
 the two together with the package pin, or releases generate with a different
 ubrn than PR CI tested.
 
+**The wasm build adds a fourth pin: `wasm-bindgen`** (wasm32 target table in
+`ddk-ffi/Cargo.toml`) must equal the `wasm-bindgen-cli-support` version ubrn
+embeds — 0.2.100 for ubrn 0.31.0-5 — because ubrn runs that wasm-bindgen over
+the module and the schema versions must match exactly. When bumping ubrn, read
+its `Cargo.lock` and move the pin (and `js-sys` with it) to match.
+
 > Note: as of uniffi 0.31, the old manual fix for `#include "/ddk_ffi.hpp"` is no longer
 > needed — the generator emits the correct `#include "ddk_ffi.hpp"`.
 
@@ -356,11 +362,16 @@ platform as `@bennyblader/ddk-ts-<node-triple>` packages, pulled in through
   rejects; `scripts/fix-esm-imports.mjs` rewrites them after every generation and
   before `tsc`. Not optional — without it the published package throws
   `ERR_MODULE_NOT_FOUND`.
-- **There is no browser build.** The old WASI/emnapi fallback was a napi-rs
-  strategy and cannot be reproduced by the N-API generator, whose runtime dlopens
-  a native cdylib. ubrn's separate `generate wasm` path (wasm-bindgen,
-  `wasm32-unknown-unknown`) restores it from this same crate; it is follow-up
-  work, not a dead end.
+- **The browser build is `@bennyblader/ddk-ts/wasm`**, from ubrn's **wasm2**
+  target (`pnpm build:wasm`, `just ts-wasm-build`): ddk-ffi built for
+  `wasm32-unknown-unknown` and loaded by the `@ubjs/wasm` player. Same API as
+  N-API plus `await init()`. It needs a clang with a wasm backend (Apple's has
+  none: `brew install llvm`) and, in ddk-ffi's wasm32 target tables,
+  `uniffi-runtime-wasm` + getrandom `js` + the `wasm-bindgen` pin described
+  under the lockstep section. **Keep `extern crate uniffi_runtime_wasm as _;`
+  in `lib.rs`**: nothing else references that crate, so without it the linker
+  drops its exports and `init()` fails at runtime, not at build time. Details
+  in `ddk-ts/DEVELOPMENT.md`.
 
 ## BAL compatibility suite (`compat/`)
 

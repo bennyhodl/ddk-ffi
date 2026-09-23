@@ -32,6 +32,11 @@ bip39 = "2.2.0"
 uniffi = { version = "=0.31.0", default-features = false, features = [
   "wasm-unstable-single-threaded",
 ] }
+uniffi-runtime-wasm = "=0.31.0-5"
+wasm-bindgen = "=0.2.100"
+
+[target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
+getrandom = { version = "0.2", features = ["js"] }
 
 [dev-dependencies]
 bip39 = { version = "2.2.0", features = ["rand"] }
