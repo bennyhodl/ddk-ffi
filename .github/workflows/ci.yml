@@ -340,8 +340,14 @@ jobs:
           if [ ! -d "$NDK_HOME" ]; then
             echo "NDK $NDK_VERSION not preinstalled; installing. Present:"
             ls "$ANDROID_SDK_ROOT/ndk" || true
-            yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" \
-              --install "ndk;$NDK_VERSION" >/dev/null
+            # The download is ~700MB and sometimes arrives corrupt ("Error on
+            # ZipFile unknown archive"); a second attempt fetches it again.
+            for attempt in 1 2 3; do
+              yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" \
+                --install "ndk;$NDK_VERSION" >/dev/null || true
+              [ -d "$NDK_HOME" ] && break
+              echo "NDK install attempt $attempt failed"
+            done
           fi
           [ -d "$NDK_HOME" ] || { echo "::error::NDK $NDK_VERSION unavailable"; exit 1; }
           echo "ANDROID_NDK_HOME=$NDK_HOME" >> "$GITHUB_ENV"
