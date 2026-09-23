@@ -1,4 +1,4 @@
-import * as ddk from '@bennyblader/ddk-ts'
+import * as ddk from '@bennyblader/ddk'
 import * as bitcoin from 'bitcoinjs-lib'
 import bs58check from 'bs58check'
 

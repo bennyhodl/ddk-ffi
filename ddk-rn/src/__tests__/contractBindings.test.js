@@ -3,7 +3,7 @@
  *
  * The ddk-rn bindings run over JSI/Hermes and can't execute in a Node/Jest
  * environment (no native TurboModule), so runtime behavior is covered by the
- * shared Rust: `ddk-ffi` unit tests and the `ddk-ts` (NAPI) suite exercise the
+ * shared Rust: `ddk-ffi` unit tests and the `ddk` (N-API) suite exercise the
  * exact same `ddk_ffi::contract` functions this binding wraps.
  *
  * What this test guards is that the bindings were GENERATED completely and

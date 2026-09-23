@@ -1,18 +1,19 @@
 # ddk ↔ bitcoin-abstraction-layer compatibility suite
 
-Proves that ddk's contract/message API (ddk-ts and ddk-rn, generated from
+Proves that ddk's contract/message API (ddk and ddk-rn, generated from
 `ddk-ffi`) is wire- and lifecycle-compatible with the stack lygos is migrating
 away from: **bitcoin-abstraction-layer (BAL)** + **@node-dlc 1.2.1**. The BAL
 party in every test runs the **latest published npm release**
 (`@atomicfinance/* 4.3.6`) paired with the ddk-ts release production ships as
 its engine (`@bennyblader/ddk-ts@0.3.42`) — the exact combination lygos-app
-and orange-grove run — while the ddk party runs this repo's ddk-ts. The two
+and orange-grove run — while the ddk party runs this repo's `@bennyblader/ddk`
+(the renamed ddk-ts). The two
 sides exchange nothing but wire bytes.
 
 Two dependency details make that pairing work:
 
 - The 0.3.42 engine is installed under the **`bal-ddk-ts` alias** so it can
-  coexist with the `link:../ddk-ts` the ddk party tests.
+  coexist with the `link:../typescript` the ddk party tests.
 - It carries a **pnpm patch** (`patches/`, wired in `pnpm-workspace.yaml`)
   removing its mislabeled `"type": "module"` — its dist is CJS. This is the
   same patch orange-grove ships for the same reason.
@@ -61,7 +62,7 @@ device:
 
 ```sh
 just compat-install        # once; everything comes from npm
-just ts-build              # the suite tests ddk-ts's current dist
+just ts-build              # the suite tests ddk's current dist
 just compat-test           # everything (spawns a throwaway regtest bitcoind)
 just compat-test-messages  # offline suites only
 just compat-vectors        # regenerate the vectors after a Rust core change
@@ -112,9 +113,9 @@ into its own wallet (`ddk-compat`) and never touches other wallets.
 The whole suite runs in the `check` job of `ci.yml` — the gate, so nothing else
 builds unless ddk and BAL still agree. It sits there rather than in a job of its
 own because the expensive prerequisite is already met: `pnpm generate:debug`
-builds the debug cdylib and symlinks `node_modules/@bennyblader/ddk-ts-<triple>`,
+builds the debug cdylib and symlinks `node_modules/@bennyblader/ddk-<triple>`,
 which is what `resolveLibPath()` resolves through. `compat/` reaches that via
-`link:../ddk-ts`, so CI tests the ddk-ts built from the commit under test, while
+`link:../typescript`, so CI tests the ddk built from the commit under test, while
 the BAL side installs from npm like any other dependency.
 
 Bitcoin Core is installed from a pinned, checksummed bitcoincore.org tarball

@@ -41,8 +41,8 @@ When making changes to `ddk-ffi/src/lib.rs`, you MUST:
 
 Releases are published by CI, never from a developer machine. No single host can
 build everything the repo ships: `ddk-rn`'s XCFramework needs macOS, its JNI
-libraries need a Linux host with the Android NDK, and `ddk-ts` builds a separate
-napi binary per platform.
+libraries need a Linux host with the Android NDK, and `ddk` builds a separate
+N-API binary per platform (plus one wasm build).
 
 With a clean working tree:
 
@@ -51,7 +51,7 @@ just release 0.2.0
 ```
 
 That runs `scripts/prep-release.js`, which sets the version in
-`ddk-ts/package.json`, `ddk-rn/package.json` and `ddk-ffi/Cargo.toml`, commits,
+`typescript/package.json`, `ddk-rn/package.json` and `ddk-ffi/Cargo.toml`, commits,
 tags `v0.2.0`, and pushes the branch and the tag.
 
 Pushing the tag triggers [`.github/workflows/publish.yml`](.github/workflows/publish.yml):
@@ -59,7 +59,7 @@ Pushing the tag triggers [`.github/workflows/publish.yml`](.github/workflows/pub
 1. `verify-version` fails the run unless the tag matches both `package.json` versions
 2. `build-ddk-rn-ios` builds the XCFramework on `macos-latest`
 3. `build-ddk-rn-android` builds the JNI libraries on `ubuntu-latest` with a pinned NDK
-4. `build-ddk-ts` builds each napi platform binary
+4. `build-ddk` builds each N-API platform binary, and `build-ddk-wasm` the wasm module
 5. The publish jobs assemble the artifacts, verify the binaries are in the tarball, and `npm publish`
 
 There is nothing to upload by hand — no binary archives, no GitHub release assets.
@@ -153,7 +153,7 @@ just release 0.1.2
 ### What `just release` does automatically:
 
 - Refuses to run unless the working tree is clean
-- Sets the version in `ddk-ts/package.json`, `ddk-rn/package.json` and `ddk-ffi/Cargo.toml`
+- Sets the version in `typescript/package.json`, `ddk-rn/package.json` and `ddk-ffi/Cargo.toml`
 - Creates the git commit and the `v<version>` tag
 - Pushes the branch and the tag
 

@@ -60,9 +60,9 @@ const fallback = () =>
 const prompt = `You are writing the GitHub release notes for ddk-ffi v${version}.
 
 ddk-ffi provides DLC (Discreet Log Contract) bindings from Rust to two published
-npm packages: @bennyblader/ddk-rn (React Native, via UniFFI) and
-@bennyblader/ddk-ts (Node.js, via napi-rs). Both are released together at the
-same version.
+npm packages, both generated from the same crate by uniffi-bindgen-react-native:
+@bennyblader/ddk-rn (React Native, JSI) and @bennyblader/ddk (Node.js via N-API,
+browsers via WebAssembly). Both are released together at the same version.
 
 Write notes for developers deciding whether to upgrade. Requirements:
 
@@ -152,7 +152,7 @@ main()
 
 \`\`\`bash
 npm install @bennyblader/ddk-rn@${version}   # React Native
-npm install @bennyblader/ddk-ts@${version}   # Node.js
+npm install @bennyblader/ddk@${version}      # Node.js + browsers
 \`\`\`
 
 Both packages ship prebuilt binaries — no Rust toolchain, no Android NDK, nothing compiled on install.

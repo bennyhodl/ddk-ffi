@@ -11,8 +11,8 @@ permissions:
   id-token: write
 
 env:
-  # Read by cargo when building the ddk-ts cdylib on macOS. APP_NAME lived here
-  # too; it was napi-rs's, and nothing reads it now that ddk-ts is generated.
+  # Read by cargo when building the ddk (N-API) cdylib on macOS. APP_NAME lived
+  # here too; it was napi-rs's, and nothing reads it now that ddk is generated.
   MACOSX_DEPLOYMENT_TARGET: '10.13'
   # Keep in sync with ddk-rn/package.json and ci.yml's UBRN_VERSION.
   UBRN_VERSION: '0.31.0-5'
@@ -34,13 +34,13 @@ jobs:
           TAG_VERSION="${GITHUB_REF_NAME#v}"
           echo "Tag version: $TAG_VERSION"
 
-          TS_VERSION=$(node -p "require('./ddk-ts/package.json').version")
+          TS_VERSION=$(node -p "require('./typescript/package.json').version")
           RN_VERSION=$(node -p "require('./ddk-rn/package.json').version")
-          echo "ddk-ts: $TS_VERSION"
+          echo "ddk: $TS_VERSION"
           echo "ddk-rn: $RN_VERSION"
 
           if [ "$TAG_VERSION" != "$TS_VERSION" ]; then
-            echo "::error::Tag $TAG_VERSION does not match ddk-ts package.json version $TS_VERSION"
+            echo "::error::Tag $TAG_VERSION does not match ddk package.json version $TS_VERSION"
             exit 1
           fi
           if [ "$TAG_VERSION" != "$RN_VERSION" ]; then
@@ -54,7 +54,7 @@ jobs:
           # stale one makes the next `cargo build` dirty the tree and blocks the
           # following release. Checking only the package.json files is how
           # ddk-ts/Cargo.toml sat at 0.3.43 through the v0.4.0 release without
-          # anything noticing; ddk-ts has no Cargo.toml now, because it is
+          # anything noticing; ddk (formerly ddk-ts) has no Cargo.toml now, as it is
           # generated from this crate.
           check_toml() {
             local file="$1" actual
@@ -79,13 +79,13 @@ jobs:
 
           echo "version=$TAG_VERSION" >> "$GITHUB_OUTPUT"
 
-  # ddk-ts is GENERATED from ddk-ffi (see ddk-ts/DEVELOPMENT.md): each host
+  # ddk is GENERATED from ddk-ffi (see typescript/DEVELOPMENT.md): each host
   # builds the release cdylib for its own target, regenerates the bindings from
   # it, and assembles platform/<node-triple>/ — a complete npm package carrying
-  # that one library. dist/ (the compiled TypeScript) is identical from either
-  # host; publish-ddk-ts takes whichever arrives.
-  build-ddk-ts:
-    name: Build ddk-ts (${{ matrix.short }})
+  # that one library. dist/node/ (the compiled TypeScript) is identical from
+  # either host; publish-ddk takes whichever arrives.
+  build-ddk:
+    name: Build ddk (${{ matrix.short }})
     needs: [verify-version]
     strategy:
       fail-fast: false
@@ -114,27 +114,27 @@ jobs:
       - name: Install uniffi-bindgen-react-native
         run: npm install -g uniffi-bindgen-react-native@${{ env.UBRN_VERSION }}
       - name: Install dependencies
-        run: cd ddk-ts && pnpm install --frozen-lockfile
+        run: cd typescript && pnpm install --frozen-lockfile
       - name: Build
-        run: cd ddk-ts && node scripts/build-release.mjs --target ${{ matrix.target }}
+        run: cd typescript && node scripts/build-release.mjs --target ${{ matrix.target }}
       - name: Verify the platform package carries its library
         run: |
-          F=ddk-ts/platform/${{ matrix.short }}/${{ matrix.lib }}
+          F=typescript/platform/${{ matrix.short }}/${{ matrix.lib }}
           [ -f "$F" ] || { echo "::error::$F was not produced"; exit 1; }
-          ls -la "ddk-ts/platform/${{ matrix.short }}"
+          ls -la "typescript/platform/${{ matrix.short }}"
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ddk-ts-bindings-${{ matrix.target }}
+          name: ddk-bindings-${{ matrix.target }}
           path: |
-            ddk-ts/dist/
-            ddk-ts/platform/
+            typescript/dist/node/
+            typescript/platform/
           if-no-files-found: error
 
-  # The `./wasm` entry. One build serves every platform, so it is its own job
+  # The wasm entry (browsers, and `./wasm`). One build serves every platform, so it is its own job
   # rather than a matrix row.
-  build-ddk-ts-wasm:
-    name: Build ddk-ts (wasm)
+  build-ddk-wasm:
+    name: Build ddk (wasm)
     needs: [verify-version]
     runs-on: ubuntu-latest
     steps:
@@ -153,22 +153,22 @@ jobs:
       - name: Install clang (wasm32 C toolchain)
         run: sudo apt-get update && sudo apt-get install -y clang llvm
       - name: Install dependencies
-        run: cd ddk-ts && pnpm install --frozen-lockfile
+        run: cd typescript && pnpm install --frozen-lockfile
       - name: Build
-        run: cd ddk-ts && pnpm build:wasm
+        run: cd typescript && pnpm build:wasm
       - name: Test the release build
-        run: cd ddk-ts && pnpm test:wasm
+        run: cd typescript && pnpm test:wasm
       - name: Committed wasm bindings match the crate
-        run: git diff --exit-code ddk-ts/src-wasm
+        run: git diff --exit-code typescript/src/wasm/generated
       - name: Upload wasm artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ddk-ts-wasm
-          path: ddk-ts/dist-wasm/
+          name: ddk-wasm
+          path: typescript/dist/wasm/
           if-no-files-found: error
 
-  test-ddk-ts:
-    name: Test ddk-ts
+  test-ddk:
+    name: Test ddk
     needs: [verify-version]
     runs-on: ubuntu-latest
     steps:
@@ -185,15 +185,15 @@ jobs:
       - name: Install uniffi-bindgen-react-native
         run: npm install -g uniffi-bindgen-react-native@${{ env.UBRN_VERSION }}
       - name: Install dependencies
-        run: cd ddk-ts && pnpm install --frozen-lockfile
+        run: cd typescript && pnpm install --frozen-lockfile
       - name: Generate + build
-        run: cd ddk-ts && pnpm generate
+        run: cd typescript && pnpm generate
       - name: Test
-        run: cd ddk-ts && pnpm test
-      # The bindings are generated, so ddk-ts cannot drift from ddk-ffi — but a
+        run: cd typescript && pnpm test
+      # The bindings are generated, so ddk cannot drift from ddk-ffi — but a
       # stale committed copy can, and that is what would ship.
       - name: Committed bindings match the crate
-        run: git diff --exit-code ddk-ts/src
+        run: git diff --exit-code typescript/src/node/generated
 
   test-ddk-rn:
     name: Test ddk-rn
@@ -224,9 +224,9 @@ jobs:
 
   # Nothing is built here: this job only assembles what the two build hosts
   # produced and publishes it. No Rust toolchain, no bindgen.
-  publish-ddk-ts:
-    name: Publish @bennyblader/ddk-ts
-    needs: [test-ddk-ts, build-ddk-ts, build-ddk-ts-wasm]
+  publish-ddk:
+    name: Publish @bennyblader/ddk
+    needs: [test-ddk, build-ddk, build-ddk-wasm]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -239,27 +239,27 @@ jobs:
         run: |
           npm install -g npm@11
           npm --version
-      # merge-multiple: both artifacts carry the same dist/ (the compiled
+      # merge-multiple: both artifacts carry the same dist/node/ (the compiled
       # bindings are host-independent) and one platform/<triple>/ each, so they
       # overlay into a single tree.
       - name: Download the builds
         uses: actions/download-artifact@v4
         with:
-          path: ddk-ts
-          pattern: ddk-ts-bindings-*
+          path: typescript
+          pattern: ddk-bindings-*
           merge-multiple: true
       # Its own download, not part of the pattern above: a single-directory
       # artifact stores that directory's CONTENTS at its root, so it has to be
-      # put back under dist-wasm/ explicitly.
+      # put back under dist/wasm/ explicitly.
       - name: Download the wasm build
         uses: actions/download-artifact@v4
         with:
-          name: ddk-ts-wasm
-          path: ddk-ts/dist-wasm
+          name: ddk-wasm
+          path: typescript/dist/wasm
       - name: Show what will be published
         run: |
-          ls -la ddk-ts/dist ddk-ts/dist-wasm ddk-ts/dist-wasm/generated ddk-ts/platform
-          for d in ddk-ts/platform/*/; do echo "--- $d"; ls -la "$d"; done
+          ls -la typescript/dist/node typescript/dist/wasm typescript/dist/wasm/generated typescript/platform
+          for d in typescript/platform/*/; do echo "--- $d"; ls -la "$d"; done
       # NPM_CONFIG_TAG rather than `npm publish --tag`: publish-release.mjs
       # publishes each platform package with a bare `npm publish` of its own,
       # which takes no tag argument but does inherit the environment. Setting the
@@ -274,7 +274,7 @@ jobs:
       # enforces the order and injects the optionalDependencies.
       - name: Publish (platform packages, then main)
         run: |
-          cd ddk-ts
+          cd typescript
           VERSION="${GITHUB_REF_NAME#v}"
           case "$VERSION" in *-*) export NPM_CONFIG_TAG=next ;; *) export NPM_CONFIG_TAG=latest ;; esac
           echo "Publishing $VERSION to dist-tag $NPM_CONFIG_TAG"
@@ -394,7 +394,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # See publish-ddk-ts.
+      # See publish-ddk.
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -455,7 +455,7 @@ jobs:
             exit 1
           fi
           echo "✅ prebuilt binaries present, no Rust source"
-      # See the note on the ddk-ts publish step: a prerelease version must not
+      # See the note on the ddk publish step: a prerelease version must not
       # take over the `latest` dist-tag.
       - name: Publish
         run: |
@@ -473,7 +473,7 @@ jobs:
   # ANTHROPIC_API_KEY is missing or the API call fails.
   github-release:
     name: Create GitHub release
-    needs: [publish-ddk-ts, publish-ddk-rn]
+    needs: [publish-ddk, publish-ddk-rn]
     runs-on: ubuntu-latest
     permissions:
       contents: write

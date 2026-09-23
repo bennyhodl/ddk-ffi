@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Usage: node scripts/prep-release.js <X.Y.Z[-tag]>
 //
-// Bumps versions in ddk-ts/package.json, ddk-rn/package.json, ddk-ffi/Cargo.toml
+// Bumps versions in typescript/package.json, ddk-rn/package.json, ddk-ffi/Cargo.toml
 // and ddk-ffi/Cargo.lock, commits, creates tag v<version>, and pushes. CI
 // (.github/workflows/publish.yml) takes over on tag push and publishes both npm
 // packages.
@@ -11,7 +11,7 @@
 // `cargo build` rewrites the lock — which then blocks the *following* release,
 // because this script refuses a dirty tree. Both were stale after v0.4.0.
 //
-// ddk-ts has no Cargo.toml: it is generated from ddk-ffi, so ddk-ffi's version
+// ddk has no Cargo.toml: it is generated from ddk-ffi, so ddk-ffi's version
 // is the only Rust version in the repo — and it is what `version()` returns to
 // consumers of both packages.
 
@@ -44,7 +44,7 @@ const bumpPkg = file => {
   write(p, JSON.stringify(pkg, null, 2) + '\n');
   console.log(`\u2713 ${file} \u2192 ${version}`);
 };
-bumpPkg('ddk-ts/package.json');
+bumpPkg('typescript/package.json');
 bumpPkg('ddk-rn/package.json');
 
 // Only the [package] version at the top of the file \u2014 later `version = "..."`
@@ -77,7 +77,7 @@ const bumpCargoLock = (file, crates) => {
 bumpCargoLock('ddk-ffi/Cargo.lock', ['ddk_ffi']);
 
 run(
-  'git add ddk-ts/package.json ddk-rn/package.json ' +
+  'git add typescript/package.json ddk-rn/package.json ' +
     'ddk-ffi/Cargo.toml ddk-ffi/Cargo.lock'
 );
 run(`git commit -m "chore: release v${version}"`);
