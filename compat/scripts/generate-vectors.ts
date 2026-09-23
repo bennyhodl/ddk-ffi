@@ -12,7 +12,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-import * as ddk from '@bennyblader/ddk-ts'
+import * as ddk from '@bennyblader/ddk'
 
 import { nodeDlc } from '../src/bal.js'
 import { BAL_MNEMONIC, CET_LOCKTIME, DDK_MNEMONIC, FEE_RATE_PER_VB, MAX_TIMEOUT_INTERVAL, MIN_TIMEOUT_INTERVAL, REFUND_LOCKTIME, REPO_ROOT } from '../src/config.js'
@@ -185,7 +185,7 @@ const rnModule = `/**
  *
  * A deterministic DLC transcript (dual-funded contract + splice successor)
  * whose every message was validated against @node-dlc ${vectors.meta.nodeDlcVersion} (the BAL message
- * codec) at generation time with @bennyblader/ddk-ts ${vectors.meta.ddkTsVersion}. CompatFlow.ts
+ * codec) at generation time with @bennyblader/ddk ${vectors.meta.ddkTsVersion}. CompatFlow.ts
  * replays it through the ddk-rn bindings and byte-compares each artifact.
  */
 export default ${json} as const;
@@ -201,6 +201,6 @@ writeFileSync(
 )
 
 console.log(`vectors written (${Object.keys(vectors.expected).length} expected artifacts)`)
-console.log(`  ddk-ts ${vectors.meta.ddkTsVersion}, node-dlc ${vectors.meta.nodeDlcVersion}`)
+console.log(`  ddk ${vectors.meta.ddkTsVersion}, node-dlc ${vectors.meta.nodeDlcVersion}`)
 console.log(`  ${resolve(vectorsDir, 'compat-vectors.json')}`)
 console.log(`  ${resolve(REPO_ROOT, 'ddk-rn', 'example', 'src', 'compatVectors.ts')}`)

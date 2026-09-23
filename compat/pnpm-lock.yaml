@@ -28,9 +28,9 @@ importers:
       '@atomicfinance/types':
         specifier: 4.3.6
         version: 4.3.6
-      '@bennyblader/ddk-ts':
-        specifier: link:../ddk-ts
-        version: link:../ddk-ts
+      '@bennyblader/ddk':
+        specifier: link:../typescript
+        version: link:../typescript
       '@noble/curves':
         specifier: ^1.6.0
         version: 1.9.7

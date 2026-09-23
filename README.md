@@ -4,7 +4,7 @@
 
 This repository provides high-performance Rust bindings for [dlcdevkit](https://github.com/bennyhodl/dlcdevkit) and [rust-dlc](https://github.com/p2pderivatives/rust-dlc), making DLC functionality available in:
 
-- **Node.js/TypeScript**: [@bennyblader/ddk-ts](./ddk-ts) - generated N-API native bindings
+- **Node.js and browsers**: [@bennyblader/ddk](./typescript) - generated N-API native bindings for Node, WebAssembly for browsers
 - **React Native**: [@bennyblader/ddk-rn](./ddk-rn) - UniFFI-based native bindings with JSI
 
 [![GitHub](https://img.shields.io/github/license/bennyhodl/ddk-ffi)](https://github.com/bennyhodl/ddk-ffi/blob/master/LICENSE)
@@ -13,24 +13,37 @@ This repository provides high-performance Rust bindings for [dlcdevkit](https://
 
 Neither package compiles anything on install — both ship prebuilt binaries.
 
-### [@bennyblader/ddk-ts](./ddk-ts) - Node.js/TypeScript
+### [@bennyblader/ddk](./typescript) - Node.js and browsers
 
-Native Node.js bindings for server-side applications, CLI tools, and desktop
-apps, generated from the same `ddk-ffi` crate as the React Native package.
+One package, two bindings generated from the same `ddk-ffi` crate as the React
+Native package. `exports` conditions pick one at resolve time: Node gets native
+N-API bindings, browsers get WebAssembly.
 
 ```bash
-npm install @bennyblader/ddk-ts
+npm install @bennyblader/ddk
+```
+
+```typescript
+import { init, version } from '@bennyblader/ddk'
+
+await init() // loads the wasm in a browser; a no-op on Node
+version()
 ```
 
 **Features:**
 
 - Generated from `ddk-ffi`, so the API matches `ddk-rn` by construction
-- Prebuilt binaries for macOS ARM64 and Linux x64 — nothing compiles on install
-- Full TypeScript support
-- Synchronous API for performance
+- Node: prebuilt binaries for macOS ARM64 and Linux x64 through
+  `@bennyblader/ddk-<platform>` optional dependencies — nothing compiles on install,
+  and it throws on a platform without one rather than silently using wasm
+- Browsers: `ddk_ffi.wasm` (4.8MB, 2.9MB gzipped), no COOP/COEP headers needed;
+  also available anywhere as `@bennyblader/ddk/wasm`
+- Full TypeScript support, synchronous calls after `init()`
 - ESM-only
 
-[View package documentation →](./ddk-ts/README.md)
+It replaces `@bennyblader/ddk-ts`.
+
+[View package documentation →](./typescript/README.md)
 
 ### [@bennyblader/ddk-rn](./ddk-rn) - React Native
 
@@ -124,7 +137,7 @@ import {
   computeContractId,
   signContractCet,
   signContractRefund,
-} from '@bennyblader/ddk-ts'; // or '@bennyblader/ddk-rn'
+} from '@bennyblader/ddk'; // or '@bennyblader/ddk-rn'
 
 // Keys stay in Rust. Only the funding pubkey comes out.
 const offererKeys = ContractKeyProvider.fromDescriptor(OFFERER_DESCRIPTOR);
@@ -214,7 +227,7 @@ const refund = signContractRefund(
 
 Runnable versions of exactly this flow:
 
-- `ddk-ts/example/src/contract.ts` — `pnpm contract`
+- `typescript/example/src/contract.ts` — `pnpm contract`
 - `ddk-rn/example/src/App.tsx` — the on-device demo the Maestro E2E drives
 
 ### Key derivation
@@ -503,7 +516,7 @@ interface ChangeOutputAndFees {
 ```
 
 `Bytes` is `Uint8Array` in both packages. A Node `Buffer` is a `Uint8Array`, so
-`ddk-ts` takes one anywhere bytes are expected; returns are plain `Uint8Array`,
+`@bennyblader/ddk` takes one anywhere bytes are expected; returns are plain `Uint8Array`,
 and `Buffer.from(b.buffer, b.byteOffset, b.byteLength)` re-wraps one zero-copy.
 
 ## 🏗️ Architecture
@@ -522,18 +535,18 @@ Both packages follow a **pure wrapper approach** around dlcdevkit and rust-dlc:
 with UniFFI **proc-macros** (`#[derive(uniffi::Record)]`, `#[uniffi::export]`,
 …) — there is no `.udl` file — and **both** packages are generated from the
 compiled library by `uniffi-bindgen-react-native`: the JSI/C++ bindings for React
-Native, and the N-API bindings for Node. Neither contains hand-written binding
+Native, and the N-API and wasm bindings for Node and browsers. Neither contains hand-written binding
 code, so the Rust source and the generated TypeScript, C++, Swift, and Kotlin
 cannot drift — from the crate or from each other.
 
 That leaves one thing worth checking rather than three:
 
-1. CI regenerates `ddk-ts/src` and fails if it differs from what is committed
+1. CI regenerates `typescript/src/*/generated` and fails if it differs from what is committed
 2. `ddk-rn/src/__tests__/contractBindings.test.js` checks that the generated JSI
    surface is complete — every function, record, and constructor present in both
    the TypeScript and the native symbol layer
-4. `ddk-ts/__test__/contract.spec.ts` drives the full lifecycle end to end,
-   including a splice rollover and the failure modes
+4. `typescript/__test__/contract.spec.ts` drives the full lifecycle end to end,
+   including a splice rollover and the failure modes — against N-API and wasm
 
 ## 🛠️ Development
 
@@ -556,12 +569,14 @@ That leaves one thing worth checking rather than three:
 │   │   └── contract.rs # stateless contract API
 │   └── Cargo.toml
 │
-├── ddk-ts/             # Node.js/TypeScript package (UniFFI + N-API)
-│   ├── src/            # generated TypeScript (committed, never hand-edited)
+├── typescript/         # @bennyblader/ddk: Node (N-API) + browsers (wasm)
+│   ├── src/node/       # N-API entry; generated/ is ubrn output (committed)
+│   ├── src/wasm/       # wasm entry; generated/ is ubrn output (committed)
 │   ├── dist/           # tsc output — what the package ships
 │   ├── platform/       # one npm package per target, each with its cdylib
 │   ├── __test__/       # vitest suites
-│   ├── example/        # runnable examples
+│   ├── example/        # runnable Node examples
+│   ├── example-browser/ # Vite app + headless-Chrome smoke test
 │   └── scripts/        # build + publish the generated package
 │
 ├── ddk-rn/             # React Native package (UniFFI + JSI)
@@ -580,13 +595,16 @@ That leaves one thing worth checking rather than three:
 just check             # cargo test (both crates) + ddk-rn typecheck
 just lint              # rustfmt + clippy + eslint
 
-# TypeScript/Node.js
-just ts-build          # build for the current platform
-just ts-build-all      # build for all supported platforms
-just ts-test           # run tests
+# @bennyblader/ddk (Node + browsers)
+just ts-build          # N-API build for the current platform
+just ts-build-all      # N-API build for all supported platforms
+just ts-test           # run tests against N-API
+just ts-wasm-build     # wasm build (needs a wasm-capable clang)
+just ts-wasm-test      # run the same tests against wasm
+just ts-wasm-smoke     # load the wasm in headless Chrome
 
 # React Native
-just build             # JSI + TurboModule bindings, iOS framework, and ddk-ts
+just build             # JSI + TurboModule bindings, iOS framework, and ddk (N-API)
 just uniffi-jsi        # regenerate TypeScript + C++ only
 just build-ios         # build the iOS XCFramework (release, stripped)
 just build-android     # build the Android JNI libraries (needs the NDK)

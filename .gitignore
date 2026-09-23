@@ -140,12 +140,11 @@ ddk-rn/ddk-ffi/
 # Release artifacts
 release-archives/
 release-artifacts/
-# One assembled npm package per platform, built by ddk-ts/scripts/build-release.mjs.
-ddk-ts/platform/
-# The wasm build (ddk-ts/scripts/build-wasm.mjs). Its TypeScript under
-# src-wasm/generated/ is committed like src/; the staged .wasm is a build output.
-ddk-ts/dist-wasm/
-ddk-ts/src-wasm/generated/*.wasm
+# One assembled npm package per platform, built by typescript/scripts/build-release.mjs.
+typescript/platform/
+# The wasm build (typescript/scripts/build-wasm.mjs). Its TypeScript under
+# src/wasm/generated/ is committed; the staged .wasm is a build output.
+typescript/src/wasm/generated/*.wasm
 
 # Ruby
 .bundle/

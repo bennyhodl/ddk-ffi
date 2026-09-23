@@ -2,7 +2,7 @@
   "name": "@bennyblader/ddk-bal-compat",
   "version": "0.0.0",
   "private": true,
-  "description": "Compatibility test suite: ddk-ts / ddk-rn wire messages and contract lifecycle against bitcoin-abstraction-layer (BAL) + @node-dlc",
+  "description": "Compatibility test suite: ddk / ddk-rn wire messages and contract lifecycle against bitcoin-abstraction-layer (BAL) + @node-dlc",
   "type": "module",
   "scripts": {
     "test": "vitest run",
@@ -17,7 +17,7 @@
     "@atomicfinance/bitcoin-rpc-provider": "4.3.6",
     "@atomicfinance/client": "4.3.6",
     "@atomicfinance/types": "4.3.6",
-    "@bennyblader/ddk-ts": "link:../ddk-ts",
+    "@bennyblader/ddk": "link:../typescript",
     "@node-dlc/bitcoin": "1.2.1",
     "@node-dlc/messaging": "1.2.1",
     "@noble/curves": "^1.6.0",

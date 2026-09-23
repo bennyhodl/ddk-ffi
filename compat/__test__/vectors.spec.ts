@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-import * as ddkWasm from '@bennyblader/ddk-ts/wasm'
+import * as ddkWasm from '@bennyblader/ddk/wasm'
 import { describe, expect, test } from 'vitest'
 
 import { REPO_ROOT } from '../src/config.js'
