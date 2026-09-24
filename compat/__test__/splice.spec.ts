@@ -53,7 +53,7 @@ describe('splice: ddk offers the successor contract, BAL accepts', () => {
     // The splice funding input, built independently by both stacks — they
     // must agree byte-for-byte.
     const spliceSerialId = 7n
-    const ddkSpliceInput = ddk.createDlcSpliceInput(base.offer, base.accept, ddk.Party.Offer, spliceSerialId, 220)
+    const ddkSpliceInput = ddk.createDlcSpliceInput(base.offer, base.accept, base.sign, ddk.Party.Offer, spliceSerialId, 220)
 
     const balInputInfo = balParty.client.dlc.createDlcInputInfo(
       base.fundTxId,
@@ -166,7 +166,7 @@ describe('splice: BAL offers the successor contract, ddk accepts', () => {
     // ddk rebuilds the same wire input from the messages alone. DlcInput's
     // local/remote fields are seat-relative and this input will appear in
     // BAL's offer, so both constructions use the base OFFERER's seat.
-    const ddkSpliceInput = ddk.createDlcSpliceInput(base.offer, base.accept, ddk.Party.Offer, spliceSerialId, 220)
+    const ddkSpliceInput = ddk.createDlcSpliceInput(base.offer, base.accept, base.sign, ddk.Party.Offer, spliceSerialId, 220)
     expect(balSpliceInput.serializeBody().toString('hex')).toBe(hex(ddkSpliceInput))
 
     // The client facade converts the FundingInput to the Input model that the
