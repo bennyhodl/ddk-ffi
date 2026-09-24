@@ -1065,7 +1065,9 @@ export function validateAccept(offer: Uint8Array, accept: Uint8Array): void /*th
 
 /**
  * Validates an offer's protocol version, funding inputs, fee rate, collateral,
- * and oracle timeouts.
+ * and oracle timeouts. `now_unix` is the caller's clock as a unix timestamp in
+ * seconds: an offer whose closest oracle event matured at or before it is
+ * rejected, because the offering party may already know the outcome.
  *
  * The lifecycle functions already validate internally (`accept_offer` validates
  * the offer, `sign_accept` validates the accept, `finalize_sign` validates the
@@ -1077,6 +1079,7 @@ export function validateOffer(
   offer: Uint8Array,
   minTimeoutInterval: number,
   maxTimeoutInterval: number,
+  nowUnix: bigint,
 ): void /*throws*/ {
   uniffiCaller.rustCallWithError(
     /*liftError:*/ FfiConverterTypeContractError.lift.bind(FfiConverterTypeContractError),
@@ -1085,6 +1088,7 @@ export function validateOffer(
         FfiConverterUint8Array.lower(offer, nativeModule().rustbuffer_alloc),
         FfiConverterUInt32.lower(minTimeoutInterval, nativeModule().rustbuffer_alloc),
         FfiConverterUInt32.lower(maxTimeoutInterval, nativeModule().rustbuffer_alloc),
+        FfiConverterUInt64.lower(nowUnix, nativeModule().rustbuffer_alloc),
         callStatus,
       )
     },
@@ -1251,6 +1255,13 @@ export type AcceptOfferParams = {
    * The maximum accepted interval between oracle maturity and the refund locktime.
    */
   maxTimeoutInterval: number
+  /**
+   * The accepting party's clock, as a unix timestamp in seconds.
+   *
+   * An offer whose closest oracle event matured at or before this time is
+   * rejected, because the offering party may already know the outcome.
+   */
+  nowUnix: bigint
 }
 
 /**
@@ -1276,18 +1287,21 @@ const FfiConverterTypeAcceptOfferParams = (() => {
         party: FfiConverterTypeContractPartyParams.readFromCursor(c),
         minTimeoutInterval: FfiConverterUInt32.readFromCursor(c),
         maxTimeoutInterval: FfiConverterUInt32.readFromCursor(c),
+        nowUnix: FfiConverterUInt64.readFromCursor(c),
       }
     }
     writeIntoCursor(value: TypeName, c: Cursor): void {
       FfiConverterTypeContractPartyParams.writeIntoCursor(value.party, c)
       FfiConverterUInt32.writeIntoCursor(value.minTimeoutInterval, c)
       FfiConverterUInt32.writeIntoCursor(value.maxTimeoutInterval, c)
+      FfiConverterUInt64.writeIntoCursor(value.nowUnix, c)
     }
     allocationSize(value: TypeName): number {
       return (
         FfiConverterTypeContractPartyParams.allocationSize(value.party) +
         FfiConverterUInt32.allocationSize(value.minTimeoutInterval) +
-        FfiConverterUInt32.allocationSize(value.maxTimeoutInterval)
+        FfiConverterUInt32.allocationSize(value.maxTimeoutInterval) +
+        FfiConverterUInt64.allocationSize(value.nowUnix)
       )
     }
   }
@@ -4634,7 +4648,7 @@ function uniffiEnsureInitialized() {
   if (nativeModule().uniffi_ddk_ffi_checksum_func_validate_accept() !== 9081) {
     throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_validate_accept')
   }
-  if (nativeModule().uniffi_ddk_ffi_checksum_func_validate_offer() !== 24632) {
+  if (nativeModule().uniffi_ddk_ffi_checksum_func_validate_offer() !== 52678) {
     throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_validate_offer')
   }
   if (nativeModule().uniffi_ddk_ffi_checksum_func_validate_sign() !== 7419) {

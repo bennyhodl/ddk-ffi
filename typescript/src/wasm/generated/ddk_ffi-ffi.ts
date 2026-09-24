@@ -530,7 +530,7 @@ const DEFINITIONS = {
       hasRustCallStatus: true,
     },
     uniffi_ddk_ffi_fn_func_validate_offer: {
-      args: [FfiType.RustBuffer, FfiType.UInt32, FfiType.UInt32],
+      args: [FfiType.RustBuffer, FfiType.UInt32, FfiType.UInt32, FfiType.UInt64],
       ret: FfiType.Void,
       hasRustCallStatus: true,
     },
@@ -1250,6 +1250,7 @@ interface NativeModuleInterface {
     offer: Uint8Array,
     minTimeoutInterval: number,
     maxTimeoutInterval: number,
+    nowUnix: bigint,
     uniffi_out_err: UniffiRustCallStatus,
   ): void
   uniffi_ddk_ffi_fn_func_validate_sign(

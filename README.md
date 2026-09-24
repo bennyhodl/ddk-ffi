@@ -171,7 +171,7 @@ const offer = createOffer({
 });
 
 // 2. Accept — returns the AcceptDlc, the unsigned transactions, and the funding PSBT
-validateOffer(offer, 0, 4_294_967_295);
+validateOffer(offer, 0, 4_294_967_295, BigInt(Math.floor(Date.now() / 1000)));
 const accepted = acceptOffer(
   offer,
   {
@@ -183,6 +183,7 @@ const accepted = acceptOffer(
     },
     minTimeoutInterval: 0,
     maxTimeoutInterval: 4_294_967_295,
+    nowUnix: BigInt(Math.floor(Date.now() / 1000)), // the acceptor's clock
   },
   acceptorKeys,
   acceptTempId
@@ -278,7 +279,7 @@ standalone so a stored or received message can be verified on its own:
 
 | Function | Checks |
 |---|---|
-| `validateOffer(offer, minTimeout, maxTimeout)` | protocol version, funding inputs, fee rate, collateral, oracle timeouts |
+| `validateOffer(offer, minTimeout, maxTimeout, nowUnix)` | protocol version, funding inputs, fee rate, collateral, oracle timeouts, oracle event not yet matured |
 | `validateAccept(offer, accept)` | the acceptor's CET adaptor signatures and refund signature |
 | `validateSign(offer, accept, sign)` | the offerer's CET adaptor signatures and refund signature |
 | `computeContractId(offer, accept)` | — returns the funded contract's 32-byte id |
@@ -386,6 +387,7 @@ interface AcceptOfferParams {
   party: ContractPartyParams;
   minTimeoutInterval: number;
   maxTimeoutInterval: number;
+  nowUnix: bigint; // the acceptor's clock, unix seconds; a matured oracle event is rejected
 }
 
 interface AcceptResult {

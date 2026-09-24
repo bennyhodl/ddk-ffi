@@ -10,7 +10,7 @@ import {
   shimSpliceSignForBal,
   spliceWitnessShimNeeded,
 } from '../src/cross.js'
-import { BAL_MNEMONIC, DDK_MNEMONIC, MAX_TIMEOUT_INTERVAL, MIN_TIMEOUT_INTERVAL } from '../src/config.js'
+import { BAL_MNEMONIC, DDK_MNEMONIC, MAX_TIMEOUT_INTERVAL, MIN_TIMEOUT_INTERVAL, NOW_UNIX } from '../src/config.js'
 import { ddk, DdkParty } from '../src/ddk.js'
 import { fundVout, makeDdkOffer, txidOf } from '../src/flow.js'
 import { BitcoindRpc } from '../src/rpc.js'
@@ -194,7 +194,7 @@ describe('splice: BAL offers the successor contract, ddk accepts', () => {
       balTypes.InputSupplementationMode.None,
     )
     const offer2: Uint8Array = balOffer2.serialize()
-    ddk.validateOffer(offer2, MIN_TIMEOUT_INTERVAL, MAX_TIMEOUT_INTERVAL)
+    ddk.validateOffer(offer2, MIN_TIMEOUT_INTERVAL, MAX_TIMEOUT_INTERVAL, NOW_UNIX)
 
     // ddk accepts with no inputs (single-funded successor).
     const tempId2 = tempId(0xd2)
@@ -211,6 +211,7 @@ describe('splice: BAL offers the successor contract, ddk accepts', () => {
         },
         minTimeoutInterval: MIN_TIMEOUT_INTERVAL,
         maxTimeoutInterval: MAX_TIMEOUT_INTERVAL,
+        nowUnix: NOW_UNIX,
       },
       ddkParty.keys,
       tempId2,

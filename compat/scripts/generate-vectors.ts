@@ -15,7 +15,7 @@ import { resolve } from 'node:path'
 import * as ddk from '@bennyblader/ddk'
 
 import { nodeDlc } from '../src/bal.js'
-import { BAL_MNEMONIC, CET_LOCKTIME, DDK_MNEMONIC, FEE_RATE_PER_VB, MAX_TIMEOUT_INTERVAL, MIN_TIMEOUT_INTERVAL, REFUND_LOCKTIME, REPO_ROOT } from '../src/config.js'
+import { BAL_MNEMONIC, CET_LOCKTIME, DDK_MNEMONIC, FEE_RATE_PER_VB, MAX_TIMEOUT_INTERVAL, MIN_TIMEOUT_INTERVAL, NOW_UNIX, REFUND_LOCKTIME, REPO_ROOT } from '../src/config.js'
 import { DdkParty } from '../src/ddk.js'
 import { fundVout, syntheticFundedInput, txidOf } from '../src/flow.js'
 import {
@@ -77,6 +77,7 @@ const vectors: CompatVectors = {
     refundLocktime: REFUND_LOCKTIME,
     minTimeoutInterval: MIN_TIMEOUT_INTERVAL,
     maxTimeoutInterval: MAX_TIMEOUT_INTERVAL,
+    nowUnix: Number(NOW_UNIX),
     contractFlags: 0,
     attestationHex: tlvBody(attestation1.serialize()).toString('hex'),
     attestedOutcome: 'repaid',

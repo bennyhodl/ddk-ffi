@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 
 import { balTypes, nodeDlc } from '../src/bal.js'
-import { BAL_MNEMONIC, DDK_MNEMONIC, MAX_TIMEOUT_INTERVAL, MIN_TIMEOUT_INTERVAL } from '../src/config.js'
+import { BAL_MNEMONIC, DDK_MNEMONIC, MAX_TIMEOUT_INTERVAL, MIN_TIMEOUT_INTERVAL, NOW_UNIX } from '../src/config.js'
 import { ddk, DdkParty } from '../src/ddk.js'
 import { fundVout, makeDdkOffer, syntheticFundedInput, txidOf } from '../src/flow.js'
 import { buildNodeDlcFundingInput, buildReferenceOffer } from '../src/messages.js'
@@ -45,6 +45,7 @@ function runOfflineFlow(scenario = upDownScenario()) {
       },
       minTimeoutInterval: MIN_TIMEOUT_INTERVAL,
       maxTimeoutInterval: MAX_TIMEOUT_INTERVAL,
+      nowUnix: NOW_UNIX,
     },
     acceptor.keys,
     ACCEPT_TEMP_ID,
@@ -159,7 +160,7 @@ describe('offer serialization parity', () => {
     // And ddk itself must keep accepting flagged offers — contract_flags is a
     // passthrough byte in ddk-messages, but this is load-bearing for every
     // lygos loan offer, so pin it.
-    expect(() => ddk.validateOffer(offer, MIN_TIMEOUT_INTERVAL, MAX_TIMEOUT_INTERVAL)).not.toThrow()
+    expect(() => ddk.validateOffer(offer, MIN_TIMEOUT_INTERVAL, MAX_TIMEOUT_INTERVAL, NOW_UNIX)).not.toThrow()
   })
 
   test('node-dlc round-trips the ddk offer byte-stably and validates it', () => {
@@ -171,7 +172,7 @@ describe('offer serialization parity', () => {
   test('ddk validates a node-dlc-built offer', () => {
     const parsed = nodeDlc.DlcOffer.deserialize(bytes(flow.offer))
     // Round-trip through node-dlc, then hand back to ddk.
-    expect(() => ddk.validateOffer(parsed.serialize(), MIN_TIMEOUT_INTERVAL, MAX_TIMEOUT_INTERVAL)).not.toThrow()
+    expect(() => ddk.validateOffer(parsed.serialize(), MIN_TIMEOUT_INTERVAL, MAX_TIMEOUT_INTERVAL, NOW_UNIX)).not.toThrow()
   })
 })
 

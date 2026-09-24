@@ -430,6 +430,11 @@ pub struct AcceptOfferParams {
     pub min_timeout_interval: u32,
     /// The maximum accepted interval between oracle maturity and the refund locktime.
     pub max_timeout_interval: u32,
+    /// The accepting party's clock, as a unix timestamp in seconds.
+    ///
+    /// An offer whose closest oracle event matured at or before this time is
+    /// rejected, because the offering party may already know the outcome.
+    pub now_unix: u64,
 }
 
 impl AcceptOfferParams {
@@ -438,6 +443,7 @@ impl AcceptOfferParams {
             party: self.party.into_rust()?,
             min_timeout_interval: self.min_timeout_interval,
             max_timeout_interval: self.max_timeout_interval,
+            now_unix: self.now_unix,
         })
     }
 }
@@ -587,7 +593,9 @@ pub fn create_offer(params: CreateOfferParams) -> Result<Vec<u8>, ContractError>
 }
 
 /// Validates an offer's protocol version, funding inputs, fee rate, collateral,
-/// and oracle timeouts.
+/// and oracle timeouts. `now_unix` is the caller's clock as a unix timestamp in
+/// seconds: an offer whose closest oracle event matured at or before it is
+/// rejected, because the offering party may already know the outcome.
 ///
 /// The lifecycle functions already validate internally (`accept_offer` validates
 /// the offer, `sign_accept` validates the accept, `finalize_sign` validates the
@@ -599,9 +607,10 @@ pub fn validate_offer(
     offer: Vec<u8>,
     min_timeout_interval: u32,
     max_timeout_interval: u32,
+    now_unix: u64,
 ) -> Result<(), ContractError> {
     let offer: OfferDlc = decode_msg(&offer, "offer")?;
-    ddk_contract::validate_offer(&offer, min_timeout_interval, max_timeout_interval)?;
+    ddk_contract::validate_offer(&offer, min_timeout_interval, max_timeout_interval, now_unix)?;
     Ok(())
 }
 
@@ -1133,6 +1142,8 @@ mod tests {
     /// Far enough past the maturity to sit inside the 100..=100_000 timeout
     /// interval the tests accept offers with.
     const REFUND_LOCKTIME: u32 = 1_000;
+    /// The acceptor's clock: before the event matures, so offers are accepted.
+    const NOW_UNIX: u64 = 100;
 
     fn oracle_keypair(secp: &Secp256k1<All>) -> Keypair {
         Keypair::from_secret_key(secp, &SecretKey::from_slice(&ORACLE_SECRET).unwrap())
@@ -1333,7 +1344,7 @@ mod tests {
 
         assert_eq!(ffi_offer, encode_msg(&direct));
         // And the resulting offer passes validation.
-        validate_offer(ffi_offer, 100, 100_000).unwrap();
+        validate_offer(ffi_offer, 100, 100_000, NOW_UNIX).unwrap();
     }
 
     #[test]
@@ -1371,6 +1382,7 @@ mod tests {
                 party: acceptor.rust.clone(),
                 min_timeout_interval: 100,
                 max_timeout_interval: 100_000,
+                now_unix: NOW_UNIX,
             },
             &funding_secret_key,
         )
@@ -1382,6 +1394,7 @@ mod tests {
                 party: ffi_party(&acceptor),
                 min_timeout_interval: 100,
                 max_timeout_interval: 100_000,
+                now_unix: NOW_UNIX,
             },
             acceptor.provider.clone(),
             ACCEPT_TEMP_ID.to_vec(),
@@ -1457,7 +1470,7 @@ mod tests {
         };
 
         let offer = create_offer(params).unwrap();
-        validate_offer(offer, 100, 100_000).unwrap();
+        validate_offer(offer, 100, 100_000, NOW_UNIX).unwrap();
     }
 
     // The complete funding flow with NO live oracle: a single-funded contract
@@ -1598,6 +1611,7 @@ mod tests {
                 },
                 min_timeout_interval: 100,
                 max_timeout_interval: 100_000,
+                now_unix: NOW_UNIX,
             },
             acceptor_keys.clone(),
             accept_temp_id.clone(),
@@ -1739,6 +1753,7 @@ mod tests {
                     },
                     min_timeout_interval: 100,
                     max_timeout_interval: 100_000,
+                    now_unix: NOW_UNIX,
                 },
                 &acceptor_secret,
             )
@@ -2072,6 +2087,7 @@ mod tests {
                 party: ffi_party(&acceptor_a),
                 min_timeout_interval: 100,
                 max_timeout_interval: 100_000,
+                now_unix: NOW_UNIX,
             },
             acceptor_a.provider.clone(),
             temp_id_a.clone(),
@@ -2129,6 +2145,7 @@ mod tests {
                 },
                 min_timeout_interval: 100,
                 max_timeout_interval: 100_000,
+                now_unix: NOW_UNIX,
             },
             acceptor_b.provider.clone(),
             temp_id_b.clone(),

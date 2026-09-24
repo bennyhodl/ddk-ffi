@@ -349,9 +349,9 @@ checksum = "c8d4a3bb8b1e0c1050499d1815f5ab16d04f0959b233085fb31653fbfc9d98f9"
 
 [[package]]
 name = "ddk"
-version = "2.0.0-rc.3"
+version = "2.0.0-rc.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "375e46b5a8087d47c1d6228f0c859495196422a484840c7b40c08175495d569d"
+checksum = "ee420f8801fbe58971a502fdb19c79c4e4b6ce346c24abbcd79f190882ac4be8"
 dependencies = [
  "bdk_chain",
  "bdk_wallet",
@@ -371,9 +371,9 @@ dependencies = [
 
 [[package]]
 name = "ddk-dlc"
-version = "2.0.0-rc.3"
+version = "2.0.0-rc.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bd2bd5c4e49ace90299cc2b607ce71b146f2ac6df716b690c735ad235e9b7e2a"
+checksum = "917999fc919323440eccda1cc8c5e2d23876e7d963ad1cd313a939f0e80d28e1"
 dependencies = [
  "bitcoin",
  "miniscript",
@@ -384,9 +384,9 @@ dependencies = [
 
 [[package]]
 name = "ddk-manager"
-version = "2.0.0-rc.3"
+version = "2.0.0-rc.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d80a1d0266a42185aed874612b9a0996b84fbb25943f9469c1772a08fcc109e"
+checksum = "2a2e44d5ebec254b092952512b95b0710653daf598f24730116a6df00fcd383b"
 dependencies = [
  "async-trait",
  "bitcoin",
@@ -404,9 +404,9 @@ dependencies = [
 
 [[package]]
 name = "ddk-messages"
-version = "2.0.0-rc.3"
+version = "2.0.0-rc.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5042db04fc8671f281acfcbe843400162238aae73ace0740795ed12e4b00aec"
+checksum = "3977e2e68ae4b1dfa8765b9907d2f5c338ea9c8ac915c2cc8e0bb72b35d905ab"
 dependencies = [
  "bitcoin",
  "ddk-dlc",
@@ -417,9 +417,9 @@ dependencies = [
 
 [[package]]
 name = "ddk-trie"
-version = "2.0.0-rc.3"
+version = "2.0.0-rc.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e50dc2679a4f5158cc8972f94db639ad007c3ce368bc7160db23351745fdfbd3"
+checksum = "658a00afff292a825a6436ba1ff1315514bee98cf8568ef0679b9fe11850dfc6"
 dependencies = [
  "bitcoin",
  "ddk-dlc",

@@ -1,5 +1,5 @@
 import { createBalParty, getBalInput, nodeDlc, type BalParty } from './bal.js'
-import { MAX_TIMEOUT_INTERVAL, MIN_TIMEOUT_INTERVAL } from './config.js'
+import { MAX_TIMEOUT_INTERVAL, MIN_TIMEOUT_INTERVAL, NOW_UNIX } from './config.js'
 import { ddk, DdkParty, type DdkFundedInput } from './ddk.js'
 import { fundVout, makeDdkOffer, txidOf } from './flow.js'
 import type { BitcoindRpc } from './rpc.js'
@@ -208,7 +208,7 @@ export async function enterBalOfferDdkAccept(
   const offer: Uint8Array = balOffer.serialize()
 
   // --- over the wire to ddk ---
-  ddk.validateOffer(offer, MIN_TIMEOUT_INTERVAL, MAX_TIMEOUT_INTERVAL)
+  ddk.validateOffer(offer, MIN_TIMEOUT_INTERVAL, MAX_TIMEOUT_INTERVAL, NOW_UNIX)
   const ddkTempId = tempId(0xa0 + contractCounter++)
   const ddkInput = await ddkParty.fundInput(rpc, 4_000n)
   const acceptResult = ddk.acceptOffer(
@@ -224,6 +224,7 @@ export async function enterBalOfferDdkAccept(
       },
       minTimeoutInterval: MIN_TIMEOUT_INTERVAL,
       maxTimeoutInterval: MAX_TIMEOUT_INTERVAL,
+      nowUnix: NOW_UNIX,
     },
     ddkParty.keys,
     ddkTempId,
