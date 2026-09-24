@@ -347,7 +347,14 @@ const DEFINITIONS = {
       hasRustCallStatus: true,
     },
     uniffi_ddk_ffi_fn_func_create_dlc_splice_input: {
-      args: [FfiType.RustBuffer, FfiType.RustBuffer, FfiType.RustBuffer, FfiType.RustBuffer, FfiType.UInt16],
+      args: [
+        FfiType.RustBuffer,
+        FfiType.RustBuffer,
+        FfiType.RustBuffer,
+        FfiType.RustBuffer,
+        FfiType.RustBuffer,
+        FfiType.UInt16,
+      ],
       ret: FfiType.RustBuffer,
       hasRustCallStatus: true,
     },
@@ -362,6 +369,22 @@ const DEFINITIONS = {
         FfiType.UInt32,
         FfiType.UInt64,
         FfiType.UInt8,
+      ],
+      ret: FfiType.RustBuffer,
+      hasRustCallStatus: true,
+    },
+    uniffi_ddk_ffi_fn_func_create_dlc_transactions_with_fee_rule: {
+      args: [
+        FfiType.RustBuffer,
+        FfiType.RustBuffer,
+        FfiType.RustBuffer,
+        FfiType.UInt32,
+        FfiType.UInt64,
+        FfiType.UInt32,
+        FfiType.UInt32,
+        FfiType.UInt64,
+        FfiType.UInt8,
+        FfiType.RustBuffer,
       ],
       ret: FfiType.RustBuffer,
       hasRustCallStatus: true,
@@ -419,6 +442,22 @@ const DEFINITIONS = {
       ret: FfiType.RustBuffer,
       hasRustCallStatus: true,
     },
+    uniffi_ddk_ffi_fn_func_create_spliced_dlc_transactions_with_fee_rule: {
+      args: [
+        FfiType.RustBuffer,
+        FfiType.RustBuffer,
+        FfiType.RustBuffer,
+        FfiType.UInt32,
+        FfiType.UInt64,
+        FfiType.UInt32,
+        FfiType.UInt32,
+        FfiType.UInt64,
+        FfiType.UInt8,
+        FfiType.RustBuffer,
+      ],
+      ret: FfiType.RustBuffer,
+      hasRustCallStatus: true,
+    },
     uniffi_ddk_ffi_fn_func_create_xpriv_from_parent_path: {
       args: [FfiType.RustBuffer, FfiType.RustBuffer, FfiType.RustBuffer, FfiType.RustBuffer],
       ret: FfiType.RustBuffer,
@@ -431,6 +470,11 @@ const DEFINITIONS = {
     },
     uniffi_ddk_ffi_fn_func_dlc_transactions_from_messages: {
       args: [FfiType.RustBuffer, FfiType.RustBuffer],
+      ret: FfiType.RustBuffer,
+      hasRustCallStatus: true,
+    },
+    uniffi_ddk_ffi_fn_func_dlc_transactions_from_signed_messages: {
+      args: [FfiType.RustBuffer, FfiType.RustBuffer, FfiType.RustBuffer],
       ret: FfiType.RustBuffer,
       hasRustCallStatus: true,
     },
@@ -735,6 +779,11 @@ const DEFINITIONS = {
       ret: FfiType.UInt16,
       hasRustCallStatus: false,
     },
+    uniffi_ddk_ffi_checksum_func_create_dlc_transactions_with_fee_rule: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
     uniffi_ddk_ffi_checksum_func_create_extkey_from_parent_path: {
       args: [],
       ret: FfiType.UInt16,
@@ -770,6 +819,11 @@ const DEFINITIONS = {
       ret: FfiType.UInt16,
       hasRustCallStatus: false,
     },
+    uniffi_ddk_ffi_checksum_func_create_spliced_dlc_transactions_with_fee_rule: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
     uniffi_ddk_ffi_checksum_func_create_xpriv_from_parent_path: {
       args: [],
       ret: FfiType.UInt16,
@@ -781,6 +835,11 @@ const DEFINITIONS = {
       hasRustCallStatus: false,
     },
     uniffi_ddk_ffi_checksum_func_dlc_transactions_from_messages: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
+    uniffi_ddk_ffi_checksum_func_dlc_transactions_from_signed_messages: {
       args: [],
       ret: FfiType.UInt16,
       hasRustCallStatus: false,
@@ -1083,6 +1142,7 @@ interface NativeModuleInterface {
   uniffi_ddk_ffi_fn_func_create_dlc_splice_input(
     prevOffer: Uint8Array,
     prevAccept: Uint8Array,
+    prevSign: Uint8Array,
     localParty: Uint8Array,
     inputSerialId: Uint8Array,
     maxWitnessLen: number,
@@ -1098,6 +1158,19 @@ interface NativeModuleInterface {
     cetLockTime: number,
     fundOutputSerialId: bigint,
     contractFlags: number,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Uint8Array
+  uniffi_ddk_ffi_fn_func_create_dlc_transactions_with_fee_rule(
+    outcomes: Uint8Array,
+    localParams: Uint8Array,
+    remoteParams: Uint8Array,
+    refundLocktime: number,
+    feeRate: bigint,
+    fundLockTime: number,
+    cetLockTime: number,
+    fundOutputSerialId: bigint,
+    contractFlags: number,
+    feeRule: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus,
   ): Uint8Array
   uniffi_ddk_ffi_fn_func_create_extkey_from_parent_path(
@@ -1143,6 +1216,19 @@ interface NativeModuleInterface {
     contractFlags: number,
     uniffi_out_err: UniffiRustCallStatus,
   ): Uint8Array
+  uniffi_ddk_ffi_fn_func_create_spliced_dlc_transactions_with_fee_rule(
+    outcomes: Uint8Array,
+    localParams: Uint8Array,
+    remoteParams: Uint8Array,
+    refundLocktime: number,
+    feeRate: bigint,
+    fundLockTime: number,
+    cetLockTime: number,
+    fundOutputSerialId: bigint,
+    contractFlags: number,
+    feeRule: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Uint8Array
   uniffi_ddk_ffi_fn_func_create_xpriv_from_parent_path(
     seedOrXpriv: Uint8Array,
     baseDerivationPath: Uint8Array,
@@ -1154,6 +1240,12 @@ interface NativeModuleInterface {
   uniffi_ddk_ffi_fn_func_dlc_transactions_from_messages(
     offer: Uint8Array,
     accept: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Uint8Array
+  uniffi_ddk_ffi_fn_func_dlc_transactions_from_signed_messages(
+    offer: Uint8Array,
+    accept: Uint8Array,
+    sign: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus,
   ): Uint8Array
   uniffi_ddk_ffi_fn_func_extract_ecdsa_signature_from_oracle_signatures(
@@ -1393,6 +1485,7 @@ interface NativeModuleInterface {
   uniffi_ddk_ffi_checksum_func_create_cets(): number
   uniffi_ddk_ffi_checksum_func_create_dlc_splice_input(): number
   uniffi_ddk_ffi_checksum_func_create_dlc_transactions(): number
+  uniffi_ddk_ffi_checksum_func_create_dlc_transactions_with_fee_rule(): number
   uniffi_ddk_ffi_checksum_func_create_extkey_from_parent_path(): number
   uniffi_ddk_ffi_checksum_func_create_extkey_from_seed(): number
   uniffi_ddk_ffi_checksum_func_create_fund_tx_locking_script(): number
@@ -1400,9 +1493,11 @@ interface NativeModuleInterface {
   uniffi_ddk_ffi_checksum_func_create_offer(): number
   uniffi_ddk_ffi_checksum_func_create_refund_transaction(): number
   uniffi_ddk_ffi_checksum_func_create_spliced_dlc_transactions(): number
+  uniffi_ddk_ffi_checksum_func_create_spliced_dlc_transactions_with_fee_rule(): number
   uniffi_ddk_ffi_checksum_func_create_xpriv_from_parent_path(): number
   uniffi_ddk_ffi_checksum_func_dlc_input_max_witness_len(): number
   uniffi_ddk_ffi_checksum_func_dlc_transactions_from_messages(): number
+  uniffi_ddk_ffi_checksum_func_dlc_transactions_from_signed_messages(): number
   uniffi_ddk_ffi_checksum_func_extract_ecdsa_signature_from_oracle_signatures(): number
   uniffi_ddk_ffi_checksum_func_finalize_sign(): number
   uniffi_ddk_ffi_checksum_func_finalize_sign_spliced(): number

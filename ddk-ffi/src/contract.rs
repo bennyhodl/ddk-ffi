@@ -823,6 +823,26 @@ pub fn dlc_transactions_from_messages(
     Ok(crate::rust_dlc_transactions_to_uniffi(transactions))
 }
 
+/// Rebuilds a signed contract's transactions, to settle or splice it.
+///
+/// Unlike [`dlc_transactions_from_messages`], this also rebuilds a contract
+/// created before ddk-dlc 2.0.0-rc.4, whose single-funded funding transaction
+/// was priced under the old fee rule: the rule is chosen by which rebuild
+/// reproduces `sign`'s contract id. `sign_contract_cet`, `sign_contract_refund`
+/// and `create_dlc_splice_input` rebuild the same way.
+#[uniffi::export]
+pub fn dlc_transactions_from_signed_messages(
+    offer: Vec<u8>,
+    accept: Vec<u8>,
+    sign: Vec<u8>,
+) -> Result<crate::DlcTransactions, ContractError> {
+    let offer: OfferDlc = decode_msg(&offer, "offer")?;
+    let accept: AcceptDlc = decode_msg(&accept, "accept")?;
+    let sign: SignDlc = decode_msg(&sign, "sign")?;
+    let transactions = ddk_contract::create_signed_dlc_transactions(&offer, &accept, &sign)?;
+    Ok(crate::rust_dlc_transactions_to_uniffi(transactions))
+}
+
 /// The offering party verifies the accept message and produces its `SignDlc`.
 /// The offer party's funding secret key is derived from `keys` +
 /// `temporary_contract_id` (the new contract's id).
@@ -1002,23 +1022,27 @@ pub fn sign_contract_refund(
 // ---------------------------------------------------------------------------
 
 /// Rebuilds the splice `FundingInput` (wire-encoded) that spends a previous
-/// contract's 2-of-2 funding output, from that contract's offer and accept
-/// messages. Only the offering party contributes a splice input; place the
+/// contract's 2-of-2 funding output, from that contract's offer, accept and
+/// sign messages. The sign message selects the fee rule, so a contract created
+/// before ddk-dlc 2.0.0-rc.4 can be spliced too. Only the offering party contributes a splice input; place the
 /// result in the offering party's `funding_inputs`. `max_witness_len` must be
 /// greater than 108 — use [`dlc_input_max_witness_len`].
 #[uniffi::export]
 pub fn create_dlc_splice_input(
     prev_offer: Vec<u8>,
     prev_accept: Vec<u8>,
+    prev_sign: Vec<u8>,
     local_party: Party,
     input_serial_id: Option<u64>,
     max_witness_len: u16,
 ) -> Result<Vec<u8>, ContractError> {
     let prev_offer: OfferDlc = decode_msg(&prev_offer, "previous offer")?;
     let prev_accept: AcceptDlc = decode_msg(&prev_accept, "previous accept")?;
+    let prev_sign: SignDlc = decode_msg(&prev_sign, "previous sign")?;
     let input = ddk_contract::create_dlc_splice_input(
         &prev_offer,
         &prev_accept,
+        &prev_sign,
         local_party.into(),
         input_serial_id,
         max_witness_len,
@@ -2064,8 +2088,9 @@ mod tests {
         let temp_id_a = vec![0xaa_u8; 32];
         let temp_id_b = vec![0xbb_u8; 32];
 
-        // Contract A: a dual-funded 100k enum contract. Only its messages are
-        // needed to build the splice input, so it need not be signed.
+        // Contract A: a dual-funded 100k enum contract. Building the splice
+        // input needs its offer, accept and sign messages; its funding
+        // transaction need not be finalized.
         let offerer_a = build_party(11, [0xaa; 32], 100);
         let acceptor_a = build_party(22, [0xaa; 32], 200);
         let offer_a = create_offer(CreateOfferParams {
@@ -2095,11 +2120,38 @@ mod tests {
         .unwrap()
         .accept;
 
+        // The offerer's sign message: its contract id is what selects the fee
+        // rule A's transactions are rebuilt under.
+        let offer_a_msg: OfferDlc = decode_msg(&offer_a, "offer").unwrap();
+        let accept_a_msg: AcceptDlc = decode_msg(&accept_a, "accept").unwrap();
+        let mut psbt_a = ddk_contract::create_funding_psbt(&offer_a_msg, &accept_a_msg).unwrap();
+        ddk_contract::signing::sign_funding_psbt_with_xpriv(
+            &offer_a_msg,
+            &accept_a_msg,
+            &mut psbt_a,
+            &Xpriv::new_master(NETWORK, &[11; 64]).unwrap(),
+            &[ddk_contract::InputDerivation {
+                input_serial_id: 100,
+                derivation_path: DerivationPath::from_str("84h/1h/0h/0/0").unwrap(),
+            }],
+        )
+        .unwrap();
+        let sign_a = sign_accept(
+            offer_a.clone(),
+            accept_a.clone(),
+            offerer_a.provider.clone(),
+            temp_id_a.clone(),
+            psbt_a.serialize(),
+        )
+        .unwrap()
+        .sign;
+
         // The splice input spends A's 2-of-2 funding output (value = A's 100k).
         let splice_serial = 900_u64;
         let splice_input = create_dlc_splice_input(
             offer_a,
             accept_a,
+            sign_a,
             Party::Offer,
             Some(splice_serial),
             dlc_input_max_witness_len(),
@@ -2189,5 +2241,63 @@ mod tests {
             !tx.input[0].witness.is_empty(),
             "splice input 2-of-2 is signed"
         );
+    }
+
+    /// A single-funded contract created, funded and settled by ddk 2.0.0-rc.3,
+    /// before ddk-dlc 2.0.0-rc.4 changed the single-funded CET fee rule (the
+    /// same fixture ddk's own tests use).
+    fn pre_rc4_fixture(name: &str) -> Vec<u8> {
+        let line = include_str!("fixtures/pre_rc4_single_funded.txt")
+            .lines()
+            .find(|line| line.starts_with(&format!("{name} ")))
+            .unwrap();
+        let hex = line.split_once(' ').unwrap().1;
+        (0..hex.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).unwrap())
+            .collect()
+    }
+
+    #[test]
+    fn a_pre_rc4_contract_rebuilds_only_from_its_signed_messages() {
+        let (offer, accept, sign) = (
+            pre_rc4_fixture("offer"),
+            pre_rc4_fixture("accept"),
+            pre_rc4_fixture("sign"),
+        );
+        let funding: bitcoin::Transaction =
+            bitcoin::consensus::deserialize(&pre_rc4_fixture("funding_transaction")).unwrap();
+        let fund_txid = |transactions: &crate::DlcTransactions| {
+            bitcoin::consensus::deserialize::<bitcoin::Transaction>(&transactions.fund.raw_bytes)
+                .unwrap()
+                .compute_txid()
+        };
+
+        // Under the current rule the funding transaction differs, so settling
+        // from the unsigned messages alone would sign the wrong transactions.
+        let current = dlc_transactions_from_messages(offer.clone(), accept.clone()).unwrap();
+        assert_ne!(fund_txid(&current), funding.compute_txid());
+
+        let signed =
+            dlc_transactions_from_signed_messages(offer.clone(), accept.clone(), sign.clone())
+                .unwrap();
+        assert_eq!(fund_txid(&signed), funding.compute_txid());
+
+        let input: FundingInput = decode_msg(
+            &create_dlc_splice_input(
+                offer,
+                accept,
+                sign,
+                Party::Offer,
+                Some(900),
+                dlc_input_max_witness_len(),
+            )
+            .unwrap(),
+            "splice input",
+        )
+        .unwrap();
+        let prev_tx: bitcoin::Transaction =
+            bitcoin::consensus::deserialize(&input.prev_tx).unwrap();
+        assert_eq!(prev_tx.compute_txid(), funding.compute_txid());
     }
 }

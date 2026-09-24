@@ -453,6 +453,7 @@ describe('splicing', () => {
     const spliceInput = ddk.createDlcSpliceInput(
       flow.offer,
       flow.accept,
+      flow.signResult.sign,
       ddk.Party.Offer,
       900n,
       ddk.dlcInputMaxWitnessLen(),
@@ -462,7 +463,7 @@ describe('splicing', () => {
   })
 
   test('rejects a max witness length <= 108', () => {
-    expect(() => ddk.createDlcSpliceInput(flow.offer, flow.accept, ddk.Party.Offer, 900n, 108)).toThrow()
+    expect(() => ddk.createDlcSpliceInput(flow.offer, flow.accept, flow.signResult.sign, ddk.Party.Offer, 900n, 108)).toThrow()
   })
 
   // A splice-out rollover: contract B is funded entirely by spending contract
@@ -479,6 +480,7 @@ describe('splicing', () => {
     const spliceInput = ddk.createDlcSpliceInput(
       flow.offer,
       flow.accept,
+      flow.signResult.sign,
       ddk.Party.Offer,
       SPLICE_SERIAL,
       ddk.dlcInputMaxWitnessLen(),

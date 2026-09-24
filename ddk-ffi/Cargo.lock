@@ -350,8 +350,7 @@ checksum = "c8d4a3bb8b1e0c1050499d1815f5ab16d04f0959b233085fb31653fbfc9d98f9"
 [[package]]
 name = "ddk"
 version = "2.0.0-rc.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee420f8801fbe58971a502fdb19c79c4e4b6ce346c24abbcd79f190882ac4be8"
+source = "git+https://github.com/bennyhodl/dlcdevkit?rev=8c3ed9c2bffc52ea7ccf913af3368bdfe449ef21#8c3ed9c2bffc52ea7ccf913af3368bdfe449ef21"
 dependencies = [
  "bdk_chain",
  "bdk_wallet",
@@ -372,8 +371,7 @@ dependencies = [
 [[package]]
 name = "ddk-dlc"
 version = "2.0.0-rc.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "917999fc919323440eccda1cc8c5e2d23876e7d963ad1cd313a939f0e80d28e1"
+source = "git+https://github.com/bennyhodl/dlcdevkit?rev=8c3ed9c2bffc52ea7ccf913af3368bdfe449ef21#8c3ed9c2bffc52ea7ccf913af3368bdfe449ef21"
 dependencies = [
  "bitcoin",
  "miniscript",
@@ -385,8 +383,7 @@ dependencies = [
 [[package]]
 name = "ddk-manager"
 version = "2.0.0-rc.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a2e44d5ebec254b092952512b95b0710653daf598f24730116a6df00fcd383b"
+source = "git+https://github.com/bennyhodl/dlcdevkit?rev=8c3ed9c2bffc52ea7ccf913af3368bdfe449ef21#8c3ed9c2bffc52ea7ccf913af3368bdfe449ef21"
 dependencies = [
  "async-trait",
  "bitcoin",
@@ -405,8 +402,7 @@ dependencies = [
 [[package]]
 name = "ddk-messages"
 version = "2.0.0-rc.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3977e2e68ae4b1dfa8765b9907d2f5c338ea9c8ac915c2cc8e0bb72b35d905ab"
+source = "git+https://github.com/bennyhodl/dlcdevkit?rev=8c3ed9c2bffc52ea7ccf913af3368bdfe449ef21#8c3ed9c2bffc52ea7ccf913af3368bdfe449ef21"
 dependencies = [
  "bitcoin",
  "ddk-dlc",
@@ -418,8 +414,7 @@ dependencies = [
 [[package]]
 name = "ddk-trie"
 version = "2.0.0-rc.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "658a00afff292a825a6436ba1ff1315514bee98cf8568ef0679b9fe11850dfc6"
+source = "git+https://github.com/bennyhodl/dlcdevkit?rev=8c3ed9c2bffc52ea7ccf913af3368bdfe449ef21#8c3ed9c2bffc52ea7ccf913af3368bdfe449ef21"
 dependencies = [
  "bitcoin",
  "ddk-dlc",

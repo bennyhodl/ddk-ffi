@@ -256,6 +256,7 @@ splice input.
 const spliceInput = createDlcSpliceInput(
   prevOffer,
   prevAccept,
+  prevSign, // selects the fee rule, so contracts from before ddk-dlc 2.0.0-rc.4 splice too
   Party.Offer,
   200n,
   dlcInputMaxWitnessLen() // 220 — the required max witness length for a DLC input

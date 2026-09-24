@@ -807,8 +807,43 @@ pub fn create_fund_tx_locking_script(
     Ok(script.to_bytes())
 }
 
-/// Create complete DLC transactions
+/// The fee rule a contract's transactions are built with (mirrors
+/// `ddk_dlc::FeeRule`). The two differ only when one party funds the whole
+/// contract.
+#[derive(uniffi::Enum, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FeeRule {
+    /// The party funding the whole contract also pays the CET fee for the
+    /// counterparty's payout output. The rule since ddk-dlc 2.0.0-rc.4, and
+    /// the only one a new contract may be created with.
+    CounterpartyPayout,
+    /// The rule before ddk-dlc 2.0.0-rc.4: each party's CET fee prices only
+    /// its own payout output. Use it only to rebuild a contract created under
+    /// that rule, to settle or splice it.
+    OwnPayoutOnly,
+}
+
+impl From<FeeRule> for ddk_dlc::FeeRule {
+    fn from(rule: FeeRule) -> Self {
+        match rule {
+            FeeRule::CounterpartyPayout => ddk_dlc::FeeRule::CounterpartyPayout,
+            FeeRule::OwnPayoutOnly => ddk_dlc::FeeRule::OwnPayoutOnly,
+        }
+    }
+}
+
+fn payouts_to_rust(outcomes: &[Payout]) -> Vec<DlcPayout> {
+    outcomes
+        .iter()
+        .map(|outcome| DlcPayout {
+            offer: Amount::from_sat(outcome.offer),
+            accept: Amount::from_sat(outcome.accept),
+        })
+        .collect()
+}
+
+/// Create complete DLC transactions, under the current fee rule.
 #[uniffi::export]
+#[allow(clippy::too_many_arguments)]
 pub fn create_dlc_transactions(
     outcomes: Vec<Payout>,
     local_params: PartyParams,
@@ -820,39 +855,58 @@ pub fn create_dlc_transactions(
     fund_output_serial_id: u64,
     contract_flags: u8,
 ) -> Result<DlcTransactions, DLCError> {
-    // Convert UniFFI types to rust-dlc types
-    let rust_local_params = party_params_to_rust(&local_params)?;
-    let rust_remote_params = party_params_to_rust(&remote_params)?;
-
-    // Convert outcomes to payouts
-    let payouts: Vec<DlcPayout> = outcomes
-        .iter()
-        .map(|outcome| DlcPayout {
-            offer: Amount::from_sat(outcome.offer),
-            accept: Amount::from_sat(outcome.accept),
-        })
-        .collect();
-
-    // Use rust-dlc library to create transactions
-    let dlc_txs = ddk_dlc::create_dlc_transactions(
-        &rust_local_params,
-        &rust_remote_params,
-        &payouts,
+    create_dlc_transactions_with_fee_rule(
+        outcomes,
+        local_params,
+        remote_params,
         refund_locktime,
         fee_rate,
         fund_lock_time,
         cet_lock_time,
         fund_output_serial_id,
         contract_flags,
+        FeeRule::CounterpartyPayout,
+    )
+}
+
+/// [`create_dlc_transactions`] under an explicit [`FeeRule`]. Pass
+/// [`FeeRule::OwnPayoutOnly`] only to rebuild a contract created before
+/// ddk-dlc 2.0.0-rc.4; check the result against its known contract id.
+#[uniffi::export]
+#[allow(clippy::too_many_arguments)]
+pub fn create_dlc_transactions_with_fee_rule(
+    outcomes: Vec<Payout>,
+    local_params: PartyParams,
+    remote_params: PartyParams,
+    refund_locktime: u32,
+    fee_rate: u64,
+    fund_lock_time: u32,
+    cet_lock_time: u32,
+    fund_output_serial_id: u64,
+    contract_flags: u8,
+    fee_rule: FeeRule,
+) -> Result<DlcTransactions, DLCError> {
+    let rust_local_params = party_params_to_rust(&local_params)?;
+    let rust_remote_params = party_params_to_rust(&remote_params)?;
+    let dlc_txs = ddk_dlc::create_dlc_transactions_with_fee_rule(
+        &rust_local_params,
+        &rust_remote_params,
+        &payouts_to_rust(&outcomes),
+        refund_locktime,
+        fee_rate,
+        fund_lock_time,
+        cet_lock_time,
+        fund_output_serial_id,
+        contract_flags,
+        fee_rule.into(),
     )
     .map_err(DLCError::from)?;
-
-    // Convert back to UniFFI types
     Ok(rust_dlc_transactions_to_uniffi(dlc_txs))
 }
 
-/// Create spliced DLC transactions
+/// Create spliced DLC transactions, under the current fee rule.
 #[uniffi::export]
+#[allow(clippy::too_many_arguments)]
 pub fn create_spliced_dlc_transactions(
     outcomes: Vec<Payout>,
     local_params: PartyParams,
@@ -864,34 +918,52 @@ pub fn create_spliced_dlc_transactions(
     fund_output_serial_id: u64,
     contract_flags: u8,
 ) -> Result<DlcTransactions, DLCError> {
-    // Convert UniFFI types to rust-dlc types
-    let rust_local_params = party_params_to_rust(&local_params)?;
-    let rust_remote_params = party_params_to_rust(&remote_params)?;
-
-    // Convert outcomes to payouts
-    let payouts: Vec<DlcPayout> = outcomes
-        .iter()
-        .map(|outcome| DlcPayout {
-            offer: Amount::from_sat(outcome.offer),
-            accept: Amount::from_sat(outcome.accept),
-        })
-        .collect();
-
-    // Use rust-dlc library to create spliced transactions
-    let dlc_txs = ddk_dlc::create_spliced_dlc_transactions(
-        &rust_local_params,
-        &rust_remote_params,
-        &payouts,
+    create_spliced_dlc_transactions_with_fee_rule(
+        outcomes,
+        local_params,
+        remote_params,
         refund_locktime,
         fee_rate,
         fund_lock_time,
         cet_lock_time,
         fund_output_serial_id,
         contract_flags,
+        FeeRule::CounterpartyPayout,
+    )
+}
+
+/// [`create_spliced_dlc_transactions`] under an explicit [`FeeRule`]. Pass
+/// [`FeeRule::OwnPayoutOnly`] only to rebuild a contract created before
+/// ddk-dlc 2.0.0-rc.4; check the result against its known contract id.
+#[uniffi::export]
+#[allow(clippy::too_many_arguments)]
+pub fn create_spliced_dlc_transactions_with_fee_rule(
+    outcomes: Vec<Payout>,
+    local_params: PartyParams,
+    remote_params: PartyParams,
+    refund_locktime: u32,
+    fee_rate: u64,
+    fund_lock_time: u32,
+    cet_lock_time: u32,
+    fund_output_serial_id: u64,
+    contract_flags: u8,
+    fee_rule: FeeRule,
+) -> Result<DlcTransactions, DLCError> {
+    let rust_local_params = party_params_to_rust(&local_params)?;
+    let rust_remote_params = party_params_to_rust(&remote_params)?;
+    let dlc_txs = ddk_dlc::create_spliced_dlc_transactions_with_fee_rule(
+        &rust_local_params,
+        &rust_remote_params,
+        &payouts_to_rust(&outcomes),
+        refund_locktime,
+        fee_rate,
+        fund_lock_time,
+        cet_lock_time,
+        fund_output_serial_id,
+        contract_flags,
+        fee_rule.into(),
     )
     .map_err(DLCError::from)?;
-
-    // Convert back to UniFFI types
     Ok(rust_dlc_transactions_to_uniffi(dlc_txs))
 }
 

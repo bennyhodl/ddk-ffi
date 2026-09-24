@@ -243,6 +243,7 @@ interface NativeModuleInterface {
   ubrn_uniffi_ddk_ffi_fn_func_create_dlc_splice_input(
     prevOffer: Uint8Array,
     prevAccept: Uint8Array,
+    prevSign: Uint8Array,
     localParty: Uint8Array,
     inputSerialId: Uint8Array,
     maxWitnessLen: number,
@@ -258,6 +259,19 @@ interface NativeModuleInterface {
     cetLockTime: number,
     fundOutputSerialId: bigint,
     contractFlags: number,
+    uniffi_out_err: UniffiRustCallStatus
+  ): Uint8Array;
+  ubrn_uniffi_ddk_ffi_fn_func_create_dlc_transactions_with_fee_rule(
+    outcomes: Uint8Array,
+    localParams: Uint8Array,
+    remoteParams: Uint8Array,
+    refundLocktime: number,
+    feeRate: bigint,
+    fundLockTime: number,
+    cetLockTime: number,
+    fundOutputSerialId: bigint,
+    contractFlags: number,
+    feeRule: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus
   ): Uint8Array;
   ubrn_uniffi_ddk_ffi_fn_func_create_extkey_from_parent_path(
@@ -306,6 +320,19 @@ interface NativeModuleInterface {
     contractFlags: number,
     uniffi_out_err: UniffiRustCallStatus
   ): Uint8Array;
+  ubrn_uniffi_ddk_ffi_fn_func_create_spliced_dlc_transactions_with_fee_rule(
+    outcomes: Uint8Array,
+    localParams: Uint8Array,
+    remoteParams: Uint8Array,
+    refundLocktime: number,
+    feeRate: bigint,
+    fundLockTime: number,
+    cetLockTime: number,
+    fundOutputSerialId: bigint,
+    contractFlags: number,
+    feeRule: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus
+  ): Uint8Array;
   ubrn_uniffi_ddk_ffi_fn_func_create_xpriv_from_parent_path(
     seedOrXpriv: Uint8Array,
     baseDerivationPath: Uint8Array,
@@ -319,6 +346,12 @@ interface NativeModuleInterface {
   ubrn_uniffi_ddk_ffi_fn_func_dlc_transactions_from_messages(
     offer: Uint8Array,
     accept: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus
+  ): Uint8Array;
+  ubrn_uniffi_ddk_ffi_fn_func_dlc_transactions_from_signed_messages(
+    offer: Uint8Array,
+    accept: Uint8Array,
+    sign: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus
   ): Uint8Array;
   ubrn_uniffi_ddk_ffi_fn_func_extract_ecdsa_signature_from_oracle_signatures(
@@ -566,6 +599,7 @@ interface NativeModuleInterface {
   ubrn_uniffi_ddk_ffi_checksum_func_create_cets(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_create_dlc_splice_input(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_create_dlc_transactions(): number;
+  ubrn_uniffi_ddk_ffi_checksum_func_create_dlc_transactions_with_fee_rule(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_create_extkey_from_parent_path(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_create_extkey_from_seed(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_create_fund_tx_locking_script(): number;
@@ -573,9 +607,11 @@ interface NativeModuleInterface {
   ubrn_uniffi_ddk_ffi_checksum_func_create_offer(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_create_refund_transaction(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_create_spliced_dlc_transactions(): number;
+  ubrn_uniffi_ddk_ffi_checksum_func_create_spliced_dlc_transactions_with_fee_rule(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_create_xpriv_from_parent_path(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_dlc_input_max_witness_len(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_dlc_transactions_from_messages(): number;
+  ubrn_uniffi_ddk_ffi_checksum_func_dlc_transactions_from_signed_messages(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_extract_ecdsa_signature_from_oracle_signatures(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_finalize_sign(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_finalize_sign_spliced(): number;

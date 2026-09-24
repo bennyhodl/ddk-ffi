@@ -427,14 +427,16 @@ export function createCets(
 
 /**
  * Rebuilds the splice `FundingInput` (wire-encoded) that spends a previous
- * contract's 2-of-2 funding output, from that contract's offer and accept
- * messages. Only the offering party contributes a splice input; place the
+ * contract's 2-of-2 funding output, from that contract's offer, accept and
+ * sign messages. The sign message selects the fee rule, so a contract created
+ * before ddk-dlc 2.0.0-rc.4 can be spliced too. Only the offering party contributes a splice input; place the
  * result in the offering party's `funding_inputs`. `max_witness_len` must be
  * greater than 108 — use [`dlc_input_max_witness_len`].
  */
 export function createDlcSpliceInput(
   prevOffer: Uint8Array,
   prevAccept: Uint8Array,
+  prevSign: Uint8Array,
   localParty: Party,
   inputSerialId: bigint | undefined,
   maxWitnessLen: number
@@ -453,6 +455,7 @@ export function createDlcSpliceInput(
           prevAccept,
           nativeModule().rustbuffer_alloc
         ),
+        FfiConverterUint8Array.lower(prevSign, nativeModule().rustbuffer_alloc),
         FfiConverterTypeParty.lower(
           localParty,
           nativeModule().rustbuffer_alloc
@@ -478,7 +481,7 @@ export function createDlcSpliceInput(
 }
 
 /**
- * Create complete DLC transactions
+ * Create complete DLC transactions, under the current fee rule.
  */
 export function createDlcTransactions(
   outcomes: Array<Payout>,
@@ -519,6 +522,64 @@ export function createDlcTransactions(
           nativeModule().rustbuffer_alloc
         ),
         FfiConverterUInt8.lower(contractFlags, nativeModule().rustbuffer_alloc),
+        callStatus
+      );
+    },
+    /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString)
+  );
+  try {
+    return FfiConverterTypeDlcTransactions.lift(__rb);
+  } finally {
+    nativeModule().rustbuffer_free(__rb);
+  }
+}
+
+/**
+ * [`create_dlc_transactions`] under an explicit [`FeeRule`]. Pass
+ * [`FeeRule::OwnPayoutOnly`] only to rebuild a contract created before
+ * ddk-dlc 2.0.0-rc.4; check the result against its known contract id.
+ */
+export function createDlcTransactionsWithFeeRule(
+  outcomes: Array<Payout>,
+  localParams: PartyParams,
+  remoteParams: PartyParams,
+  refundLocktime: number,
+  feeRate: bigint,
+  fundLockTime: number,
+  cetLockTime: number,
+  fundOutputSerialId: bigint,
+  contractFlags: number,
+  feeRule: FeeRule
+): DlcTransactions /*throws*/ {
+  const __rb: Uint8Array = uniffiCaller.rustCallWithError(
+    /*liftError:*/ FfiConverterTypeDLCError.lift.bind(FfiConverterTypeDLCError),
+    /*caller:*/ (callStatus) => {
+      return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_create_dlc_transactions_with_fee_rule(
+        FfiConverterSequenceTypePayout.lower(
+          outcomes,
+          nativeModule().rustbuffer_alloc
+        ),
+        FfiConverterTypePartyParams.lower(
+          localParams,
+          nativeModule().rustbuffer_alloc
+        ),
+        FfiConverterTypePartyParams.lower(
+          remoteParams,
+          nativeModule().rustbuffer_alloc
+        ),
+        FfiConverterUInt32.lower(
+          refundLocktime,
+          nativeModule().rustbuffer_alloc
+        ),
+        FfiConverterUInt64.lower(feeRate, nativeModule().rustbuffer_alloc),
+        FfiConverterUInt32.lower(fundLockTime, nativeModule().rustbuffer_alloc),
+        FfiConverterUInt32.lower(cetLockTime, nativeModule().rustbuffer_alloc),
+        FfiConverterUInt64.lower(
+          fundOutputSerialId,
+          nativeModule().rustbuffer_alloc
+        ),
+        FfiConverterUInt8.lower(contractFlags, nativeModule().rustbuffer_alloc),
+        FfiConverterTypeFeeRule.lower(feeRule, nativeModule().rustbuffer_alloc),
         callStatus
       );
     },
@@ -709,7 +770,7 @@ export function createRefundTransaction(
 }
 
 /**
- * Create spliced DLC transactions
+ * Create spliced DLC transactions, under the current fee rule.
  */
 export function createSplicedDlcTransactions(
   outcomes: Array<Payout>,
@@ -750,6 +811,64 @@ export function createSplicedDlcTransactions(
           nativeModule().rustbuffer_alloc
         ),
         FfiConverterUInt8.lower(contractFlags, nativeModule().rustbuffer_alloc),
+        callStatus
+      );
+    },
+    /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString)
+  );
+  try {
+    return FfiConverterTypeDlcTransactions.lift(__rb);
+  } finally {
+    nativeModule().rustbuffer_free(__rb);
+  }
+}
+
+/**
+ * [`create_spliced_dlc_transactions`] under an explicit [`FeeRule`]. Pass
+ * [`FeeRule::OwnPayoutOnly`] only to rebuild a contract created before
+ * ddk-dlc 2.0.0-rc.4; check the result against its known contract id.
+ */
+export function createSplicedDlcTransactionsWithFeeRule(
+  outcomes: Array<Payout>,
+  localParams: PartyParams,
+  remoteParams: PartyParams,
+  refundLocktime: number,
+  feeRate: bigint,
+  fundLockTime: number,
+  cetLockTime: number,
+  fundOutputSerialId: bigint,
+  contractFlags: number,
+  feeRule: FeeRule
+): DlcTransactions /*throws*/ {
+  const __rb: Uint8Array = uniffiCaller.rustCallWithError(
+    /*liftError:*/ FfiConverterTypeDLCError.lift.bind(FfiConverterTypeDLCError),
+    /*caller:*/ (callStatus) => {
+      return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_create_spliced_dlc_transactions_with_fee_rule(
+        FfiConverterSequenceTypePayout.lower(
+          outcomes,
+          nativeModule().rustbuffer_alloc
+        ),
+        FfiConverterTypePartyParams.lower(
+          localParams,
+          nativeModule().rustbuffer_alloc
+        ),
+        FfiConverterTypePartyParams.lower(
+          remoteParams,
+          nativeModule().rustbuffer_alloc
+        ),
+        FfiConverterUInt32.lower(
+          refundLocktime,
+          nativeModule().rustbuffer_alloc
+        ),
+        FfiConverterUInt64.lower(feeRate, nativeModule().rustbuffer_alloc),
+        FfiConverterUInt32.lower(fundLockTime, nativeModule().rustbuffer_alloc),
+        FfiConverterUInt32.lower(cetLockTime, nativeModule().rustbuffer_alloc),
+        FfiConverterUInt64.lower(
+          fundOutputSerialId,
+          nativeModule().rustbuffer_alloc
+        ),
+        FfiConverterUInt8.lower(contractFlags, nativeModule().rustbuffer_alloc),
+        FfiConverterTypeFeeRule.lower(feeRule, nativeModule().rustbuffer_alloc),
         callStatus
       );
     },
@@ -829,6 +948,41 @@ export function dlcTransactionsFromMessages(
       return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_dlc_transactions_from_messages(
         FfiConverterUint8Array.lower(offer, nativeModule().rustbuffer_alloc),
         FfiConverterUint8Array.lower(accept, nativeModule().rustbuffer_alloc),
+        callStatus
+      );
+    },
+    /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString)
+  );
+  try {
+    return FfiConverterTypeDlcTransactions.lift(__rb);
+  } finally {
+    nativeModule().rustbuffer_free(__rb);
+  }
+}
+
+/**
+ * Rebuilds a signed contract's transactions, to settle or splice it.
+ *
+ * Unlike [`dlc_transactions_from_messages`], this also rebuilds a contract
+ * created before ddk-dlc 2.0.0-rc.4, whose single-funded funding transaction
+ * was priced under the old fee rule: the rule is chosen by which rebuild
+ * reproduces `sign`'s contract id. `sign_contract_cet`, `sign_contract_refund`
+ * and `create_dlc_splice_input` rebuild the same way.
+ */
+export function dlcTransactionsFromSignedMessages(
+  offer: Uint8Array,
+  accept: Uint8Array,
+  sign: Uint8Array
+): DlcTransactions /*throws*/ {
+  const __rb: Uint8Array = uniffiCaller.rustCallWithError(
+    /*liftError:*/ FfiConverterTypeContractError.lift.bind(
+      FfiConverterTypeContractError
+    ),
+    /*caller:*/ (callStatus) => {
+      return nativeModule().ubrn_uniffi_ddk_ffi_fn_func_dlc_transactions_from_signed_messages(
+        FfiConverterUint8Array.lower(offer, nativeModule().rustbuffer_alloc),
+        FfiConverterUint8Array.lower(accept, nativeModule().rustbuffer_alloc),
+        FfiConverterUint8Array.lower(sign, nativeModule().rustbuffer_alloc),
         callStatus
       );
     },
@@ -4882,6 +5036,54 @@ const FfiConverterTypeDLCError = (() => {
 })();
 
 /**
+ * The fee rule a contract's transactions are built with (mirrors
+ * `ddk_dlc::FeeRule`). The two differ only when one party funds the whole
+ * contract.
+ */
+export enum FeeRule {
+  /**
+   * The party funding the whole contract also pays the CET fee for the
+   * counterparty's payout output. The rule since ddk-dlc 2.0.0-rc.4, and
+   * the only one a new contract may be created with.
+   */
+  CounterpartyPayout,
+  /**
+   * The rule before ddk-dlc 2.0.0-rc.4: each party's CET fee prices only
+   * its own payout output. Use it only to rebuild a contract created under
+   * that rule, to settle or splice it.
+   */
+  OwnPayoutOnly,
+}
+
+const FfiConverterTypeFeeRule = (() => {
+  type TypeName = FeeRule;
+  class FFIConverter extends AbstractFfiConverterByteArray<TypeName> {
+    readFromCursor(c: Cursor): TypeName {
+      switch (c.readI32()) {
+        case 1:
+          return FeeRule.CounterpartyPayout;
+        case 2:
+          return FeeRule.OwnPayoutOnly;
+        default:
+          throw new UniffiInternalError.UnexpectedEnumCase();
+      }
+    }
+    writeIntoCursor(value: TypeName, c: Cursor): void {
+      switch (value) {
+        case FeeRule.CounterpartyPayout:
+          return c.writeI32(1);
+        case FeeRule.OwnPayoutOnly:
+          return c.writeI32(2);
+      }
+    }
+    allocationSize(value: TypeName): number {
+      return 4;
+    }
+  }
+  return new FFIConverter();
+})();
+
+/**
  * Identifies which party's funding inputs an operation applies to.
  */
 export enum Party {
@@ -5363,7 +5565,7 @@ function uniffiEnsureInitialized() {
   }
   if (
     nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_create_dlc_splice_input() !==
-    50727
+    33258
   ) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       'uniffi_ddk_ffi_checksum_func_create_dlc_splice_input'
@@ -5371,10 +5573,18 @@ function uniffiEnsureInitialized() {
   }
   if (
     nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_create_dlc_transactions() !==
-    60266
+    28858
   ) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       'uniffi_ddk_ffi_checksum_func_create_dlc_transactions'
+    );
+  }
+  if (
+    nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_create_dlc_transactions_with_fee_rule() !==
+    47463
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      'uniffi_ddk_ffi_checksum_func_create_dlc_transactions_with_fee_rule'
     );
   }
   if (
@@ -5426,10 +5636,18 @@ function uniffiEnsureInitialized() {
   }
   if (
     nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_create_spliced_dlc_transactions() !==
-    55101
+    18672
   ) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       'uniffi_ddk_ffi_checksum_func_create_spliced_dlc_transactions'
+    );
+  }
+  if (
+    nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_create_spliced_dlc_transactions_with_fee_rule() !==
+    58022
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      'uniffi_ddk_ffi_checksum_func_create_spliced_dlc_transactions_with_fee_rule'
     );
   }
   if (
@@ -5454,6 +5672,14 @@ function uniffiEnsureInitialized() {
   ) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       'uniffi_ddk_ffi_checksum_func_dlc_transactions_from_messages'
+    );
+  }
+  if (
+    nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_dlc_transactions_from_signed_messages() !==
+    16865
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      'uniffi_ddk_ffi_checksum_func_dlc_transactions_from_signed_messages'
     );
   }
   if (
@@ -5643,6 +5869,7 @@ export default Object.freeze({
     FfiConverterTypeDlcInputInfo,
     FfiConverterTypeDlcTransactions,
     FfiConverterTypeExtendedKey,
+    FfiConverterTypeFeeRule,
     FfiConverterTypeOracleAttestationRef,
     FfiConverterTypeOracleInfo,
     FfiConverterTypeParty,

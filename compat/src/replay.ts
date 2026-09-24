@@ -168,11 +168,11 @@ export function buildAccept(ddk: any, vectors: CompatVectors, offer: Uint8Array)
 }
 
 /** Builds contract 2's (splice successor) offer — fully deterministic. */
-export function buildSpliceOffer(ddk: any, vectors: CompatVectors, offer: Uint8Array, accept: Uint8Array): { spliceInput: Uint8Array; offer2: Uint8Array } {
+export function buildSpliceOffer(ddk: any, vectors: CompatVectors, offer: Uint8Array, accept: Uint8Array, sign: Uint8Array): { spliceInput: Uint8Array; offer2: Uint8Array } {
   const { offerer, contract, splice } = vectors
   const offererKeys = ddk.ContractKeyProvider.fromDescriptor(offerer.descriptor)
   const offer2TempId = fromHexString(splice.offerTempIdHex)
-  const spliceInput = ddk.createDlcSpliceInput(offer, accept, ddk.Party.Offer, BigInt(splice.spliceSerialId), 220)
+  const spliceInput = ddk.createDlcSpliceInput(offer, accept, sign, ddk.Party.Offer, BigInt(splice.spliceSerialId), 220)
   const offer2 = ddk.createOffer({
     chainHash: ddk.chainHashFromNetwork('regtest'),
     temporaryContractId: offer2TempId,
@@ -272,7 +272,7 @@ export function runDdkReplay(ddk: any, vectors: CompatVectors): Record<string, s
   out.refundHex = toHexString(ddk.signContractRefund(offer, accept, sign, acceptorKeys, acceptTempId))
 
   // --- contract 2: splice successor ---
-  const { spliceInput, offer2 } = buildSpliceOffer(ddk, vectors, offer, accept)
+  const { spliceInput, offer2 } = buildSpliceOffer(ddk, vectors, offer, accept, sign)
   out.spliceInputHex = toHexString(spliceInput)
   out.offer2Hex = toHexString(offer2)
 

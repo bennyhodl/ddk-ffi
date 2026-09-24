@@ -312,6 +312,19 @@ extern "C" {
         uint8_t contract_flags, 
         RustCallStatus *uniffi_out_err
     );
+    RustBuffer uniffi_ddk_ffi_fn_func_create_dlc_transactions_with_fee_rule(
+        RustBuffer outcomes, 
+        RustBuffer local_params, 
+        RustBuffer remote_params, 
+        uint32_t refund_locktime, 
+        uint64_t fee_rate, 
+        uint32_t fund_lock_time, 
+        uint32_t cet_lock_time, 
+        uint64_t fund_output_serial_id, 
+        uint8_t contract_flags, 
+        RustBuffer fee_rule, 
+        RustCallStatus *uniffi_out_err
+    );
     RustBuffer uniffi_ddk_ffi_fn_func_create_extkey_from_parent_path(
         RustBuffer extkey, 
         RustBuffer path, 
@@ -347,6 +360,19 @@ extern "C" {
         uint32_t cet_lock_time, 
         uint64_t fund_output_serial_id, 
         uint8_t contract_flags, 
+        RustCallStatus *uniffi_out_err
+    );
+    RustBuffer uniffi_ddk_ffi_fn_func_create_spliced_dlc_transactions_with_fee_rule(
+        RustBuffer outcomes, 
+        RustBuffer local_params, 
+        RustBuffer remote_params, 
+        uint32_t refund_locktime, 
+        uint64_t fee_rate, 
+        uint32_t fund_lock_time, 
+        uint32_t cet_lock_time, 
+        uint64_t fund_output_serial_id, 
+        uint8_t contract_flags, 
+        RustBuffer fee_rule, 
         RustCallStatus *uniffi_out_err
     );
     RustBuffer uniffi_ddk_ffi_fn_func_create_xpriv_from_parent_path(
@@ -410,6 +436,7 @@ extern "C" {
     RustBuffer uniffi_ddk_ffi_fn_func_create_dlc_splice_input(
         RustBuffer prev_offer, 
         RustBuffer prev_accept, 
+        RustBuffer prev_sign, 
         RustBuffer local_party, 
         RustBuffer input_serial_id, 
         uint16_t max_witness_len, 
@@ -429,6 +456,12 @@ extern "C" {
     RustBuffer uniffi_ddk_ffi_fn_func_dlc_transactions_from_messages(
         RustBuffer offer, 
         RustBuffer accept, 
+        RustCallStatus *uniffi_out_err
+    );
+    RustBuffer uniffi_ddk_ffi_fn_func_dlc_transactions_from_signed_messages(
+        RustBuffer offer, 
+        RustBuffer accept, 
+        RustBuffer sign, 
         RustCallStatus *uniffi_out_err
     );
     RustBuffer uniffi_ddk_ffi_fn_func_finalize_sign(
@@ -727,6 +760,8 @@ extern "C" {
     );
     uint16_t uniffi_ddk_ffi_checksum_func_create_dlc_transactions(
     );
+    uint16_t uniffi_ddk_ffi_checksum_func_create_dlc_transactions_with_fee_rule(
+    );
     uint16_t uniffi_ddk_ffi_checksum_func_create_extkey_from_parent_path(
     );
     uint16_t uniffi_ddk_ffi_checksum_func_create_extkey_from_seed(
@@ -736,6 +771,8 @@ extern "C" {
     uint16_t uniffi_ddk_ffi_checksum_func_create_refund_transaction(
     );
     uint16_t uniffi_ddk_ffi_checksum_func_create_spliced_dlc_transactions(
+    );
+    uint16_t uniffi_ddk_ffi_checksum_func_create_spliced_dlc_transactions_with_fee_rule(
     );
     uint16_t uniffi_ddk_ffi_checksum_func_create_xpriv_from_parent_path(
     );
@@ -768,6 +805,8 @@ extern "C" {
     uint16_t uniffi_ddk_ffi_checksum_func_dlc_input_max_witness_len(
     );
     uint16_t uniffi_ddk_ffi_checksum_func_dlc_transactions_from_messages(
+    );
+    uint16_t uniffi_ddk_ffi_checksum_func_dlc_transactions_from_signed_messages(
     );
     uint16_t uniffi_ddk_ffi_checksum_func_finalize_sign(
     );
@@ -2509,6 +2548,14 @@ NativeDdkFfi::NativeDdkFfi(
             return this->cpp_uniffi_ddk_ffi_fn_func_create_dlc_transactions(rt, thisVal, args, count);
         }
     );
+    props["ubrn_uniffi_ddk_ffi_fn_func_create_dlc_transactions_with_fee_rule"] = jsi::Function::createFromHostFunction(
+        rt,
+        jsi::PropNameID::forAscii(rt, "ubrn_uniffi_ddk_ffi_fn_func_create_dlc_transactions_with_fee_rule"),
+        10,
+        [this](jsi::Runtime &rt, const jsi::Value &thisVal, const jsi::Value *args, size_t count) -> jsi::Value {
+            return this->cpp_uniffi_ddk_ffi_fn_func_create_dlc_transactions_with_fee_rule(rt, thisVal, args, count);
+        }
+    );
     props["ubrn_uniffi_ddk_ffi_fn_func_create_extkey_from_parent_path"] = jsi::Function::createFromHostFunction(
         rt,
         jsi::PropNameID::forAscii(rt, "ubrn_uniffi_ddk_ffi_fn_func_create_extkey_from_parent_path"),
@@ -2547,6 +2594,14 @@ NativeDdkFfi::NativeDdkFfi(
         9,
         [this](jsi::Runtime &rt, const jsi::Value &thisVal, const jsi::Value *args, size_t count) -> jsi::Value {
             return this->cpp_uniffi_ddk_ffi_fn_func_create_spliced_dlc_transactions(rt, thisVal, args, count);
+        }
+    );
+    props["ubrn_uniffi_ddk_ffi_fn_func_create_spliced_dlc_transactions_with_fee_rule"] = jsi::Function::createFromHostFunction(
+        rt,
+        jsi::PropNameID::forAscii(rt, "ubrn_uniffi_ddk_ffi_fn_func_create_spliced_dlc_transactions_with_fee_rule"),
+        10,
+        [this](jsi::Runtime &rt, const jsi::Value &thisVal, const jsi::Value *args, size_t count) -> jsi::Value {
+            return this->cpp_uniffi_ddk_ffi_fn_func_create_spliced_dlc_transactions_with_fee_rule(rt, thisVal, args, count);
         }
     );
     props["ubrn_uniffi_ddk_ffi_fn_func_create_xpriv_from_parent_path"] = jsi::Function::createFromHostFunction(
@@ -2640,7 +2695,7 @@ NativeDdkFfi::NativeDdkFfi(
     props["ubrn_uniffi_ddk_ffi_fn_func_create_dlc_splice_input"] = jsi::Function::createFromHostFunction(
         rt,
         jsi::PropNameID::forAscii(rt, "ubrn_uniffi_ddk_ffi_fn_func_create_dlc_splice_input"),
-        5,
+        6,
         [this](jsi::Runtime &rt, const jsi::Value &thisVal, const jsi::Value *args, size_t count) -> jsi::Value {
             return this->cpp_uniffi_ddk_ffi_fn_func_create_dlc_splice_input(rt, thisVal, args, count);
         }
@@ -2675,6 +2730,14 @@ NativeDdkFfi::NativeDdkFfi(
         2,
         [this](jsi::Runtime &rt, const jsi::Value &thisVal, const jsi::Value *args, size_t count) -> jsi::Value {
             return this->cpp_uniffi_ddk_ffi_fn_func_dlc_transactions_from_messages(rt, thisVal, args, count);
+        }
+    );
+    props["ubrn_uniffi_ddk_ffi_fn_func_dlc_transactions_from_signed_messages"] = jsi::Function::createFromHostFunction(
+        rt,
+        jsi::PropNameID::forAscii(rt, "ubrn_uniffi_ddk_ffi_fn_func_dlc_transactions_from_signed_messages"),
+        3,
+        [this](jsi::Runtime &rt, const jsi::Value &thisVal, const jsi::Value *args, size_t count) -> jsi::Value {
+            return this->cpp_uniffi_ddk_ffi_fn_func_dlc_transactions_from_signed_messages(rt, thisVal, args, count);
         }
     );
     props["ubrn_uniffi_ddk_ffi_fn_func_finalize_sign"] = jsi::Function::createFromHostFunction(
@@ -2821,6 +2884,14 @@ NativeDdkFfi::NativeDdkFfi(
             return this->cpp_uniffi_ddk_ffi_checksum_func_create_dlc_transactions(rt, thisVal, args, count);
         }
     );
+    props["ubrn_uniffi_ddk_ffi_checksum_func_create_dlc_transactions_with_fee_rule"] = jsi::Function::createFromHostFunction(
+        rt,
+        jsi::PropNameID::forAscii(rt, "ubrn_uniffi_ddk_ffi_checksum_func_create_dlc_transactions_with_fee_rule"),
+        0,
+        [this](jsi::Runtime &rt, const jsi::Value &thisVal, const jsi::Value *args, size_t count) -> jsi::Value {
+            return this->cpp_uniffi_ddk_ffi_checksum_func_create_dlc_transactions_with_fee_rule(rt, thisVal, args, count);
+        }
+    );
     props["ubrn_uniffi_ddk_ffi_checksum_func_create_extkey_from_parent_path"] = jsi::Function::createFromHostFunction(
         rt,
         jsi::PropNameID::forAscii(rt, "ubrn_uniffi_ddk_ffi_checksum_func_create_extkey_from_parent_path"),
@@ -2859,6 +2930,14 @@ NativeDdkFfi::NativeDdkFfi(
         0,
         [this](jsi::Runtime &rt, const jsi::Value &thisVal, const jsi::Value *args, size_t count) -> jsi::Value {
             return this->cpp_uniffi_ddk_ffi_checksum_func_create_spliced_dlc_transactions(rt, thisVal, args, count);
+        }
+    );
+    props["ubrn_uniffi_ddk_ffi_checksum_func_create_spliced_dlc_transactions_with_fee_rule"] = jsi::Function::createFromHostFunction(
+        rt,
+        jsi::PropNameID::forAscii(rt, "ubrn_uniffi_ddk_ffi_checksum_func_create_spliced_dlc_transactions_with_fee_rule"),
+        0,
+        [this](jsi::Runtime &rt, const jsi::Value &thisVal, const jsi::Value *args, size_t count) -> jsi::Value {
+            return this->cpp_uniffi_ddk_ffi_checksum_func_create_spliced_dlc_transactions_with_fee_rule(rt, thisVal, args, count);
         }
     );
     props["ubrn_uniffi_ddk_ffi_checksum_func_create_xpriv_from_parent_path"] = jsi::Function::createFromHostFunction(
@@ -2987,6 +3066,14 @@ NativeDdkFfi::NativeDdkFfi(
         0,
         [this](jsi::Runtime &rt, const jsi::Value &thisVal, const jsi::Value *args, size_t count) -> jsi::Value {
             return this->cpp_uniffi_ddk_ffi_checksum_func_dlc_transactions_from_messages(rt, thisVal, args, count);
+        }
+    );
+    props["ubrn_uniffi_ddk_ffi_checksum_func_dlc_transactions_from_signed_messages"] = jsi::Function::createFromHostFunction(
+        rt,
+        jsi::PropNameID::forAscii(rt, "ubrn_uniffi_ddk_ffi_checksum_func_dlc_transactions_from_signed_messages"),
+        0,
+        [this](jsi::Runtime &rt, const jsi::Value &thisVal, const jsi::Value *args, size_t count) -> jsi::Value {
+            return this->cpp_uniffi_ddk_ffi_checksum_func_dlc_transactions_from_signed_messages(rt, thisVal, args, count);
         }
     );
     props["ubrn_uniffi_ddk_ffi_checksum_func_finalize_sign"] = jsi::Function::createFromHostFunction(
@@ -3558,6 +3645,16 @@ jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_func_create_dlc_transactions(jsi:
         
         return uniffi::ddk_ffi::Bridging<RustBuffer>::toJs(rt, callInvoker, value);
 }
+jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_func_create_dlc_transactions_with_fee_rule(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
+        RustCallStatus status = uniffi::ddk_ffi::Bridging<RustCallStatus>::rustSuccess(rt);
+        auto value = uniffi_ddk_ffi_fn_func_create_dlc_transactions_with_fee_rule(uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[1]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[2]), uniffi_jsi::Bridging<uint32_t>::fromJs(rt, callInvoker, args[3]), uniffi_jsi::Bridging<uint64_t>::fromJs(rt, callInvoker, args[4]), uniffi_jsi::Bridging<uint32_t>::fromJs(rt, callInvoker, args[5]), uniffi_jsi::Bridging<uint32_t>::fromJs(rt, callInvoker, args[6]), uniffi_jsi::Bridging<uint64_t>::fromJs(rt, callInvoker, args[7]), uniffi_jsi::Bridging<uint8_t>::fromJs(rt, callInvoker, args[8]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[9]), 
+            &status
+        );
+        uniffi::ddk_ffi::Bridging<RustCallStatus>::copyIntoJs(rt, callInvoker, status, args[count - 1]);
+
+        
+        return uniffi::ddk_ffi::Bridging<RustBuffer>::toJs(rt, callInvoker, value);
+}
 jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_func_create_extkey_from_parent_path(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         RustCallStatus status = uniffi::ddk_ffi::Bridging<RustCallStatus>::rustSuccess(rt);
         auto value = uniffi_ddk_ffi_fn_func_create_extkey_from_parent_path(uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[1]), 
@@ -3601,6 +3698,16 @@ jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_func_create_refund_transaction(js
 jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_func_create_spliced_dlc_transactions(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         RustCallStatus status = uniffi::ddk_ffi::Bridging<RustCallStatus>::rustSuccess(rt);
         auto value = uniffi_ddk_ffi_fn_func_create_spliced_dlc_transactions(uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[1]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[2]), uniffi_jsi::Bridging<uint32_t>::fromJs(rt, callInvoker, args[3]), uniffi_jsi::Bridging<uint64_t>::fromJs(rt, callInvoker, args[4]), uniffi_jsi::Bridging<uint32_t>::fromJs(rt, callInvoker, args[5]), uniffi_jsi::Bridging<uint32_t>::fromJs(rt, callInvoker, args[6]), uniffi_jsi::Bridging<uint64_t>::fromJs(rt, callInvoker, args[7]), uniffi_jsi::Bridging<uint8_t>::fromJs(rt, callInvoker, args[8]), 
+            &status
+        );
+        uniffi::ddk_ffi::Bridging<RustCallStatus>::copyIntoJs(rt, callInvoker, status, args[count - 1]);
+
+        
+        return uniffi::ddk_ffi::Bridging<RustBuffer>::toJs(rt, callInvoker, value);
+}
+jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_func_create_spliced_dlc_transactions_with_fee_rule(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
+        RustCallStatus status = uniffi::ddk_ffi::Bridging<RustCallStatus>::rustSuccess(rt);
+        auto value = uniffi_ddk_ffi_fn_func_create_spliced_dlc_transactions_with_fee_rule(uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[1]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[2]), uniffi_jsi::Bridging<uint32_t>::fromJs(rt, callInvoker, args[3]), uniffi_jsi::Bridging<uint64_t>::fromJs(rt, callInvoker, args[4]), uniffi_jsi::Bridging<uint32_t>::fromJs(rt, callInvoker, args[5]), uniffi_jsi::Bridging<uint32_t>::fromJs(rt, callInvoker, args[6]), uniffi_jsi::Bridging<uint64_t>::fromJs(rt, callInvoker, args[7]), uniffi_jsi::Bridging<uint8_t>::fromJs(rt, callInvoker, args[8]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[9]), 
             &status
         );
         uniffi::ddk_ffi::Bridging<RustCallStatus>::copyIntoJs(rt, callInvoker, status, args[count - 1]);
@@ -3719,7 +3826,7 @@ jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_func_contract_info_payouts(jsi::R
 }
 jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_func_create_dlc_splice_input(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         RustCallStatus status = uniffi::ddk_ffi::Bridging<RustCallStatus>::rustSuccess(rt);
-        auto value = uniffi_ddk_ffi_fn_func_create_dlc_splice_input(uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[1]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[2]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[3]), uniffi_jsi::Bridging<uint16_t>::fromJs(rt, callInvoker, args[4]), 
+        auto value = uniffi_ddk_ffi_fn_func_create_dlc_splice_input(uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[1]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[2]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[3]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[4]), uniffi_jsi::Bridging<uint16_t>::fromJs(rt, callInvoker, args[5]), 
             &status
         );
         uniffi::ddk_ffi::Bridging<RustCallStatus>::copyIntoJs(rt, callInvoker, status, args[count - 1]);
@@ -3759,6 +3866,16 @@ jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_func_dlc_input_max_witness_len(js
 jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_func_dlc_transactions_from_messages(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         RustCallStatus status = uniffi::ddk_ffi::Bridging<RustCallStatus>::rustSuccess(rt);
         auto value = uniffi_ddk_ffi_fn_func_dlc_transactions_from_messages(uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[1]), 
+            &status
+        );
+        uniffi::ddk_ffi::Bridging<RustCallStatus>::copyIntoJs(rt, callInvoker, status, args[count - 1]);
+
+        
+        return uniffi::ddk_ffi::Bridging<RustBuffer>::toJs(rt, callInvoker, value);
+}
+jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_func_dlc_transactions_from_signed_messages(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
+        RustCallStatus status = uniffi::ddk_ffi::Bridging<RustCallStatus>::rustSuccess(rt);
+        auto value = uniffi_ddk_ffi_fn_func_dlc_transactions_from_signed_messages(uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[1]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[2]), 
             &status
         );
         uniffi::ddk_ffi::Bridging<RustCallStatus>::copyIntoJs(rt, callInvoker, status, args[count - 1]);
@@ -3925,6 +4042,13 @@ jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_checksum_func_create_dlc_transaction
         
         return uniffi_jsi::Bridging<uint16_t>::toJs(rt, callInvoker, value);
 }
+jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_checksum_func_create_dlc_transactions_with_fee_rule(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
+        auto value = uniffi_ddk_ffi_checksum_func_create_dlc_transactions_with_fee_rule(
+        );
+
+        
+        return uniffi_jsi::Bridging<uint16_t>::toJs(rt, callInvoker, value);
+}
 jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_checksum_func_create_extkey_from_parent_path(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         auto value = uniffi_ddk_ffi_checksum_func_create_extkey_from_parent_path(
         );
@@ -3955,6 +4079,13 @@ jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_checksum_func_create_refund_transact
 }
 jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_checksum_func_create_spliced_dlc_transactions(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         auto value = uniffi_ddk_ffi_checksum_func_create_spliced_dlc_transactions(
+        );
+
+        
+        return uniffi_jsi::Bridging<uint16_t>::toJs(rt, callInvoker, value);
+}
+jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_checksum_func_create_spliced_dlc_transactions_with_fee_rule(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
+        auto value = uniffi_ddk_ffi_checksum_func_create_spliced_dlc_transactions_with_fee_rule(
         );
 
         
@@ -4067,6 +4198,13 @@ jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_checksum_func_dlc_input_max_witness_
 }
 jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_checksum_func_dlc_transactions_from_messages(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         auto value = uniffi_ddk_ffi_checksum_func_dlc_transactions_from_messages(
+        );
+
+        
+        return uniffi_jsi::Bridging<uint16_t>::toJs(rt, callInvoker, value);
+}
+jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_checksum_func_dlc_transactions_from_signed_messages(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
+        auto value = uniffi_ddk_ffi_checksum_func_dlc_transactions_from_signed_messages(
         );
 
         
