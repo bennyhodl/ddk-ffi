@@ -30,6 +30,9 @@ export const REFUND_LOCKTIME = 1_617_170_573
 export const EVENT_MATURITY_EPOCH = 1_617_170_572
 export const MIN_TIMEOUT_INTERVAL = 0
 export const MAX_TIMEOUT_INTERVAL = 365 * 24 * 3600
+// ddk refuses an offer whose oracle event matured at or before the acceptor's
+// clock, so the clock the suites hand to ddk is pinned just before maturity.
+export const NOW_UNIX = BigInt(EVENT_MATURITY_EPOCH - 1)
 
 // Fixed mnemonics: the parties must be deterministic so the message-parity
 // assertions and the committed ddk-rn vectors are reproducible.

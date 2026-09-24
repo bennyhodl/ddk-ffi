@@ -416,6 +416,7 @@ interface NativeModuleInterface {
     offer: Uint8Array,
     minTimeoutInterval: number,
     maxTimeoutInterval: number,
+    nowUnix: bigint,
     uniffi_out_err: UniffiRustCallStatus
   ): void;
   ubrn_uniffi_ddk_ffi_fn_func_validate_sign(

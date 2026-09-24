@@ -53,6 +53,9 @@ export interface CompatVectors {
     refundLocktime: number
     minTimeoutInterval: number
     maxTimeoutInterval: number
+    /** The acceptor's clock (unix seconds), pinned before the oracle maturity
+     * so replaying the committed offer is accepted at any real date. */
+    nowUnix: number
     contractFlags: number
     attestationHex: string
     attestedOutcome: string
@@ -158,6 +161,7 @@ export function buildAccept(ddk: any, vectors: CompatVectors, offer: Uint8Array)
       },
       minTimeoutInterval: contract.minTimeoutInterval,
       maxTimeoutInterval: contract.maxTimeoutInterval,
+      nowUnix: BigInt(contract.nowUnix),
     },
     acceptorKeys,
     acceptTempId,
@@ -211,6 +215,7 @@ export function buildSpliceAccept(ddk: any, vectors: CompatVectors, offer2: Uint
       },
       minTimeoutInterval: contract.minTimeoutInterval,
       maxTimeoutInterval: contract.maxTimeoutInterval,
+      nowUnix: BigInt(contract.nowUnix),
     },
     acceptorKeys,
     accept2TempId,
@@ -238,7 +243,7 @@ export function runDdkReplay(ddk: any, vectors: CompatVectors): Record<string, s
   const offer = fromHexString(transcript.offerHex)
   const accept = fromHexString(transcript.acceptHex)
   const sign = fromHexString(transcript.signHex)
-  ddk.validateOffer(offer, contract.minTimeoutInterval, contract.maxTimeoutInterval)
+  ddk.validateOffer(offer, contract.minTimeoutInterval, contract.maxTimeoutInterval, BigInt(contract.nowUnix))
   ddk.validateAccept(offer, accept)
   ddk.validateSign(offer, accept, sign)
 
@@ -276,7 +281,7 @@ export function runDdkReplay(ddk: any, vectors: CompatVectors): Record<string, s
   const offer2Committed = fromHexString(transcript.offer2Hex)
   const accept2 = fromHexString(transcript.accept2Hex)
   const sign2 = fromHexString(transcript.sign2Hex)
-  ddk.validateOffer(offer2Committed, contract.minTimeoutInterval, contract.maxTimeoutInterval)
+  ddk.validateOffer(offer2Committed, contract.minTimeoutInterval, contract.maxTimeoutInterval, BigInt(contract.nowUnix))
   ddk.validateAccept(offer2Committed, accept2)
   ddk.validateSign(offer2Committed, accept2, sign2)
 

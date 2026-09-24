@@ -507,6 +507,7 @@ extern "C" {
         RustBuffer offer, 
         uint32_t min_timeout_interval, 
         uint32_t max_timeout_interval, 
+        uint64_t now_unix, 
         RustCallStatus *uniffi_out_err
     );
     void uniffi_ddk_ffi_fn_func_validate_sign(
@@ -2751,7 +2752,7 @@ NativeDdkFfi::NativeDdkFfi(
     props["ubrn_uniffi_ddk_ffi_fn_func_validate_offer"] = jsi::Function::createFromHostFunction(
         rt,
         jsi::PropNameID::forAscii(rt, "ubrn_uniffi_ddk_ffi_fn_func_validate_offer"),
-        3,
+        4,
         [this](jsi::Runtime &rt, const jsi::Value &thisVal, const jsi::Value *args, size_t count) -> jsi::Value {
             return this->cpp_uniffi_ddk_ffi_fn_func_validate_offer(rt, thisVal, args, count);
         }
@@ -3857,7 +3858,7 @@ jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_func_validate_accept(jsi::Runtime
 }
 jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_func_validate_offer(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         RustCallStatus status = uniffi::ddk_ffi::Bridging<RustCallStatus>::rustSuccess(rt);
-        uniffi_ddk_ffi_fn_func_validate_offer(uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[0]), uniffi_jsi::Bridging<uint32_t>::fromJs(rt, callInvoker, args[1]), uniffi_jsi::Bridging<uint32_t>::fromJs(rt, callInvoker, args[2]), 
+        uniffi_ddk_ffi_fn_func_validate_offer(uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[0]), uniffi_jsi::Bridging<uint32_t>::fromJs(rt, callInvoker, args[1]), uniffi_jsi::Bridging<uint32_t>::fromJs(rt, callInvoker, args[2]), uniffi_jsi::Bridging<uint64_t>::fromJs(rt, callInvoker, args[3]), 
             &status
         );
         uniffi::ddk_ffi::Bridging<RustCallStatus>::copyIntoJs(rt, callInvoker, status, args[count - 1]);

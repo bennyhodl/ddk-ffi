@@ -12,6 +12,9 @@ const OFFERER_DESCRIPTOR =
   'wpkh(tprv8ZgxMBicQKsPdeeuBw7yrpnwFVYj1ehvmPPtkwwnRdSAyCre8qxoyWWuaWLsfNUXNraEoucZQJzLzdj3KNZFJd9Tdv7rm97ikN9yYxQLfMz/84h/1h/0h/0/*)'
 const PREV_TX_HEX =
   '02000000010000000000000000000000000000000000000000000000000000000000000000ffffffff00ffffffff01400d0300000000001600143a4279e9c96f8305f3bc0566f9d8be101c189a8300000000'
+// The acceptor's clock. The fixture announcement matures at 750, so this must
+// be before it: validateOffer/acceptOffer refuse an already-matured event.
+const NOW_UNIX = 100n
 const OFFERER_SPK_HEX = '00143a4279e9c96f8305f3bc0566f9d8be101c189a83'
 // A two-outcome ("up"/"down") enum contract with a signed oracle announcement
 // and 100 000 sats total collateral.
@@ -90,6 +93,7 @@ function runFullFlow() {
       },
       minTimeoutInterval: 100,
       maxTimeoutInterval: 100_000,
+      nowUnix: NOW_UNIX,
     },
     acceptorKeys,
     acceptTempId,
@@ -219,7 +223,7 @@ describe('full single-funded lifecycle', () => {
 
   test('createOffer -> validateOffer', () => {
     expect(flow.offer.length).toBeGreaterThan(0)
-    expect(() => ddk.validateOffer(flow.offer, 100, 100_000)).not.toThrow()
+    expect(() => ddk.validateOffer(flow.offer, 100, 100_000, NOW_UNIX)).not.toThrow()
   })
 
   test('acceptOffer -> AcceptResult with transactions + psbt', () => {
@@ -264,7 +268,7 @@ describe('validation rejects tampered / mismatched messages', () => {
 
   test('validateOffer throws on malformed bytes with a code', () => {
     try {
-      ddk.validateOffer(buf('deadbeef'), 100, 100_000)
+      ddk.validateOffer(buf('deadbeef'), 100, 100_000, NOW_UNIX)
       throw new Error('should have thrown')
     } catch (e) {
       expect(typeof (e as { tag?: string }).tag).toBe('string')
@@ -303,7 +307,13 @@ describe('validation rejects tampered / mismatched messages', () => {
   test('validateOffer rejects an oracle timeout outside the accepted window', () => {
     // The fixture event matures at 750 against a refund locktime of 1000, a gap
     // of 250 — outside a 1..100 window.
-    expect(() => ddk.validateOffer(flow.offer, 1, 100)).toThrow()
+    expect(() => ddk.validateOffer(flow.offer, 1, 100, NOW_UNIX)).toThrow()
+  })
+
+  test('validateOffer rejects an offer whose oracle event has already matured', () => {
+    // The fixture event matures at 750; a clock at or past it is refused.
+    expect(() => ddk.validateOffer(flow.offer, 100, 100_000, 750n)).toThrow()
+    expect(() => ddk.validateOffer(flow.offer, 100, 100_000, 749n)).not.toThrow()
   })
 
   test('undecodable message bytes surface as Serialization', () => {
@@ -510,6 +520,7 @@ describe('splicing', () => {
         },
         minTimeoutInterval: 100,
         maxTimeoutInterval: 100_000,
+        nowUnix: NOW_UNIX,
       },
       flow.acceptorKeys,
       acceptTempIdB,

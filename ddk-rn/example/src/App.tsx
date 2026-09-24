@@ -206,7 +206,7 @@ export default function App() {
         refundLocktime: 1_000,
         contractFlags: 0,
       });
-      validateOffer(offer, 100, 100_000);
+      validateOffer(offer, 100, 100_000, 100n);
 
       // 2) Accept — the acceptor contributes nothing.
       const acceptResult = acceptOffer(
@@ -222,6 +222,8 @@ export default function App() {
           },
           minTimeoutInterval: 100,
           maxTimeoutInterval: 100_000,
+          // The fixture announcement matures at 750; the clock must be before it.
+          nowUnix: 100n,
         },
         acceptorKeys,
         acceptTempId
