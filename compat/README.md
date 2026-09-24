@@ -110,6 +110,14 @@ into its own wallet (`ddk-compat`) and never touches other wallets.
 
 ## CI
 
+> **Temporarily, CI runs only `pnpm test:messages`.** The lifecycle and splice
+> suites create contracts with BAL 4.3.6 on its 0.3.42 engine, which uses the
+> fee rule before ddk-dlc 2.0.0-rc.4, so single-funded and splice creation
+> cannot agree with this ddk. The `check` job goes back to `pnpm test` once the
+> BAL party is a BAL release on this engine
+> (AtomicFinance/bitcoin-abstraction-layer#217). Until then, run
+> `just compat-test` locally.
+
 The whole suite runs in the `check` job of `ci.yml` — the gate, so nothing else
 builds unless ddk and BAL still agree. It sits there rather than in a job of its
 own because the expensive prerequisite is already met: `pnpm generate:debug`
