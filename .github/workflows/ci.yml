@@ -200,14 +200,15 @@ jobs:
       - name: Install compat deps
         run: cd compat && pnpm install --frozen-lockfile
 
-      # The full suite, not `test:messages` — the regtest lifecycle and splice
-      # suites are the ones that prove ddk and BAL can actually fund and settle
-      # each other's contracts. global-setup.ts spawns its own throwaway node on
-      # :18543; when none is reachable it only warns, but the regtest suites then
-      # fail on the connection, so a broken bitcoind step surfaces as a red job
-      # rather than as suites that silently stopped running.
-      - name: BAL compatibility suite
-        run: cd compat && pnpm test
+      # TEMPORARY: only the offline half (message parity + vectors). The regtest
+      # lifecycle and splice suites create contracts with the released BAL
+      # (4.3.6 on its 0.3.42 engine), which uses the fee rule before ddk-dlc
+      # 2.0.0-rc.4, so single-funded and splice creation cannot agree with this
+      # ddk. Switch back to `pnpm test` once compat's BAL party is a BAL release
+      # on this engine (AtomicFinance/bitcoin-abstraction-layer#217). Until then,
+      # run the full suite locally with `just compat-test`.
+      - name: BAL compatibility suite (messages and vectors only)
+        run: cd compat && pnpm test:messages
 
       # ---- ddk-rn (React Native) -------------------------------------------
       # The pnpm workspace covers `.` and `example`, and this is also what

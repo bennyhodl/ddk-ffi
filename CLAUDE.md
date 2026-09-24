@@ -421,6 +421,14 @@ that bite:
   two together and keep them on the version you run locally. Same reasoning as
   the NDK and Maestro pins, with one extra edge: an unpinned consensus node
   means CI proves compatibility against whatever Core released last.
+- **Temporarily, CI runs only `test:messages`.** The regtest half creates
+  contracts with released BAL 4.3.6 on its 0.3.42 engine, which uses the fee
+  rule before ddk-dlc 2.0.0-rc.4, so 5 single-funded and splice creation tests
+  fail against this ddk. Switch the `BAL compatibility suite` step back to
+  `pnpm test` once compat's BAL party is a BAL release on this engine
+  (AtomicFinance/bitcoin-abstraction-layer#217). Run the full suite locally
+  with `just compat-test` until then. The Bitcoin Core install step stays so
+  that the switch back is one line.
 - **Vectors couple three files.** `just compat-vectors` rewrites
   `compat/vectors/compat-vectors.json` AND the generated
   `ddk-rn/example/src/compatVectors.ts` + `compatReplay.ts` (a verbatim copy
