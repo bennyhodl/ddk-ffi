@@ -28,16 +28,15 @@ thiserror = "2.0.12"
 secp256k1-zkp = "0.11.0"
 bip39 = "2.2.0"
 
-# ddk's fallback for settling and splicing contracts built under the fee rule
-# before ddk-dlc 2.0.0-rc.4 is not released yet. Pinned to the dlcdevkit commit
-# that adds it; replace with the release version in [dependencies] and delete
-# this section once it is published.
+# ddk's fee-rule fallback for settling and splicing existing contracts is on
+# dlcdevkit master but not released yet. Replace with the release version in
+# [dependencies] and delete this section once it is published.
 [patch.crates-io]
-ddk = { git = "https://github.com/bennyhodl/dlcdevkit", rev = "8c3ed9c2bffc52ea7ccf913af3368bdfe449ef21" }
-ddk-dlc = { git = "https://github.com/bennyhodl/dlcdevkit", rev = "8c3ed9c2bffc52ea7ccf913af3368bdfe449ef21" }
-ddk-messages = { git = "https://github.com/bennyhodl/dlcdevkit", rev = "8c3ed9c2bffc52ea7ccf913af3368bdfe449ef21" }
-ddk-manager = { git = "https://github.com/bennyhodl/dlcdevkit", rev = "8c3ed9c2bffc52ea7ccf913af3368bdfe449ef21" }
-ddk-trie = { git = "https://github.com/bennyhodl/dlcdevkit", rev = "8c3ed9c2bffc52ea7ccf913af3368bdfe449ef21" }
+ddk = { git = "https://github.com/bennyhodl/dlcdevkit", branch = "master" }
+ddk-dlc = { git = "https://github.com/bennyhodl/dlcdevkit", branch = "master" }
+ddk-messages = { git = "https://github.com/bennyhodl/dlcdevkit", branch = "master" }
+ddk-manager = { git = "https://github.com/bennyhodl/dlcdevkit", branch = "master" }
+ddk-trie = { git = "https://github.com/bennyhodl/dlcdevkit", branch = "master" }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 uniffi = { version = "=0.31.0", default-features = false, features = [

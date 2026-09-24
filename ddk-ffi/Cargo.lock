@@ -350,7 +350,7 @@ checksum = "c8d4a3bb8b1e0c1050499d1815f5ab16d04f0959b233085fb31653fbfc9d98f9"
 [[package]]
 name = "ddk"
 version = "2.0.0-rc.6"
-source = "git+https://github.com/bennyhodl/dlcdevkit?rev=8c3ed9c2bffc52ea7ccf913af3368bdfe449ef21#8c3ed9c2bffc52ea7ccf913af3368bdfe449ef21"
+source = "git+https://github.com/bennyhodl/dlcdevkit?branch=master#f0eb2457bbb0ffb5d4d62047c63d5684fa810100"
 dependencies = [
  "bdk_chain",
  "bdk_wallet",
@@ -371,7 +371,7 @@ dependencies = [
 [[package]]
 name = "ddk-dlc"
 version = "2.0.0-rc.6"
-source = "git+https://github.com/bennyhodl/dlcdevkit?rev=8c3ed9c2bffc52ea7ccf913af3368bdfe449ef21#8c3ed9c2bffc52ea7ccf913af3368bdfe449ef21"
+source = "git+https://github.com/bennyhodl/dlcdevkit?branch=master#f0eb2457bbb0ffb5d4d62047c63d5684fa810100"
 dependencies = [
  "bitcoin",
  "miniscript",
@@ -383,7 +383,7 @@ dependencies = [
 [[package]]
 name = "ddk-manager"
 version = "2.0.0-rc.6"
-source = "git+https://github.com/bennyhodl/dlcdevkit?rev=8c3ed9c2bffc52ea7ccf913af3368bdfe449ef21#8c3ed9c2bffc52ea7ccf913af3368bdfe449ef21"
+source = "git+https://github.com/bennyhodl/dlcdevkit?branch=master#f0eb2457bbb0ffb5d4d62047c63d5684fa810100"
 dependencies = [
  "async-trait",
  "bitcoin",
@@ -402,7 +402,7 @@ dependencies = [
 [[package]]
 name = "ddk-messages"
 version = "2.0.0-rc.6"
-source = "git+https://github.com/bennyhodl/dlcdevkit?rev=8c3ed9c2bffc52ea7ccf913af3368bdfe449ef21#8c3ed9c2bffc52ea7ccf913af3368bdfe449ef21"
+source = "git+https://github.com/bennyhodl/dlcdevkit?branch=master#f0eb2457bbb0ffb5d4d62047c63d5684fa810100"
 dependencies = [
  "bitcoin",
  "ddk-dlc",
@@ -414,7 +414,7 @@ dependencies = [
 [[package]]
 name = "ddk-trie"
 version = "2.0.0-rc.6"
-source = "git+https://github.com/bennyhodl/dlcdevkit?rev=8c3ed9c2bffc52ea7ccf913af3368bdfe449ef21#8c3ed9c2bffc52ea7ccf913af3368bdfe449ef21"
+source = "git+https://github.com/bennyhodl/dlcdevkit?branch=master#f0eb2457bbb0ffb5d4d62047c63d5684fa810100"
 dependencies = [
  "bitcoin",
  "ddk-dlc",
