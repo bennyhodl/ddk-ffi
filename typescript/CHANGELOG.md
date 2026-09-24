@@ -42,7 +42,7 @@ The `ddk-ffi` cdylib each platform package carries is now built with link-time o
 
 The whole DLC lifecycle now runs in Node: build an offer, accept it, fund it, sign it, and settle it — either the CET an oracle attestation selects or the refund once its locktime passes. Contracts can also be spliced, rolling one into another that spends its funding output.
 
-Nothing is persisted. Every transaction is rebuilt from the offer/accept/sign wire messages at the moment it is needed, so there is no contract store to keep in sync, and funding secret keys stay in Rust behind a `ContractKeyProvider` and never cross into JS. Either party can settle on its own. Built on the published `ddk` / `ddk-dlc` 2.0.0-rc.6 crates, and in parity with `@bennyblader/ddk-rn`.
+Nothing is persisted. Every transaction is rebuilt from the offer/accept/sign wire messages at the moment it is needed, so there is no contract store to keep in sync, and funding secret keys stay in Rust behind a `ContractKeyProvider` and never cross into JS. Either party can settle on its own. Built on the published `ddk` / `ddk-dlc` 2.0.0-rc.7 crates, and in parity with `@bennyblader/ddk-rn`.
 
 ### The published package actually loads
 
