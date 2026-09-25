@@ -14,7 +14,7 @@ env:
   # Read by cargo when building the ddk (N-API) cdylib on macOS. APP_NAME lived
   # here too; it was napi-rs's, and nothing reads it now that ddk is generated.
   MACOSX_DEPLOYMENT_TARGET: '10.13'
-  # Keep in sync with ddk-rn/package.json and ci.yml's UBRN_VERSION.
+  # Keep in sync with packages/react-native/package.json and ci.yml's UBRN_VERSION.
   UBRN_VERSION: '0.31.0-5'
   # Keep in sync with ci.yml's NDK_VERSION and the example app's ndkVersion.
   NDK_VERSION: '27.1.12297006'
@@ -34,8 +34,8 @@ jobs:
           TAG_VERSION="${GITHUB_REF_NAME#v}"
           echo "Tag version: $TAG_VERSION"
 
-          TS_VERSION=$(node -p "require('./typescript/package.json').version")
-          RN_VERSION=$(node -p "require('./ddk-rn/package.json').version")
+          TS_VERSION=$(node -p "require('./packages/node-browser/package.json').version")
+          RN_VERSION=$(node -p "require('./packages/react-native/package.json').version")
           echo "ddk: $TS_VERSION"
           echo "ddk-rn: $RN_VERSION"
 
@@ -74,12 +74,12 @@ jobs:
               exit 1
             fi
           }
-          check_toml ddk-ffi/Cargo.toml
-          check_lock ddk-ffi/Cargo.lock ddk_ffi
+          check_toml ffi/Cargo.toml
+          check_lock ffi/Cargo.lock ddk_ffi
 
           echo "version=$TAG_VERSION" >> "$GITHUB_OUTPUT"
 
-  # ddk is GENERATED from ddk-ffi (see typescript/DEVELOPMENT.md): each host
+  # ddk is GENERATED from ddk-ffi (see packages/node-browser/DEVELOPMENT.md): each host
   # builds the release cdylib for its own target, regenerates the bindings from
   # it, and assembles platform/<node-triple>/ — a complete npm package carrying
   # that one library. dist/node/ (the compiled TypeScript) is identical from
@@ -114,21 +114,21 @@ jobs:
       - name: Install uniffi-bindgen-react-native
         run: npm install -g uniffi-bindgen-react-native@${{ env.UBRN_VERSION }}
       - name: Install dependencies
-        run: cd typescript && pnpm install --frozen-lockfile
+        run: cd packages/node-browser && pnpm install --frozen-lockfile
       - name: Build
-        run: cd typescript && node scripts/build-release.mjs --target ${{ matrix.target }}
+        run: cd packages/node-browser && node scripts/build-release.mjs --target ${{ matrix.target }}
       - name: Verify the platform package carries its library
         run: |
-          F=typescript/platform/${{ matrix.short }}/${{ matrix.lib }}
+          F=packages/node-browser/platform/${{ matrix.short }}/${{ matrix.lib }}
           [ -f "$F" ] || { echo "::error::$F was not produced"; exit 1; }
-          ls -la "typescript/platform/${{ matrix.short }}"
+          ls -la "packages/node-browser/platform/${{ matrix.short }}"
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4
         with:
           name: ddk-bindings-${{ matrix.target }}
           path: |
-            typescript/dist/node/
-            typescript/platform/
+            packages/node-browser/dist/node/
+            packages/node-browser/platform/
           if-no-files-found: error
 
   # The wasm entry (browsers, and `./wasm`). One build serves every platform, so it is its own job
@@ -153,18 +153,18 @@ jobs:
       - name: Install clang (wasm32 C toolchain)
         run: sudo apt-get update && sudo apt-get install -y clang llvm
       - name: Install dependencies
-        run: cd typescript && pnpm install --frozen-lockfile
+        run: cd packages/node-browser && pnpm install --frozen-lockfile
       - name: Build
-        run: cd typescript && pnpm build:wasm
+        run: cd packages/node-browser && pnpm build:wasm
       - name: Test the release build
-        run: cd typescript && pnpm test:wasm
+        run: cd packages/node-browser && pnpm test:wasm
       - name: Committed wasm bindings match the crate
-        run: git diff --exit-code typescript/src/wasm/generated
+        run: git diff --exit-code packages/node-browser/browser/generated
       - name: Upload wasm artifact
         uses: actions/upload-artifact@v4
         with:
           name: ddk-wasm
-          path: typescript/dist/wasm/
+          path: packages/node-browser/dist/wasm/
           if-no-files-found: error
 
   test-ddk:
@@ -185,15 +185,15 @@ jobs:
       - name: Install uniffi-bindgen-react-native
         run: npm install -g uniffi-bindgen-react-native@${{ env.UBRN_VERSION }}
       - name: Install dependencies
-        run: cd typescript && pnpm install --frozen-lockfile
+        run: cd packages/node-browser && pnpm install --frozen-lockfile
       - name: Generate + build
-        run: cd typescript && pnpm generate
+        run: cd packages/node-browser && pnpm generate
       - name: Test
-        run: cd typescript && pnpm test
+        run: cd packages/node-browser && pnpm test
       # The bindings are generated, so ddk cannot drift from ddk-ffi — but a
       # stale committed copy can, and that is what would ship.
       - name: Committed bindings match the crate
-        run: git diff --exit-code typescript/src/node/generated
+        run: git diff --exit-code packages/node-browser/node/generated
 
   test-ddk-rn:
     name: Test ddk-rn
@@ -212,15 +212,15 @@ jobs:
         run: npm install -g uniffi-bindgen-react-native@${{ env.UBRN_VERSION }}
       - uses: extractions/setup-just@v1
       - name: Generate JSI bindings
-        run: just uniffi-jsi
+        run: just native uniffi-jsi
       - name: Generate TurboModule bindings
-        run: just uniffi-turbo
+        run: just native uniffi-turbo
       - name: Install dependencies
-        run: cd ddk-rn && pnpm install
+        run: cd packages/react-native && pnpm install
       - name: Build
-        run: cd ddk-rn && pnpm prepare
+        run: cd packages/react-native && pnpm prepare
       - name: Test
-        run: cd ddk-rn && pnpm test
+        run: cd packages/react-native && pnpm test
 
   # Nothing is built here: this job only assembles what the two build hosts
   # produced and publishes it. No Rust toolchain, no bindgen.
@@ -245,7 +245,7 @@ jobs:
       - name: Download the builds
         uses: actions/download-artifact@v4
         with:
-          path: typescript
+          path: packages/node-browser
           pattern: ddk-bindings-*
           merge-multiple: true
       # Its own download, not part of the pattern above: a single-directory
@@ -255,11 +255,11 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: ddk-wasm
-          path: typescript/dist/wasm
+          path: packages/node-browser/dist/wasm
       - name: Show what will be published
         run: |
-          ls -la typescript/dist/node typescript/dist/wasm typescript/dist/wasm/generated typescript/platform
-          for d in typescript/platform/*/; do echo "--- $d"; ls -la "$d"; done
+          ls -la packages/node-browser/dist/node packages/node-browser/dist/wasm packages/node-browser/dist/wasm/generated packages/node-browser/platform
+          for d in packages/node-browser/platform/*/; do echo "--- $d"; ls -la "$d"; done
       # NPM_CONFIG_TAG rather than `npm publish --tag`: publish-release.mjs
       # publishes each platform package with a bare `npm publish` of its own,
       # which takes no tag argument but does inherit the environment. Setting the
@@ -274,7 +274,7 @@ jobs:
       # enforces the order and injects the optionalDependencies.
       - name: Publish (platform packages, then main)
         run: |
-          cd typescript
+          cd packages/node-browser
           VERSION="${GITHUB_REF_NAME#v}"
           case "$VERSION" in *-*) export NPM_CONFIG_TAG=next ;; *) export NPM_CONFIG_TAG=latest ;; esac
           echo "Publishing $VERSION to dist-tag $NPM_CONFIG_TAG"
@@ -305,19 +305,19 @@ jobs:
         run: npm install -g uniffi-bindgen-react-native@${{ env.UBRN_VERSION }}
       - uses: extractions/setup-just@v1
       - name: Install ddk-rn dependencies
-        run: cd ddk-rn && pnpm install
+        run: cd packages/react-native && pnpm install
       - name: Generate JSI bindings
-        run: just uniffi-jsi
+        run: just native uniffi-jsi
       - name: Generate TurboModule bindings
-        run: just uniffi-turbo
+        run: just native uniffi-turbo
       # Release + stripped; see the comment above `build-ios` in the justfile.
       - name: Build XCFramework
-        run: just build-ios
+        run: just build react-native ios
       - name: Upload XCFramework
         uses: actions/upload-artifact@v4
         with:
           name: ddk-rn-ios-xcframework
-          path: ddk-rn/ios/DdkRn.xcframework
+          path: packages/react-native/ios/DdkRn.xcframework
           if-no-files-found: error
       # The bindings are regenerated here by `--and-generate`, so publish takes
       # them from this job rather than regenerating a third time.
@@ -326,8 +326,8 @@ jobs:
         with:
           name: ddk-rn-generated-bindings
           path: |
-            ddk-rn/src
-            ddk-rn/cpp
+            packages/react-native/src
+            packages/react-native/cpp
           if-no-files-found: error
 
   build-ddk-rn-android:
@@ -351,7 +351,7 @@ jobs:
         run: cargo install cargo-ndk
       - uses: extractions/setup-just@v1
       - name: Install ddk-rn dependencies
-        run: cd ddk-rn && pnpm install
+        run: cd packages/react-native && pnpm install
       # ubrn shells out to `cargo ndk`, which resolves the toolchain from
       # ANDROID_NDK_HOME.
       #
@@ -380,12 +380,12 @@ jobs:
       - name: Build JNI libraries
         run: |
           echo "Using NDK at $ANDROID_NDK_HOME"
-          just build-android
+          just native build-android
       - name: Upload JNI libraries
         uses: actions/upload-artifact@v4
         with:
           name: ddk-rn-android-jnilibs
-          path: ddk-rn/android/src/main/jniLibs
+          path: packages/react-native/android/src/main/jniLibs
           if-no-files-found: error
 
   publish-ddk-rn:
@@ -411,26 +411,26 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: ddk-rn-generated-bindings
-          path: ddk-rn
+          path: packages/react-native
       - name: Download iOS XCFramework
         uses: actions/download-artifact@v4
         with:
           name: ddk-rn-ios-xcframework
-          path: ddk-rn/ios/DdkRn.xcframework
+          path: packages/react-native/ios/DdkRn.xcframework
       - name: Download Android JNI libraries
         uses: actions/download-artifact@v4
         with:
           name: ddk-rn-android-jnilibs
-          path: ddk-rn/android/src/main/jniLibs
+          path: packages/react-native/android/src/main/jniLibs
       - name: Install ddk-rn dependencies
-        run: cd ddk-rn && pnpm install
+        run: cd packages/react-native && pnpm install
       - name: Build
-        run: cd ddk-rn && pnpm prepare
+        run: cd packages/react-native && pnpm prepare
       # Fail loudly rather than publishing a package that would make consumers
       # compile Rust — the exact failure mode this pipeline exists to prevent.
       - name: Verify binaries are in the tarball
         run: |
-          cd ddk-rn
+          cd packages/react-native
           npm pack --dry-run 2>&1 | tee /tmp/pack.txt
           # The simulator slice is named for the archs it contains
           # (ios-arm64-simulator, ios-arm64_x86_64-simulator, ...), so match the
@@ -450,7 +450,7 @@ jobs:
             echo "::error::Android shipped a static archive; expected a shared library (android.useSharedLibrary)"
             exit 1
           fi
-          if grep -qE 'ddk-ffi/(src|Cargo)' /tmp/pack.txt; then
+          if grep -qE 'ffi/(src|Cargo)' /tmp/pack.txt; then
             echo "::error::Rust source leaked into the tarball"
             exit 1
           fi
@@ -459,7 +459,7 @@ jobs:
       # take over the `latest` dist-tag.
       - name: Publish
         run: |
-          cd ddk-rn
+          cd packages/react-native
           VERSION="${GITHUB_REF_NAME#v}"
           case "$VERSION" in *-*) export NPM_CONFIG_TAG=next ;; *) export NPM_CONFIG_TAG=latest ;; esac
           echo "Publishing $VERSION to dist-tag $NPM_CONFIG_TAG"

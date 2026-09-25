@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // Usage: node scripts/prep-release.js <X.Y.Z[-tag]>
 //
-// Bumps versions in typescript/package.json, ddk-rn/package.json, ddk-ffi/Cargo.toml
-// and ddk-ffi/Cargo.lock, commits, creates tag v<version>, and pushes. CI
+// Bumps versions in packages/node-browser/package.json, packages/react-native/package.json, ffi/Cargo.toml
+// and ffi/Cargo.lock, commits, creates tag v<version>, and pushes. CI
 // (.github/workflows/publish.yml) takes over on tag push and publishes both npm
 // packages.
 //
@@ -44,8 +44,8 @@ const bumpPkg = file => {
   write(p, JSON.stringify(pkg, null, 2) + '\n');
   console.log(`\u2713 ${file} \u2192 ${version}`);
 };
-bumpPkg('typescript/package.json');
-bumpPkg('ddk-rn/package.json');
+bumpPkg('packages/node-browser/package.json');
+bumpPkg('packages/react-native/package.json');
 
 // Only the [package] version at the top of the file \u2014 later `version = "..."`
 // lines belong to dependencies.
@@ -55,7 +55,7 @@ const bumpCargoToml = file => {
   write(p, out);
   console.log(`\u2713 ${file} \u2192 ${version}`);
 };
-bumpCargoToml('ddk-ffi/Cargo.toml');
+bumpCargoToml('ffi/Cargo.toml');
 
 // Rewrite the `version` that follows a given `name = "<crate>"` entry. Done by
 // regex rather than by invoking cargo so the release path stays offline, fast,
@@ -74,11 +74,11 @@ const bumpCargoLock = (file, crates) => {
   write(p, out);
   console.log(`\u2713 ${file} \u2192 ${version} (${crates.join(', ')})`);
 };
-bumpCargoLock('ddk-ffi/Cargo.lock', ['ddk_ffi']);
+bumpCargoLock('ffi/Cargo.lock', ['ddk_ffi']);
 
 run(
-  'git add typescript/package.json ddk-rn/package.json ' +
-    'ddk-ffi/Cargo.toml ddk-ffi/Cargo.lock'
+  'git add packages/node-browser/package.json packages/react-native/package.json ' +
+    'ffi/Cargo.toml ffi/Cargo.lock'
 );
 run(`git commit -m "chore: release v${version}"`);
 run(`git tag v${version}`);

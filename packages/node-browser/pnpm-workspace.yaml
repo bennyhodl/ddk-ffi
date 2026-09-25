@@ -1,0 +1,5 @@
+packages:
+  - .
+  - ../../examples/node
+  - ../../examples/browser
+  - ../../tests/conformance

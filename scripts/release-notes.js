@@ -40,7 +40,7 @@ const files = sh(`git diff --name-only ${previous} v${version} | head -60`);
 let changelog = '';
 try {
   changelog = sh(
-    "awk '/^## \\[Unreleased\\]/{f=1;next} /^## \\[/{f=0} f' ddk-rn/CHANGELOG.md"
+    "awk '/^## \\[Unreleased\\]/{f=1;next} /^## \\[/{f=0} f' packages/react-native/CHANGELOG.md"
   );
 } catch {
   /* no changelog, or no Unreleased section */

@@ -29,9 +29,9 @@ Desktop.ini
 target/
 # ddk-ffi ships compiled native artifacts (xcframework, cdylib, jniLibs), so its
 # lockfile is committed for reproducible builds. It is the only Rust crate in the
-# repo; stray copies (e.g. a stale ddk-rn/ddk-ffi) stay ignored.
+# repo; stray copies (e.g. a stale packages/react-native/ddk-ffi) stay ignored.
 Cargo.lock
-!/ddk-ffi/Cargo.lock
+!/ffi/Cargo.lock
 **/*.rs.bk
 *.pdb
 
@@ -101,23 +101,23 @@ DerivedData/
 
 # Android JNI
 **/jniLibs/
-ddk-rn/android/src/main/jniLibs/
+packages/react-native/android/src/main/jniLibs/
 
 # iOS frameworks
-ddk-rn/ios/*.xcframework/
+packages/react-native/ios/*.xcframework/
 
 # ====================
 # Generated Files (from uniffi)
 # ====================
 # Note: We now include generated turbo module files in git for npm package
 # Only ignore helper files
-ddk-rn/cpp/UniffiCallInvoker.h
+packages/react-native/cpp/UniffiCallInvoker.h
 
 # Build outputs
-ddk-rn/lib/
+packages/react-native/lib/
 
 # Rust source copy for npm package (created during release)
-ddk-rn/ddk-ffi/
+packages/react-native/ddk-ffi/
 
 # ====================
 # Environment & Config
@@ -140,11 +140,11 @@ ddk-rn/ddk-ffi/
 # Release artifacts
 release-archives/
 release-artifacts/
-# One assembled npm package per platform, built by typescript/scripts/build-release.mjs.
-typescript/platform/
-# The wasm build (typescript/scripts/build-wasm.mjs). Its TypeScript under
-# src/wasm/generated/ is committed; the staged .wasm is a build output.
-typescript/src/wasm/generated/*.wasm
+# One assembled npm package per platform, built by packages/node-browser/scripts/build-release.mjs.
+packages/node-browser/platform/
+# The wasm build (packages/node-browser/scripts/build-wasm.mjs). Its TypeScript under
+# browser/generated/ is committed; the staged .wasm is a build output.
+packages/node-browser/browser/generated/*.wasm
 
 # Ruby
 .bundle/

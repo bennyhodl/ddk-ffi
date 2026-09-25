@@ -1,0 +1,9 @@
+{
+  "name": "ddk-conformance",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "@bennyblader/ddk": "workspace:*",
+    "vitest": "^3.2.4"
+  }
+}

@@ -1,0 +1,16 @@
+# Generated: ubrn writes node/generated/ and browser/generated/ on every build, and it runs prettier
+# over its own output. Checking it here would only ever produce a loop — prettier
+# rewrites a file that the next generation puts straight back. Same reason
+# React Native's ESLint config lists its generated files.
+node/generated
+browser/generated
+
+# Build output. tsc writes dist/, build-release.mjs writes
+# platform/, and Vite writes ../../examples/browser/dist/; all are gitignored, and
+# prettier was reporting them as failures.
+dist
+platform
+../../examples/browser/dist
+
+# Lockfile: pnpm owns the formatting.
+pnpm-lock.yaml
