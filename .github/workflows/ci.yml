@@ -44,14 +44,13 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # Must match packages/react-native/package.json — see the version-lockstep note in CLAUDE.md.
-  UBRN_VERSION: "0.31.0-5"
+  TURBO_TEAM: ${{ vars.TURBO_TEAM }}
   # Tied to the example's React Native release; see the environment table in
   # CLAUDE.md.
   NODE_VERSION: "20"
-  # pnpm 10: packages/react-native/pnpm-lock.yaml is lockfileVersion 9.0, which pnpm 8 cannot
+  # pnpm 10: pnpm-lock.yaml is lockfileVersion 9.0, which pnpm 8 cannot
   # read without rewriting it.
-  PNPM_VERSION: "10"
+  PNPM_VERSION: "10.14.0"
   # Pinned to match publish.yml. ANDROID_NDK_LATEST_HOME tracks whatever the
   # runner image ships and would let CI drift from what releases are built with.
   NDK_VERSION: "27.1.12297006"
@@ -76,6 +75,9 @@ jobs:
   # Nothing below runs unless this is green.
   # ==========================================================================
   check:
+    permissions:
+      contents: read
+      id-token: write
     name: Check (fmt, clippy, lint, tests, parity)
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -97,6 +99,12 @@ jobs:
         uses: pnpm/action-setup@v2
         with:
           version: ${{ env.PNPM_VERSION }}
+
+      - name: Authenticate Turborepo remote cache
+        if: vars.TURBO_TEAM != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: vercel/setup-turborepo-remote-cache-action@v1.0.0
+        with:
+          team: ${{ vars.TURBO_TEAM }}
 
       - name: Cache cargo
         uses: actions/cache@v3
@@ -121,22 +129,19 @@ jobs:
         run: cd ffi && cargo test --all-features
 
       # ---- @bennyblader/ddk: Node (N-API) ---------------------------------
-      - name: Install ddk deps
-        run: cd packages/node-browser && pnpm install --frozen-lockfile
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: prettier (ddk)
         run: cd packages/node-browser && pnpm format:check
-
-      # Install ubrn: ddk is GENERATED from ddk-ffi, so building it needs the
-      # bindgen, exactly as ddk-rn does.
-      - name: Install uniffi-bindgen-react-native (matches the ddk-rn pin)
-        run: npm install -g uniffi-bindgen-react-native@${{ env.UBRN_VERSION }}
 
       # Debug, not release: vitest imports dist/node/index.js, so the cdylib has to
       # exist, but this is a gate — the release builds happen in stage 2. This
       # also regenerates packages/node-browser/node/generated, which the next step checks.
       - name: Generate + build ddk N-API (debug)
-        run: cd packages/node-browser && pnpm generate:debug
+        run: |
+          pnpm turbo run generate:debug --filter=@bennyblader/ddk
+          pnpm --filter @bennyblader/ddk link:node
 
       - name: vitest (ddk, N-API)
         run: cd packages/node-browser && pnpm test
@@ -161,7 +166,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y clang llvm
 
       - name: Build ddk wasm (debug)
-        run: cd packages/node-browser && pnpm build:wasm:debug
+        run: pnpm turbo run build:wasm:debug --filter=@bennyblader/ddk
 
       - name: vitest (ddk, wasm)
         run: cd packages/node-browser && pnpm test:wasm
@@ -177,7 +182,9 @@ jobs:
       # Chrome: proves the package's `new URL(..., import.meta.url)` survives a
       # bundler and the module instantiates in a real browser.
       - name: Typecheck Node/browser package and Node example
-        run: cd packages/node-browser && pnpm typecheck
+        run: |
+          pnpm --filter @bennyblader/ddk typecheck
+          pnpm --filter ddk-example check
 
       - name: Browser smoke test (ddk wasm)
         run: cd examples/browser && CHROME=$(command -v google-chrome) pnpm smoke
@@ -200,9 +207,6 @@ jobs:
             "bitcoin-${{ env.BITCOIN_VERSION }}/bin/bitcoind" /usr/local/bin/bitcoind
           bitcoind --version | head -1
 
-      - name: Install compat deps
-        run: cd tests/compatibility && pnpm install --frozen-lockfile
-
       # TEMPORARY: only the offline half (message parity + vectors). The regtest
       # lifecycle and splice suites create contracts with the released BAL
       # (4.3.6 on its 0.3.42 engine), which uses the fee rule before ddk-dlc
@@ -214,11 +218,7 @@ jobs:
         run: cd tests/compatibility && pnpm test:messages
 
       # ---- ddk-rn (React Native) -------------------------------------------
-      # The pnpm workspace covers `.` and `example`, and this is also what
-      # applies patches/uniffi-bindgen-react-native@*.patch.
-      - name: Install ddk-rn deps
-        run: cd packages/react-native && pnpm install
-
+      # All packages and examples share the root pnpm workspace.
       # Both typecheck steps below resolve @bennyblader/ddk-rn through lib/,
       # so the package has to be built first.
       - name: Build ddk-rn package (bob)
@@ -270,6 +270,9 @@ jobs:
   # Uploads the app for the e2e stage.
   # ==========================================================================
   build-rn:
+    permissions:
+      contents: read
+      id-token: write
     name: Build ddk-rn (${{ matrix.platform }})
     needs: check
     strategy:
@@ -313,6 +316,12 @@ jobs:
         with:
           version: ${{ env.PNPM_VERSION }}
 
+      - name: Authenticate Turborepo remote cache
+        if: vars.TURBO_TEAM != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: vercel/setup-turborepo-remote-cache-action@v1.0.0
+        with:
+          team: ${{ vars.TURBO_TEAM }}
+
       - name: Install just
         uses: extractions/setup-just@v1
 
@@ -325,12 +334,9 @@ jobs:
             ffi/target
           key: ${{ runner.os }}-build-rn-${{ matrix.platform }}-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Install uniffi-bindgen-react-native (matches ddk-rn pin)
-        run: npm install -g uniffi-bindgen-react-native@${{ env.UBRN_VERSION }}
-
       - name: Install cargo-ndk
         if: matrix.platform == 'android'
-        run: cargo install cargo-ndk
+        run: cargo install cargo-ndk --locked
 
       # Two builds need this: cargo-ndk cross-compiles libddk_ffi.so with it, and
       # Gradle uses it for the ddk-rn module's CMake C++ (the example pins the
@@ -353,16 +359,11 @@ jobs:
           [ -d "$NDK_HOME" ] || { echo "::error::NDK $NDK_VERSION unavailable"; exit 1; }
           echo "ANDROID_NDK_HOME=$NDK_HOME" >> "$GITHUB_ENV"
 
-      # Must precede any native build: the generated android/CMakeLists.txt
-      # resolves ubrn via require.resolve('uniffi-bindgen-react-native/package.json'),
-      # which only works because pnpm applies patches/uniffi-bindgen-react-native@*.patch
-      # on install. Without it the Android C++ build fails with
-      # "'UniffiCallInvoker.h' file not found". See CLAUDE.md.
-      - name: Install RN deps (applies the ubrn patch) + build package
+      # Native CMake resolves the workspace-local binding generator through Node.
+      - name: Install workspace dependencies + build package
         run: |
-          cd packages/react-native
-          pnpm install
-          pnpm prepare
+          pnpm install --frozen-lockfile
+          pnpm --filter @bennyblader/ddk-rn build
 
       # Both regenerate the bindings (--and-generate), so this is also the check
       # that ddk-ffi's proc-macros still produce valid bindings.
@@ -372,7 +373,9 @@ jobs:
 
       - name: Build JNI library (x86_64) + bindings
         if: matrix.platform == 'android'
-        run: just native build-android x86_64
+        env:
+          ORG_GRADLE_PROJECT_reactNativeArchitectures: x86_64
+        run: pnpm build:android
 
       - name: Verify bindings were generated
         run: |
@@ -416,36 +419,15 @@ jobs:
             || { echo "::error::libddk_ffi.so is stripped; ubrn codegen needs its symbol table"; exit 1; }
           echo "✅ 16KB aligned, symbol table intact"
 
-      - name: pod install
-        if: matrix.platform == 'ios'
-        run: cd examples/react-native/ios && pod install
-
-      # Release, not Debug: only a release build embeds the JS bundle, which is
-      # what lets the e2e stage run without Metro. Signing is disabled — this is
-      # only ever installed on a simulator.
       - name: Build example app (iOS simulator, Release)
         if: matrix.platform == 'ios'
-        run: |
-          cd examples/react-native/ios
-          xcodebuild \
-            -workspace DdkRnExample.xcworkspace \
-            -scheme DdkRnExample \
-            -configuration Release \
-            -sdk iphonesimulator \
-            -destination 'generic/platform=iOS Simulator' \
-            -derivedDataPath build \
-            CODE_SIGNING_ALLOWED=NO ARCHS=arm64 ONLY_ACTIVE_ARCH=YES \
-            build
+        run: pnpm build:app:ios
 
-      # Release for the embedded bundle. Needs no secrets: the example's release
-      # buildType signs with the committed debug keystore and proguard is off.
       - name: Build example APK (x86_64, Release)
         if: matrix.platform == 'android'
-        run: |
-          cd examples/react-native/android
-          ./gradlew assembleRelease \
-            -PreactNativeArchitectures=x86_64 \
-            --no-daemon --console=plain
+        env:
+          ORG_GRADLE_PROJECT_reactNativeArchitectures: x86_64
+        run: pnpm build:app:android
 
       # tar, not a bare upload: actions/upload-artifact does not preserve the
       # executable bit, which would leave the .app unlaunchable.
@@ -480,6 +462,9 @@ jobs:
   # cannot ship a platform that does not build.
   # ==========================================================================
   build-ts:
+    permissions:
+      contents: read
+      id-token: write
     name: Build ddk (${{ matrix.target }})
     needs: check
     strategy:
@@ -514,6 +499,12 @@ jobs:
         with:
           version: ${{ env.PNPM_VERSION }}
 
+      - name: Authenticate Turborepo remote cache
+        if: vars.TURBO_TEAM != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: vercel/setup-turborepo-remote-cache-action@v1.0.0
+        with:
+          team: ${{ vars.TURBO_TEAM }}
+
       - name: Cache cargo
         uses: actions/cache@v3
         with:
@@ -523,17 +514,14 @@ jobs:
             ffi/target
           key: ${{ runner.os }}-build-ts-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Install uniffi-bindgen-react-native (matches the ddk-rn pin)
-        run: npm install -g uniffi-bindgen-react-native@${{ env.UBRN_VERSION }}
-
       - name: Install deps
-        run: cd packages/node-browser && pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       # Builds the release cdylib for this target, regenerates the bindings from
       # it, compiles them, and assembles platform/<triple>/ — the package that
       # carries the library to consumers.
       - name: Build
-        run: cd packages/node-browser && node scripts/build-release.mjs --target ${{ matrix.rust-target }}
+        run: pnpm build:node
 
       - name: Verify build output
         run: |
@@ -560,6 +548,9 @@ jobs:
   # through a different script. `check` already gates on a debug build; this
   # catches what only the release profile (LTO) can break, before a tag does.
   build-ts-wasm:
+    permissions:
+      contents: read
+      id-token: write
     name: Build ddk (wasm)
     needs: check
     runs-on: ubuntu-latest
@@ -582,6 +573,12 @@ jobs:
         with:
           version: ${{ env.PNPM_VERSION }}
 
+      - name: Authenticate Turborepo remote cache
+        if: vars.TURBO_TEAM != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: vercel/setup-turborepo-remote-cache-action@v1.0.0
+        with:
+          team: ${{ vars.TURBO_TEAM }}
+
       - name: Cache cargo
         uses: actions/cache@v3
         with:
@@ -591,17 +588,14 @@ jobs:
             ffi/target
           key: ${{ runner.os }}-build-ts-wasm-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Install uniffi-bindgen-react-native (matches the ddk-rn pin)
-        run: npm install -g uniffi-bindgen-react-native@${{ env.UBRN_VERSION }}
-
       - name: Install clang (wasm32 C toolchain)
         run: sudo apt-get update && sudo apt-get install -y clang llvm
 
       - name: Install deps
-        run: cd packages/node-browser && pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Build
-        run: cd packages/node-browser && pnpm build:wasm
+        run: pnpm build:browser
 
       - name: vitest (release wasm)
         run: cd packages/node-browser && pnpm test:wasm

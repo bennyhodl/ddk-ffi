@@ -114,7 +114,7 @@ jobs:
       - name: Install uniffi-bindgen-react-native
         run: npm install -g uniffi-bindgen-react-native@${{ env.UBRN_VERSION }}
       - name: Install dependencies
-        run: cd packages/node-browser && pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
       - name: Build
         run: cd packages/node-browser && node scripts/build-release.mjs --target ${{ matrix.target }}
       - name: Verify the platform package carries its library
@@ -153,7 +153,7 @@ jobs:
       - name: Install clang (wasm32 C toolchain)
         run: sudo apt-get update && sudo apt-get install -y clang llvm
       - name: Install dependencies
-        run: cd packages/node-browser && pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
       - name: Build
         run: cd packages/node-browser && pnpm build:wasm
       - name: Test the release build
@@ -185,7 +185,7 @@ jobs:
       - name: Install uniffi-bindgen-react-native
         run: npm install -g uniffi-bindgen-react-native@${{ env.UBRN_VERSION }}
       - name: Install dependencies
-        run: cd packages/node-browser && pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
       - name: Generate + build
         run: cd packages/node-browser && pnpm generate
       - name: Test
@@ -216,7 +216,7 @@ jobs:
       - name: Generate TurboModule bindings
         run: just native uniffi-turbo
       - name: Install dependencies
-        run: cd packages/react-native && pnpm install
+        run: pnpm install --frozen-lockfile
       - name: Build
         run: cd packages/react-native && pnpm prepare
       - name: Test
@@ -305,7 +305,7 @@ jobs:
         run: npm install -g uniffi-bindgen-react-native@${{ env.UBRN_VERSION }}
       - uses: extractions/setup-just@v1
       - name: Install ddk-rn dependencies
-        run: cd packages/react-native && pnpm install
+        run: pnpm install --frozen-lockfile
       - name: Generate JSI bindings
         run: just native uniffi-jsi
       - name: Generate TurboModule bindings
@@ -351,7 +351,7 @@ jobs:
         run: cargo install cargo-ndk
       - uses: extractions/setup-just@v1
       - name: Install ddk-rn dependencies
-        run: cd packages/react-native && pnpm install
+        run: pnpm install --frozen-lockfile
       # ubrn shells out to `cargo ndk`, which resolves the toolchain from
       # ANDROID_NDK_HOME.
       #
@@ -423,7 +423,7 @@ jobs:
           name: ddk-rn-android-jnilibs
           path: packages/react-native/android/src/main/jniLibs
       - name: Install ddk-rn dependencies
-        run: cd packages/react-native && pnpm install
+        run: pnpm install --frozen-lockfile
       - name: Build
         run: cd packages/react-native && pnpm prepare
       # Fail loudly rather than publishing a package that would make consumers

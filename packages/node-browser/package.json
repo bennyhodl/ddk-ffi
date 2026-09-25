@@ -64,12 +64,13 @@
     "build:node": "node scripts/build-release.mjs --local",
     "build:browser": "node scripts/build-wasm.mjs",
     "check": "pnpm typecheck && pnpm format:check",
-    "typecheck": "tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.wasm.json --noEmit && pnpm --filter ddk-example build",
+    "typecheck": "tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.wasm.json --noEmit",
     "test:browser": "pnpm test:wasm",
     "test:browser:smoke": "pnpm --filter ddk-example-browser smoke",
     "example:node": "pnpm --filter ddk-example dev",
     "example:contract": "pnpm --filter ddk-example contract",
-    "example:browser": "pnpm --filter ddk-example-browser dev"
+    "example:browser": "pnpm --filter ddk-example-browser dev",
+    "link:node": "node scripts/link-local.mjs"
   },
   "dependencies": {
     "@ubjs/core": "0.31.0-5",
@@ -89,11 +90,5 @@
     "trailingComma": "all",
     "singleQuote": true,
     "arrowParens": "always"
-  },
-  "workspaces": [
-    "../../examples/node",
-    "../../examples/browser",
-    "../../tests/conformance"
-  ],
-  "packageManager": "pnpm@10.14.0"
+  }
 }

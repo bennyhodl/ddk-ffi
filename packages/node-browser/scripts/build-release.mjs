@@ -25,7 +25,7 @@
  *   node scripts/build-release.mjs --local --debug     # ditto, debug profile (CI's gate)
  */
 import { execFileSync } from 'node:child_process'
-import { copyFileSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -155,19 +155,8 @@ for (const t of targets) {
     ) + '\n',
   )
   console.log(`  ${PKG_BASE}${nodeTriple} -> platform/${nodeTriple}/${lib}`)
-
-  // Local development and CI's test gate resolve the library through
-  // node_modules, exactly as a consumer would. The main package deliberately
-  // carries no optionalDependencies in the repo (publish-release.mjs injects
-  // them), so without this symlink there is nothing for resolveLibPath to find.
-  if (local) {
-    const scope = join(PKG, 'node_modules', PKG_BASE.split('/')[0])
-    const linked = join(scope, `${PKG_BASE.split('/')[1]}${nodeTriple}`)
-    mkdirSync(scope, { recursive: true })
-    rmSync(linked, { recursive: true, force: true })
-    symlinkSync(outDir, linked, 'dir')
-    console.log(`  linked   node_modules/${PKG_BASE}${nodeTriple} -> platform/${nodeTriple}`)
-  }
 }
+
+if (local) await import('./link-local.mjs')
 
 console.log(`\nDone (${version}, ${profile}). Publish with: node scripts/publish-release.mjs`)

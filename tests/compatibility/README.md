@@ -14,7 +14,7 @@ Two dependency details make that pairing work:
 
 - The 0.3.42 engine is installed under the **`bal-ddk-ts` alias** so it can
   coexist with the `link:../../packages/node-browser` the ddk party tests.
-- It carries a **pnpm patch** (`patches/`, wired in `pnpm-workspace.yaml`)
+- It carries a **pnpm patch** (`patches/`, wired in the root `pnpm-workspace.yaml`)
   removing its mislabeled `"type": "module"` — its dist is CJS. This is the
   same patch orange-grove ships for the same reason.
 - `@node-dlc` is pinned to exactly `1.2.1`, the version every published BAL

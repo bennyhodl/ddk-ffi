@@ -58,7 +58,7 @@
     "example:pods": "cd ../../examples/react-native/ios && pod install",
     "build": "bob build",
     "build:ios": "just build-ios",
-    "build:android": "just build-android",
+    "build:android": "just build-android \"${ORG_GRADLE_PROJECT_reactNativeArchitectures:-}\"",
     "generate": "just uniffi-jsi && just uniffi-turbo",
     "check": "pnpm typecheck && pnpm lint && pnpm format:check",
     "format": "prettier --write .eslintrc.cjs src scripts *.js *.json *.yaml",
@@ -118,11 +118,7 @@
     "react": "19.1.0",
     "react-native": "0.80.0",
     "react-native-builder-bob": "0.30.0",
-    "turbo": "^1.10.7",
     "typescript": "^5.2.2"
-  },
-  "resolutions": {
-    "@types/react": "^19.1.0"
   },
   "peerDependencies": {
     "react": "*",
@@ -179,6 +175,5 @@
     "@babel/runtime": "^7.20.0",
     "@ubjs/core": "0.31.0-5",
     "uniffi-bindgen-react-native": "0.31.0-5"
-  },
-  "packageManager": "pnpm@10.14.0"
+  }
 }

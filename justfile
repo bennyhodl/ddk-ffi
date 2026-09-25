@@ -4,38 +4,36 @@ set positional-arguments
 _default:
     @just --list
 
-# Install the two package workspaces and the independent BAL compatibility suite.
+# Install the root workspace, including examples and compatibility tests.
 install:
-    pnpm --dir packages/node-browser install --frozen-lockfile
-    pnpm --dir packages/react-native install --frozen-lockfile
-    pnpm --dir tests/compatibility install --frozen-lockfile
+    pnpm install --frozen-lockfile
 
 # Build a runtime; React Native requires ios or android.
 build runtime platform="":
     #!/usr/bin/env bash
     set -euo pipefail
     case "$1/$2" in
-      node/) pnpm --dir packages/node-browser build:node ;;
-      browser/) pnpm --dir packages/node-browser build:browser ;;
-      react-native/ios|react-native/android) pnpm --dir packages/react-native "build:$2" ;;
+      node/) pnpm build:node ;;
+      browser/) pnpm build:browser ;;
+      react-native/ios|react-native/android) pnpm "build:$2" ;;
       *) echo 'usage: just build node|browser|react-native [ios|android]' >&2; exit 1 ;;
     esac
 
 # Check Rust and both packages. Build Node and browser bindings first.
 check:
-    cargo check --manifest-path ffi/Cargo.toml --all-features
-    cargo fmt --manifest-path ffi/Cargo.toml -- --check
-    cargo clippy --manifest-path ffi/Cargo.toml --all-features -- -D warnings
-    pnpm --dir packages/node-browser check
-    pnpm --dir packages/react-native build
-    pnpm --dir packages/react-native check
-    pnpm --dir packages/react-native --filter ddk-rn-example typecheck
+    pnpm check
 
 # Format handwritten Rust and package source.
 format:
-    cargo fmt --manifest-path ffi/Cargo.toml
-    pnpm --dir packages/node-browser format
-    pnpm --dir packages/react-native format
+    pnpm format
+
+# Build a self-contained mobile example for the simulator/emulator.
+build-app platform:
+    pnpm "build:app:{{platform}}"
+
+# Remove build outputs; pass --cache to also clear the local Turbo cache.
+clean *args:
+    pnpm clean {{args}}
 
 # Run a runtime suite. A mobile platform selects the device end-to-end flow.
 test runtime platform="":
@@ -69,7 +67,7 @@ generate-react-native:
 
 # Package-owned native diagnostics and individual build/install/test steps.
 native +args:
-    just --justfile packages/react-native/justfile "$@"
+    pnpm exec just --justfile packages/react-native/justfile "$@"
 
 # Offline BAL message and vector compatibility, without a regtest node.
 compat-messages:

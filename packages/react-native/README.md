@@ -88,16 +88,12 @@ For complete API documentation, see the [main README](../../README.md#-the-contr
 - Node.js >= 20
 - Rust >= 1.70
 - pnpm
-- UniFFI React Native, installed globally at the version pinned in
-  `package.json`: `pnpm add -g uniffi-bindgen-react-native@<version>`
+- UniFFI React Native, installed by the root `pnpm install`.
 - iOS: Xcode 14+, CocoaPods
 - Android: Android Studio, NDK 27.1.12297006
 
-> The `uniffi` crate, this package's `uniffi-bindgen-react-native` dependency,
-> and the globally installed binary must all be the same release — the `just`
-> recipes call the binary on `$PATH`, not the one in `node_modules`. A skew shows
-> up as TypeScript errors like "Expected 2 arguments, but got 1" on every
-> generated `.lower()` call.
+> Keep the Rust UniFFI version and both npm generator pins compatible.
+> Root commands use the workspace-local generator.
 
 ### Building from source
 

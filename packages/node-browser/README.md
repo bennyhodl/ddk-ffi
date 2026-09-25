@@ -127,8 +127,7 @@ A thrown error is a typed variant class carrying the Rust variant name in
 - Node.js >= 18
 - Rust >= 1.70
 - pnpm
-- `uniffi-bindgen-react-native`, at the version ddk-rn pins:
-  `pnpm add -g uniffi-bindgen-react-native@0.31.0-5`
+- The pinned binding generator, installed with the root pnpm workspace.
 
 ### Building from Source
 
@@ -161,8 +160,8 @@ packages/node-browser/
 ```
 
 Examples live in `../../examples/node/` and `../../examples/browser/`. Shared
-runtime tests live in `../../tests/conformance/`. This package's pnpm workspace
-includes all three directories.
+runtime tests live in `../../tests/conformance/`. The root pnpm workspace
+includes both packages, all examples, and the shared tests.
 
 From the repository root:
 

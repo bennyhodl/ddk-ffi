@@ -1,0 +1,26 @@
+{
+  "name": "ddk-ffi-workspace",
+  "private": true,
+  "packageManager": "pnpm@10.14.0",
+  "scripts": {
+    "turbo": "node scripts/turbo.mjs",
+    "build": "pnpm build:node && pnpm build:browser && pnpm turbo run build --filter=@bennyblader/ddk-rn",
+    "build:node": "pnpm turbo run link:node --filter=@bennyblader/ddk",
+    "build:browser": "pnpm turbo run build:browser --filter=@bennyblader/ddk",
+    "build:ios": "pnpm turbo run build:ios --filter=@bennyblader/ddk-rn",
+    "build:android": "pnpm turbo run build:android --filter=@bennyblader/ddk-rn",
+    "build:app:ios": "pnpm turbo run build:ios --filter=ddk-rn-example",
+    "build:app:android": "pnpm turbo run build:android --filter=ddk-rn-example",
+    "check": "pnpm turbo run check check:rust check:root",
+    "check:rust": "cargo check --manifest-path ffi/Cargo.toml --all-features && cargo fmt --manifest-path ffi/Cargo.toml -- --check && cargo clippy --manifest-path ffi/Cargo.toml --all-features -- -D warnings",
+    "format": "pnpm format:root && cargo fmt --manifest-path ffi/Cargo.toml && pnpm turbo run format",
+    "clean": "node scripts/clean.mjs",
+    "clean:all": "node scripts/clean.mjs --cache",
+    "check:root": "pnpm --filter @bennyblader/ddk exec prettier ../../package.json ../../turbo.json ../../scripts/turbo.mjs ../../scripts/clean.mjs --check",
+    "format:root": "pnpm --filter @bennyblader/ddk exec prettier ../../package.json ../../turbo.json ../../scripts/turbo.mjs ../../scripts/clean.mjs --write"
+  },
+  "devDependencies": {
+    "turbo": "2.11.4",
+    "uniffi-bindgen-react-native": "0.31.0-5"
+  }
+}
