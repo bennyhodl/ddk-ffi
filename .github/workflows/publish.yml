@@ -75,7 +75,7 @@ jobs:
             fi
           }
           check_toml ffi/Cargo.toml
-          check_lock ffi/Cargo.lock ddk_ffi
+          check_lock Cargo.lock ddk_ffi
 
           echo "version=$TAG_VERSION" >> "$GITHUB_OUTPUT"
 

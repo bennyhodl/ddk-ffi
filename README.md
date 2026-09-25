@@ -670,8 +670,15 @@ Xcode/SDK, Java, and NDK toolchains before calling Turbo. Native caches are
 separate for different hosts and toolchains. Build inputs include the Rust
 sources, Cargo lockfile, binding configuration, and the workspace lockfile.
 Changes confined to the example do not invalidate the native binding task.
-Checks and formatting always execute. Device tests continue to run against the
-built apps, including apps restored from cache.
+Rust checks, Clippy, format checks, and tests use native Cargo tasks and cache
+successful results. JavaScript checks and formatting always execute. Device
+tests continue to run against the built apps, including apps restored from cache.
+
+The root `Cargo.toml` owns the Rust workspace and release profile; the crate stays
+in `ffi/` and compilation artifacts stay in `ffi/target`. Turbo's experimental
+Cargo integration discovers `ddk_ffi` and the `ddk-rust` workspace. Use
+`pnpm check:rust` and `pnpm test:rust` locally or in CI. Both preserve
+`--all-features`; Clippy rejects warnings. Append `--force` to rerun cached checks.
 
 The first binding generation also compiles the workspace's pinned UniFFI CLI.
 Cargo, Xcode, and Gradle retain their incremental caches for builds that miss

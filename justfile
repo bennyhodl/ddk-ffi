@@ -40,7 +40,7 @@ test runtime platform="":
     #!/usr/bin/env bash
     set -euo pipefail
     case "$1/$2" in
-      rust/) cargo test --manifest-path ffi/Cargo.toml --all-features ;;
+      rust/) pnpm test:rust ;;
       node/) pnpm --dir packages/node-browser test ;;
       browser/) pnpm --dir packages/node-browser test:browser; pnpm --dir packages/node-browser test:browser:smoke ;;
       react-native/) pnpm --dir packages/react-native test ;;

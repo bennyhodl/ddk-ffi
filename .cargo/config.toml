@@ -1,3 +1,7 @@
+[build]
+# Preserve the native tooling and CI artifact paths inside ffi/.
+target-dir = "ffi/target"
+
 # Android 15+ requires every .so in an APK to be 16KB-page aligned.
 #
 # packages/react-native/android/CMakeLists.txt already sets `-Wl,-z,max-page-size=16384`, but

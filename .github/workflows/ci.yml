@@ -115,23 +115,16 @@ jobs:
             ffi/target
           key: ${{ runner.os }}-check-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-      # ---- Rust: ddk-ffi, the only crate in the repo -----------------------
-      - name: cargo check
-        run: cd ffi && cargo check --all-features
-
-      - name: cargo fmt
-        run: cd ffi && cargo fmt -- --check
-
-      - name: cargo clippy
-        run: cd ffi && cargo clippy --all-features -- -D warnings
-
-      - name: cargo test
-        run: cd ffi && cargo test --all-features
-
-      # ---- @bennyblader/ddk: Node (N-API) ---------------------------------
       - name: Install workspace dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Rust check, formatting, and clippy (Turbo)
+        run: pnpm check:rust
+
+      - name: Rust tests (Turbo)
+        run: pnpm test:rust
+
+      # ---- @bennyblader/ddk: Node (N-API) ---------------------------------
       - name: prettier (ddk)
         run: cd packages/node-browser && pnpm format:check
 

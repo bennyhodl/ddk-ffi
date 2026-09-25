@@ -1,0 +1,12 @@
+[workspace]
+members = ["ffi"]
+resolver = "2"
+
+[workspace.metadata]
+name = "ddk-rust"
+
+# No `strip`: ubrn's Android codegen needs the .so's symbol table.
+# No `panic = "abort"`: uniffi turns caught panics into caller-side errors.
+[profile.release]
+lto = true
+codegen-units = 1

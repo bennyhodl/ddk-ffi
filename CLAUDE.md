@@ -71,10 +71,10 @@ This project uses `just` as the primary build orchestrator. All build commands s
 - `pnpm build:wasm` / `build:wasm:debug`: the wasm build into `dist/wasm/`
 - `pnpm test` / `pnpm test:wasm`: the same vitest suites against N-API / wasm
 
-### Rust Commands (run from ffi/)
+### Rust Commands (run from the repository root)
 
 - `cargo build`: Build Rust crate
-- `cargo test`: Run Rust tests
+- `pnpm test:rust`: Run all-feature Rust tests through Turbo
 
 ## Development Workflow
 
@@ -257,19 +257,10 @@ Rules to preserve:
   modified `build.gradle` that must never be committed — a single-ABI
   `build.gradle` ships an app that only runs on one architecture. After running it
   with an argument: `git checkout packages/react-native/android/build.gradle`.
-- **`just native build-android` can fail locally with `can't find crate for core` /
-  "the `aarch64-linux-android` target may not be installed" while `just
-  build-ios` works and `rustup show` lists the target.** `ffi/rust-toolchain.toml`
-  pins `stable`, but the ubrn shim starts with `cargo run` from `packages/react-native/`, where
-  no `rust-toolchain.toml` applies, so the rustup proxy resolves the *default*
-  toolchain and exports it as `RUSTUP_TOOLCHAIN` to every child — including the
-  `cargo ndk` that builds the crate. If the default is a versioned toolchain
-  (`1.98.0-…`) rather than `stable`, it needs the Android targets too:
-  `rustup target add aarch64-linux-android armv7-linux-androideabi
-  i686-linux-android x86_64-linux-android`, or run with
-  `RUSTUP_TOOLCHAIN=stable just native build-android`. iOS only works by luck — the
-  iOS targets happen to be installed on both. CI has one toolchain, so it never
-  sees this.
+- The root `rust-toolchain.toml` pins `stable` for Cargo and the ubrn shim from
+  every package directory. Keep it at the workspace root so native builds and
+  Turbo fingerprint the same compiler. An explicit `RUSTUP_TOOLCHAIN` still
+  overrides the file.
 - Generation runs prettier over `packages/react-native/src/`, which reformats hand-written files
   living there (e.g. `src/__tests__/contractBindings.test.js`). Committing the
   prettier-formatted version keeps that from churning on every build.
@@ -449,7 +440,7 @@ that bite:
 
 ## Testing
 
-- Rust tests: `cargo test` (in ffi/)
+- Rust tests: `pnpm test:rust` (root Cargo workspace; crate source in ffi/)
 - TypeScript tests: `pnpm test` (in packages/react-native/)
 - BAL compatibility: `just test compatibility` (see above)
 - Integration testing via example app

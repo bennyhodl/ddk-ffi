@@ -31,7 +31,7 @@ target/
 # lockfile is committed for reproducible builds. It is the only Rust crate in the
 # repo; stray copies (e.g. a stale packages/react-native/ddk-ffi) stay ignored.
 Cargo.lock
-!/ffi/Cargo.lock
+!/Cargo.lock
 **/*.rs.bk
 *.pdb
 
