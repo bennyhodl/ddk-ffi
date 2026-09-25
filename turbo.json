@@ -39,8 +39,10 @@
         "!browser/**",
         "$TURBO_ROOT$/ffi/src/**",
         "$TURBO_ROOT$/ffi/Cargo.toml",
-        "$TURBO_ROOT$/ffi/Cargo.lock",
-        "$TURBO_ROOT$/ffi/uniffi.toml"
+        "$TURBO_ROOT$/Cargo.lock",
+        "$TURBO_ROOT$/ffi/uniffi.toml",
+        "$TURBO_ROOT$/Cargo.toml",
+        "$TURBO_ROOT$/rust-toolchain.toml"
       ],
       "outputs": ["dist/node/**", "platform/**", "node/generated/**"]
     },
@@ -51,8 +53,10 @@
         "!browser/**",
         "$TURBO_ROOT$/ffi/src/**",
         "$TURBO_ROOT$/ffi/Cargo.toml",
-        "$TURBO_ROOT$/ffi/Cargo.lock",
-        "$TURBO_ROOT$/ffi/uniffi.toml"
+        "$TURBO_ROOT$/Cargo.lock",
+        "$TURBO_ROOT$/ffi/uniffi.toml",
+        "$TURBO_ROOT$/Cargo.toml",
+        "$TURBO_ROOT$/rust-toolchain.toml"
       ],
       "outputs": ["dist/node/**", "platform/**", "node/generated/**"]
     },
@@ -67,8 +71,10 @@
         "!node/**",
         "$TURBO_ROOT$/ffi/src/**",
         "$TURBO_ROOT$/ffi/Cargo.toml",
-        "$TURBO_ROOT$/ffi/Cargo.lock",
-        "$TURBO_ROOT$/ffi/uniffi.toml"
+        "$TURBO_ROOT$/Cargo.lock",
+        "$TURBO_ROOT$/ffi/uniffi.toml",
+        "$TURBO_ROOT$/Cargo.toml",
+        "$TURBO_ROOT$/rust-toolchain.toml"
       ],
       "outputs": ["dist/wasm/**", "browser/generated/**"]
     },
@@ -79,8 +85,10 @@
         "!node/**",
         "$TURBO_ROOT$/ffi/src/**",
         "$TURBO_ROOT$/ffi/Cargo.toml",
-        "$TURBO_ROOT$/ffi/Cargo.lock",
-        "$TURBO_ROOT$/ffi/uniffi.toml"
+        "$TURBO_ROOT$/Cargo.lock",
+        "$TURBO_ROOT$/ffi/uniffi.toml",
+        "$TURBO_ROOT$/Cargo.toml",
+        "$TURBO_ROOT$/rust-toolchain.toml"
       ],
       "outputs": ["dist/wasm/**", "browser/generated/**"]
     },
@@ -92,8 +100,10 @@
         "scripts/**",
         "$TURBO_ROOT$/ffi/src/**",
         "$TURBO_ROOT$/ffi/Cargo.toml",
-        "$TURBO_ROOT$/ffi/Cargo.lock",
-        "$TURBO_ROOT$/ffi/uniffi.toml"
+        "$TURBO_ROOT$/Cargo.lock",
+        "$TURBO_ROOT$/ffi/uniffi.toml",
+        "$TURBO_ROOT$/Cargo.toml",
+        "$TURBO_ROOT$/rust-toolchain.toml"
       ],
       "outputs": [
         "ios/DdkRn.xcframework/**",
@@ -111,8 +121,10 @@
         "scripts/**",
         "$TURBO_ROOT$/ffi/src/**",
         "$TURBO_ROOT$/ffi/Cargo.toml",
-        "$TURBO_ROOT$/ffi/Cargo.lock",
-        "$TURBO_ROOT$/ffi/uniffi.toml"
+        "$TURBO_ROOT$/Cargo.lock",
+        "$TURBO_ROOT$/ffi/uniffi.toml",
+        "$TURBO_ROOT$/Cargo.toml",
+        "$TURBO_ROOT$/rust-toolchain.toml"
       ],
       "outputs": [
         "android/src/main/jniLibs/**",
@@ -165,9 +177,6 @@
       ],
       "outputs": ["android/app/build/outputs/apk/release/**"]
     },
-    "//#check:rust": {
-      "cache": false
-    },
     "check": {
       "cache": false
     },
@@ -192,6 +201,62 @@
     },
     "//#check:root": {
       "cache": false
+    },
+    "ddk-rust#check": {
+      "command": [
+        "cargo",
+        "check",
+        "--workspace",
+        "--locked",
+        "--all-features"
+      ],
+      "cache": true,
+      "outputs": [],
+      "dependsOn": ["lint", "format:check"],
+      "inputs": ["$TURBO_DEFAULT$", "!ffi/target/**"]
+    },
+    "ddk-rust#lint": {
+      "command": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--locked",
+        "--all-features",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cache": true,
+      "outputs": [],
+      "inputs": ["$TURBO_DEFAULT$", "!ffi/target/**"]
+    },
+    "ddk-rust#test": {
+      "command": ["cargo", "test", "--workspace", "--locked", "--all-features"],
+      "cache": true,
+      "outputs": [],
+      "inputs": ["$TURBO_DEFAULT$", "!ffi/target/**"]
+    },
+    "ddk-rust#format:check": {
+      "command": ["cargo", "fmt", "--all", "--", "--check"],
+      "cache": true,
+      "outputs": [],
+      "inputs": [
+        "Cargo.toml",
+        "Cargo.lock",
+        "rust-toolchain.toml",
+        ".cargo/**",
+        "ffi/Cargo.toml",
+        "ffi/**/*.rs",
+        "!ffi/target/**",
+        "rustfmt.toml",
+        ".rustfmt.toml",
+        "ffi/rustfmt.toml",
+        "ffi/.rustfmt.toml"
+      ]
     }
+  },
+  "futureFlags": {
+    "experimentalCargoWorkspaces": true,
+    "experimentalTaskCommand": true
   }
 }

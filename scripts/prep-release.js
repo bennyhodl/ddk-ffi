@@ -2,7 +2,7 @@
 // Usage: node scripts/prep-release.js <X.Y.Z[-tag]>
 //
 // Bumps versions in packages/node-browser/package.json, packages/react-native/package.json, ffi/Cargo.toml
-// and ffi/Cargo.lock, commits, creates tag v<version>, and pushes. CI
+// and Cargo.lock, commits, creates tag v<version>, and pushes. CI
 // (.github/workflows/publish.yml) takes over on tag push and publishes both npm
 // packages.
 //
@@ -74,11 +74,11 @@ const bumpCargoLock = (file, crates) => {
   write(p, out);
   console.log(`\u2713 ${file} \u2192 ${version} (${crates.join(', ')})`);
 };
-bumpCargoLock('ffi/Cargo.lock', ['ddk_ffi']);
+bumpCargoLock('Cargo.lock', ['ddk_ffi']);
 
 run(
   'git add packages/node-browser/package.json packages/react-native/package.json ' +
-    'ffi/Cargo.toml ffi/Cargo.lock'
+    'ffi/Cargo.toml Cargo.lock'
 );
 run(`git commit -m "chore: release v${version}"`);
 run(`git tag v${version}`);

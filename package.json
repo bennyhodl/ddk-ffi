@@ -11,13 +11,14 @@
     "build:android": "pnpm turbo run build:android --filter=@bennyblader/ddk-rn",
     "build:app:ios": "pnpm turbo run build:ios --filter=ddk-rn-example",
     "build:app:android": "pnpm turbo run build:android --filter=ddk-rn-example",
-    "check": "pnpm turbo run check check:rust check:root",
-    "check:rust": "cargo check --manifest-path ffi/Cargo.toml --all-features && cargo fmt --manifest-path ffi/Cargo.toml -- --check && cargo clippy --manifest-path ffi/Cargo.toml --all-features -- -D warnings",
-    "format": "pnpm format:root && cargo fmt --manifest-path ffi/Cargo.toml && pnpm turbo run format",
+    "check": "pnpm turbo run check check:root",
+    "check:rust": "pnpm turbo run check --filter=ddk-rust",
+    "format": "pnpm format:root && pnpm turbo run format",
     "clean": "node scripts/clean.mjs",
     "clean:all": "node scripts/clean.mjs --cache",
     "check:root": "pnpm --filter @bennyblader/ddk exec prettier ../../package.json ../../turbo.json ../../scripts/turbo.mjs ../../scripts/clean.mjs --check",
-    "format:root": "pnpm --filter @bennyblader/ddk exec prettier ../../package.json ../../turbo.json ../../scripts/turbo.mjs ../../scripts/clean.mjs --write"
+    "format:root": "pnpm --filter @bennyblader/ddk exec prettier ../../package.json ../../turbo.json ../../scripts/turbo.mjs ../../scripts/clean.mjs --write",
+    "test:rust": "pnpm turbo run test --filter=ddk-rust"
   },
   "devDependencies": {
     "turbo": "2.11.4",

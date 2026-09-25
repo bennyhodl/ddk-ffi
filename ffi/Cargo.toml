@@ -45,9 +45,3 @@ bip39 = { version = "2.2.0", features = ["rand"] }
 name = "uniffi-bindgen"
 path = "src/uniffi-bindgen.rs"
 required-features = ["uniffi-bindgen"]
-
-# No `strip`: ubrn's Android codegen needs the .so's symbol table.
-# No `panic = "abort"`: uniffi turns caught panics into caller-side errors.
-[profile.release]
-lto = true
-codegen-units = 1
