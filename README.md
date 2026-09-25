@@ -4,8 +4,8 @@
 
 This repository provides high-performance Rust bindings for [dlcdevkit](https://github.com/bennyhodl/dlcdevkit) and [rust-dlc](https://github.com/p2pderivatives/rust-dlc), making DLC functionality available in:
 
-- **Node.js and browsers**: [@bennyblader/ddk](./typescript) - generated N-API native bindings for Node, WebAssembly for browsers
-- **React Native**: [@bennyblader/ddk-rn](./ddk-rn) - UniFFI-based native bindings with JSI
+- **Node.js and browsers**: [@bennyblader/ddk](./packages/node-browser) - generated N-API native bindings for Node, WebAssembly for browsers
+- **React Native**: [@bennyblader/ddk-rn](./packages/react-native) - UniFFI-based native bindings with JSI
 
 [![GitHub](https://img.shields.io/github/license/bennyhodl/ddk-ffi)](https://github.com/bennyhodl/ddk-ffi/blob/master/LICENSE)
 
@@ -13,7 +13,7 @@ This repository provides high-performance Rust bindings for [dlcdevkit](https://
 
 Neither package compiles anything on install — both ship prebuilt binaries.
 
-### [@bennyblader/ddk](./typescript) - Node.js and browsers
+### [@bennyblader/ddk](./packages/node-browser) - Node.js and browsers
 
 One package, two bindings generated from the same `ddk-ffi` crate as the React
 Native package. `exports` conditions pick one at resolve time: Node gets native
@@ -43,9 +43,9 @@ version()
 
 It replaces `@bennyblader/ddk-ts`.
 
-[View package documentation →](./typescript/README.md)
+[View package documentation →](./packages/node-browser/README.md)
 
-### [@bennyblader/ddk-rn](./ddk-rn) - React Native
+### [@bennyblader/ddk-rn](./packages/react-native) - React Native
 
 React Native bindings using UniFFI for mobile DLC applications.
 
@@ -60,7 +60,7 @@ npm install @bennyblader/ddk-rn
 - Requires the React Native new architecture; built and E2E-tested against RN 0.80
 - TurboModule optimizations
 
-[View package documentation →](./ddk-rn/README.md)
+[View package documentation →](./packages/react-native/README.md)
 
 > Prereleases publish to the `next` dist-tag: `npm install @bennyblader/ddk-rn@next`.
 
@@ -228,8 +228,8 @@ const refund = signContractRefund(
 
 Runnable versions of exactly this flow:
 
-- `typescript/example/src/contract.ts` — `pnpm contract`
-- `ddk-rn/example/src/App.tsx` — the on-device demo the Maestro E2E drives
+- `examples/node/src/contract.ts` — `pnpm contract`
+- `examples/react-native/src/App.tsx` — the on-device demo the Maestro E2E drives
 
 ### Key derivation
 
@@ -534,7 +534,7 @@ Both packages follow a **pure wrapper approach** around dlcdevkit and rust-dlc:
 └─────────────────┘    └──────────────┘    └─────────────┘
 ```
 
-`ddk-ffi/src/` is the single source of truth for the interface. It is annotated
+`ffi/src/` is the single source of truth for the interface. It is annotated
 with UniFFI **proc-macros** (`#[derive(uniffi::Record)]`, `#[uniffi::export]`,
 …) — there is no `.udl` file — and **both** packages are generated from the
 compiled library by `uniffi-bindgen-react-native`: the JSI/C++ bindings for React
@@ -544,11 +544,11 @@ cannot drift — from the crate or from each other.
 
 That leaves one thing worth checking rather than three:
 
-1. CI regenerates `typescript/src/*/generated` and fails if it differs from what is committed
-2. `ddk-rn/src/__tests__/contractBindings.test.js` checks that the generated JSI
+1. CI regenerates `packages/node-browser/src/*/generated` and fails if it differs from what is committed
+2. `packages/react-native/src/__tests__/contractBindings.test.js` checks that the generated JSI
    surface is complete — every function, record, and constructor present in both
    the TypeScript and the native symbol layer
-4. `typescript/__test__/contract.spec.ts` drives the full lifecycle end to end,
+4. `tests/conformance/contract.spec.ts` drives the full lifecycle end to end,
    including a splice rollover and the failure modes — against N-API and wasm
 
 ## 🛠️ Development
@@ -560,74 +560,68 @@ That leaves one thing worth checking rather than three:
 - pnpm
 - Just (`cargo install just`)
 - `uniffi-bindgen-react-native` installed globally, at the version pinned in
-  `ddk-rn/package.json` (see [CLAUDE.md](./CLAUDE.md) on version lockstep)
+  `packages/react-native/package.json` (see [CLAUDE.md](./CLAUDE.md) on version lockstep)
 
 ### Project Structure
 
-```
-.
-├── ddk-ffi/            # Rust crate — the UniFFI interface (proc-macros, no UDL)
-│   ├── src/
-│   │   ├── lib.rs      # transaction API
-│   │   └── contract.rs # stateless contract API
-│   └── Cargo.toml
-│
-├── typescript/         # @bennyblader/ddk: Node (N-API) + browsers (wasm)
-│   ├── src/node/       # N-API entry; generated/ is ubrn output (committed)
-│   ├── src/wasm/       # wasm entry; generated/ is ubrn output (committed)
-│   ├── dist/           # tsc output — what the package ships
-│   ├── platform/       # one npm package per target, each with its cdylib
-│   ├── __test__/       # vitest suites
-│   ├── example/        # runnable Node examples
-│   ├── example-browser/ # Vite app + headless-Chrome smoke test
-│   └── scripts/        # build + publish the generated package
-│
-├── ddk-rn/             # React Native package (UniFFI + JSI)
-│   ├── src/            # generated TypeScript
-│   ├── cpp/            # generated C++ JSI bindings
-│   ├── ios/            # iOS native module + prebuilt XCFramework
-│   ├── android/        # Android native module + prebuilt JNI libraries
-│   └── example/        # example app, driven by the Maestro E2E
-│
-└── justfile            # build automation
+```text
+ffi/                         # Shared Rust interface and UniFFI configuration
+packages/
+  node-browser/              # @bennyblader/ddk
+    node/                    # Native loader and generated N-API bindings
+    browser/                 # WASM loader and generated browser bindings
+    scripts/                 # Build and release this package
+  react-native/              # @bennyblader/ddk-rn
+    src/generated/           # Generated TypeScript and TurboModule spec
+    ios/                     # iOS adapter and XCFramework
+    android/                 # Android adapter and JNI libraries
+    cpp/                     # Generated JSI bindings
+    justfile                 # Native build and device-test recipes
+examples/
+  node/
+  browser/
+  react-native/
+tests/
+  conformance/               # Shared Node/WASM contract tests
+  compatibility/             # BAL interoperability and mobile replay vectors
+justfile                     # Repository command entrypoint
 ```
 
-### Quick Commands
+### Development commands
 
-```bash
-just check             # cargo test (both crates) + ddk-rn typecheck
-just lint              # rustfmt + clippy + eslint
+Run these from the repository root:
 
-# @bennyblader/ddk (Node + browsers)
-just ts-build          # N-API build for the current platform
-just ts-build-all      # N-API build for all supported platforms
-just ts-test           # run tests against N-API
-just ts-wasm-build     # wasm build (needs a wasm-capable clang)
-just ts-wasm-test      # run the same tests against wasm
-just ts-wasm-smoke     # load the wasm in headless Chrome
+```sh
+just install
+just build node
+just build browser
+just generate-react-native
+just check
+just format
+just test rust
+just test node
+just test browser
+just test react-native
+just compat-messages
 
-# React Native
-just build             # JSI + TurboModule bindings, iOS framework, and ddk (N-API)
-just uniffi-jsi        # regenerate TypeScript + C++ only
-just build-ios         # build the iOS XCFramework (release, stripped)
-just build-android     # build the Android JNI libraries (needs the NDK)
+just example node
+just example node contract
+just example browser
 
-# End-to-end, on a real simulator/emulator
-just e2e-flows         # parse every Maestro flow — no device, no build (~15s)
-just e2e-ios           # build, install, and run the flows on iOS
-just e2e-android       # the same on Android (one-time: just e2e-android-setup)
-
-# Release both packages (bumps versions, tags, pushes; CI publishes)
-just release 0.5.0
-
-just clean
+just build react-native ios
+just build react-native android
+just native example-ios      # Install CocoaPods for the mobile example
+just example react-native ios
+just example react-native android
+just test react-native ios
+just test react-native android
 ```
 
-> Adding a new `#[uniffi::export]` needs `just build-ios`, not just
-> `just uniffi-jsi` — the generated C++ calls into the XCFramework, and only
-> `build-ios` rebuilds it.
+Node and browser remain one npm package. The package's export conditions select
+the implementation; consumers keep importing `@bennyblader/ddk`.
 
-See [DEVELOPMENT.md](./DEVELOPMENT.md) for the full workflow and release process.
+See [DEVELOPMENT.md](./DEVELOPMENT.md) for prerequisites, native diagnostics and
+the release process. Native builds must be rebuilt after changing Rust exports.
 
 ## 📄 License
 
@@ -637,7 +631,7 @@ MIT License - see [LICENSE](./LICENSE) file for details.
 
 Contributions welcome! Please ensure:
 
-1. All tests pass (`just check`, `just lint`)
+1. Checks and the relevant runtime tests pass (`just check`, `just test <runtime>`)
 2. Bindings are regenerated when changing Rust code, and committed alongside it
 3. API parity between the two packages is maintained
 4. Documentation and the relevant `CHANGELOG.md` are updated

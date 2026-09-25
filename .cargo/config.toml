@@ -1,6 +1,6 @@
 # Android 15+ requires every .so in an APK to be 16KB-page aligned.
 #
-# ddk-rn/android/CMakeLists.txt already sets `-Wl,-z,max-page-size=16384`, but
+# packages/react-native/android/CMakeLists.txt already sets `-Wl,-z,max-page-size=16384`, but
 # only for the C++ library CMake itself builds. Since ddk-rn switched Android to
 # `useSharedLibrary: true`, libddk_ffi.so is a second shared object in the APK
 # and it is produced by cargo, not CMake — so it needs the flag here or it
@@ -13,7 +13,7 @@
 # for the host, and a macOS or Linux linker rejects `-z max-page-size`.
 #
 # This file lives at the repo root because cargo discovers config by walking up
-# from the current directory, and ubrn invokes cargo from ddk-rn/ rather than
+# from the current directory, and ubrn invokes cargo from packages/react-native/ rather than
 # from the crate directory. The root is an ancestor of every build cwd.
 
 [target.aarch64-linux-android]

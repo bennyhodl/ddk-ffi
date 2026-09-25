@@ -1,0 +1,21 @@
+{
+  // Compiles the wasm entry (browser/) to dist/wasm/: the `browser` and
+  // `default` conditions of `.`, and `./wasm`.
+  // DOM is in lib because the same output runs in browsers (fetch, Response).
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "types": [],
+    "allowJs": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "outDir": "dist/wasm",
+    "rootDir": "browser",
+    "strict": true,
+    "skipLibCheck": true
+  },
+  "include": ["browser/**/*.ts"]
+}
