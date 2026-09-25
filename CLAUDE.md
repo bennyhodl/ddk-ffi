@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a React Native library that provides Rust-powered DLC (Discreet Log Contract) functionality through UniFFI bindings. The project bridges Rust DLC implementation to React Native using `uniffi-bindgen-react-native`.
+This repository provides Rust-powered DLC (Discreet Log Contract) bindings for Node.js, browsers, and React Native using `uniffi-bindgen-react-native`.
 
 ## Architecture
 
@@ -50,8 +50,8 @@ This project uses `just` as the primary build orchestrator. All build commands s
 
 ### Example App Commands
 
-- `just example react-native ios`: Install iOS dependencies with new architecture enabled
-- `just example react-native android`: Build Android example app
+- `just example react-native ios`: Run the iOS example app
+- `just example react-native android`: Run the Android example app
 - `cd examples/react-native && npx react-native run-ios`: Run iOS example
 - `cd examples/react-native && npx react-native run-android`: Run Android example
 
@@ -97,8 +97,8 @@ This project uses `just` as the primary build orchestrator. All build commands s
 
 ### Node Layer
 
-- `packages/node-browser/src/{node,wasm}/generated/`: Generated TypeScript bindings (committed; never hand-edited)
-- `packages/node-browser/src/{node,wasm}/index.ts`: the two hand-written entries; `packages/node-browser/package.json`'s
+- `packages/node-browser/{node,browser}/generated/`: Generated TypeScript bindings (committed; never hand-edited)
+- `packages/node-browser/{node,browser}/index.ts`: the two hand-written entries; `packages/node-browser/package.json`'s
   `exports` picks one (`node` → N-API, `browser`/`default` → wasm, `./wasm` → wasm)
 - `packages/node-browser/scripts/build-release.mjs`: cargo build → generate → tsc → platform packages
 - `packages/node-browser/scripts/build-wasm.mjs`: `ubrn build wasm2` → tsc → stage the .wasm
@@ -107,7 +107,7 @@ This project uses `just` as the primary build orchestrator. All build commands s
 
 ### React Native Layer
 
-- `packages/react-native/src/`: Generated TypeScript bindings
+- `packages/react-native/src/generated/`: Generated TypeScript bindings
 - `packages/react-native/cpp/`: Generated C++ bindings for JSI
 - `packages/react-native/ios/`: iOS native module and XCFramework
 - `packages/react-native/android/`: Android native module and JNI libraries
@@ -115,7 +115,7 @@ This project uses `just` as the primary build orchestrator. All build commands s
 
 ### Generated Files (do not edit manually)
 
-- TypeScript bindings in `packages/react-native/src/` **and `packages/node-browser/src/*/generated/`**
+- TypeScript bindings in `packages/react-native/src/generated/` **and `packages/node-browser/{node,browser}/generated/`**
 - C++ bindings in `packages/react-native/cpp/`
 - iOS frameworks in `packages/react-native/ios/*.xcframework`
 - Android libraries in `packages/react-native/android/src/main/jniLibs/`
@@ -134,20 +134,13 @@ regenerate both and check `lygos-app` before touching it.
 
 ### UniFFI / ubrn version lockstep
 
-The `uniffi` crate (`ffi/Cargo.toml`), the `uniffi-bindgen-react-native` dependency
-(`packages/react-native/package.json`), the `@ubjs/core`, `@ubjs/node` and `@ubjs/wasm` runtimes, and the
-**globally installed** `uniffi-bindgen-react-native` binary must stay on compatible
-releases. The `just native uniffi-*` recipes call the bare
-`uniffi-bindgen-react-native` on `$PATH`, which resolves to the global pnpm install —
-not `packages/react-native/node_modules`. A version skew shows up as TypeScript errors like
-"Expected 2 arguments, but got 1" on every generated `.lower()` call.
+The `uniffi` crate (`ffi/Cargo.toml`), the generator pinned in the root and
+React Native `package.json` files, and the `@ubjs/core`, `@ubjs/node`, and
+`@ubjs/wasm` runtimes must stay compatible. The root pnpm workspace installs the
+CLI. Root `pnpm` and `just native` commands resolve that local CLI.
 
-ubrn pins an exact `uniffi_core` version (e.g. ubrn `0.31.0-5` requires `uniffi_core =0.31.0`),
-so pin the Rust crate to that exact patch. Update the global binary with
-`pnpm add -g uniffi-bindgen-react-native@<version>`. CI installs the version in
-`UBRN_VERSION`, which is declared in **both** `ci.yml` and `publish.yml`; bump
-the two together with the package pin, or releases generate with a different
-ubrn than PR CI tested.
+ubrn `0.31.0-5` requires `uniffi_core =0.31.0`; keep the exact crate patch pin.
+Release CI still declares `UBRN_VERSION`; update it together with both npm pins.
 
 **The wasm build adds a fourth pin: `wasm-bindgen`** (wasm32 target table in
 `ffi/Cargo.toml`) must equal the `wasm-bindgen-cli-support` version ubrn
@@ -160,7 +153,7 @@ its `Cargo.lock` and move the pin (and `js-sys` with it) to match.
 
 ### Dependencies
 
-- Requires `uniffi-bindgen-react-native` globally installed (version must match `packages/react-native/package.json`)
+- Install the pinned generator with `pnpm install --frozen-lockfile` at the root.
 - Uses pnpm as package manager (not npm/yarn)
 - React Native new architecture enabled by default
 
@@ -404,7 +397,7 @@ that bite:
   `just build node` is needed locally. Two wiring details: 0.3.42 is installed
   under the **`bal-ddk-ts` alias** (it must coexist with `link:../packages/node-browser`),
   and it carries a **pnpm patch** (`tests/compatibility/patches/`, wired in
-  `tests/compatibility/pnpm-workspace.yaml`) removing its mislabeled `"type": "module"` —
+  the root `pnpm-workspace.yaml`) removing its mislabeled `"type": "module"` —
   its dist is CJS; same patch orange-grove ships. `@node-dlc` is pinned to
   exactly `1.2.1` (what all BAL packages pin) so message-class identity is
   shared with BAL's internals — do not loosen those pins.
@@ -799,3 +792,17 @@ gh pr checkout <pr-number>
 # Merge a PR
 gh pr merge <pr-number> --merge  # or --squash, --rebase
 ```
+
+## Turborepo
+
+Use root `pnpm build:node`, `build:browser`, `build:ios`, `build:android`,
+`build:app:ios`, and `build:app:android`, or their `just` equivalents.
+`pnpm turbo` runs `scripts/turbo.mjs` to fingerprint native toolchains before
+cache lookup. Raw `pnpm exec turbo run` bypasses that fingerprint and is not a
+supported build entry point. Login/link commands may use `pnpm exec turbo`.
+
+The root `turbo.json` owns task dependencies, inputs, and artifact outputs.
+Do not cache `node_modules`, Cargo target directories, Gradle working directories,
+or Xcode DerivedData. Cache the finished libraries and runnable app instead.
+The uncached Node link task recreates local module links after cache restoration.
+`pnpm clean` removes outputs; `pnpm clean:all` also removes the local cache.

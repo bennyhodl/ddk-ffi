@@ -116,7 +116,7 @@ packages/react-native/cpp/UniffiCallInvoker.h
 # Build outputs
 packages/react-native/lib/
 
-# Rust source copy for npm package (created during release)
+# Legacy Rust source copy from the former source-build package
 packages/react-native/ddk-ffi/
 
 # ====================
@@ -150,9 +150,6 @@ packages/node-browser/browser/generated/*.wasm
 .bundle/
 vendor/
 
-# Turborepo
-.turbo/
-
 # Expo
 .expo/
 web-build/
@@ -166,3 +163,6 @@ buck-out/
 **/fastlane/Preview.html
 **/fastlane/screenshots
 **/fastlane/test_output
+# Turborepo cache, logs, and local remote-cache association
+.turbo/
+.vercel/

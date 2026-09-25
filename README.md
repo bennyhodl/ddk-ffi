@@ -544,11 +544,11 @@ cannot drift — from the crate or from each other.
 
 That leaves one thing worth checking rather than three:
 
-1. CI regenerates `packages/node-browser/src/*/generated` and fails if it differs from what is committed
+1. CI regenerates `packages/node-browser/{node,browser}/generated` and fails if it differs from what is committed
 2. `packages/react-native/src/__tests__/contractBindings.test.js` checks that the generated JSI
    surface is complete — every function, record, and constructor present in both
    the TypeScript and the native symbol layer
-4. `tests/conformance/contract.spec.ts` drives the full lifecycle end to end,
+3. `tests/conformance/contract.spec.ts` drives the full lifecycle end to end,
    including a splice rollover and the failure modes — against N-API and wasm
 
 ## 🛠️ Development
@@ -559,8 +559,8 @@ That leaves one thing worth checking rather than three:
 - Node.js 20+
 - pnpm
 - Just (`cargo install just`)
-- `uniffi-bindgen-react-native` installed globally, at the version pinned in
-  `packages/react-native/package.json` (see [CLAUDE.md](./CLAUDE.md) on version lockstep)
+- Android: `cargo install cargo-ndk --locked` and NDK 27.1.12297006
+- The binding generator is installed by `pnpm install` at the root lockfile version.
 
 ### Project Structure
 
@@ -647,3 +647,70 @@ Contributions welcome! Please ensure:
 ---
 
 Built with ❤️ using [dlcdevkit](https://github.com/bennyhodl/dlcdevkit)
+
+### Turborepo builds and remote cache
+
+Run `pnpm install --frozen-lockfile` at the repository root. One pnpm workspace
+owns both packages, all examples, and the compatibility tests. Package scripts
+still own their toolchains; Turbo schedules them and caches their outputs.
+
+```sh
+pnpm build:node          # Native Node library, generated TS, and local link
+pnpm build:browser       # WASM and generated browser bindings
+pnpm build:ios           # iOS XCFramework and React Native bindings
+pnpm build:android       # Android JNI libraries and React Native bindings
+pnpm build:app:ios       # Bindings, then a Release simulator app
+pnpm build:app:android   # Bindings, then a Release APK
+pnpm check
+pnpm format
+```
+
+Use `pnpm turbo`, which fingerprints the installed Rust, Node, C compiler,
+Xcode/SDK, Java, and NDK toolchains before calling Turbo. Native caches are
+separate for different hosts and toolchains. Build inputs include the Rust
+sources, Cargo lockfile, binding configuration, and the workspace lockfile.
+Changes confined to the example do not invalidate the native binding task.
+Checks and formatting always execute. Device tests continue to run against the
+built apps, including apps restored from cache.
+
+The first binding generation also compiles the workspace's pinned UniFFI CLI.
+Cargo, Xcode, and Gradle retain their incremental caches for builds that miss
+Turbo's artifact cache. Turbo stores the finished libraries/apps, not entire
+compiler working directories.
+
+#### Try a fresh build and a cache hit
+
+```sh
+pnpm clean:all
+pnpm build:node           # May restore from Vercel if a matching build exists
+pnpm build:node           # Look for "cache hit" and the Cached task count
+pnpm clean               # Remove outputs but keep local/remote Turbo caches
+pnpm build:node           # Restore the library without compiling it
+just example node
+```
+
+For a guaranteed fresh compile even when Vercel has the artifacts:
+
+```sh
+pnpm clean:all
+pnpm turbo run link:node --filter=@bennyblader/ddk --force
+pnpm build:node
+```
+
+`pnpm clean` removes repository build outputs and compiler working directories.
+`pnpm clean:all` also clears the local Turbo cache. Both preserve installed
+packages, committed generated source, SDKs, and Vercel's shared cache.
+
+#### Remote caching
+
+```sh
+pnpm exec turbo login
+pnpm exec turbo link
+```
+
+Select the Vercel team that owns the cache. Each developer authenticates on their
+own machine; the local association and credentials are not committed.
+GitHub Actions uses the `TURBO_TEAM` repository variable and a Vercel OIDC
+policy restricted to this repository and `.github/workflows/ci.yml`. The workflow
+exchanges GitHub identity for a short-lived cache token. Fork PRs build without
+remote-cache credentials.

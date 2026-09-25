@@ -17,7 +17,7 @@
     "@atomicfinance/bitcoin-rpc-provider": "4.3.6",
     "@atomicfinance/client": "4.3.6",
     "@atomicfinance/types": "4.3.6",
-    "@bennyblader/ddk": "link:../../packages/node-browser",
+    "@bennyblader/ddk": "workspace:*",
     "@node-dlc/bitcoin": "1.2.1",
     "@node-dlc/messaging": "1.2.1",
     "@noble/curves": "^1.6.0",
@@ -31,6 +31,5 @@
     "tsx": "^4.20.0",
     "typescript": "^5.8.3",
     "vitest": "^3.2.4"
-  },
-  "packageManager": "pnpm@10.14.0"
+  }
 }

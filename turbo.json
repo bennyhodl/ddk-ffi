@@ -1,0 +1,197 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "globalDependencies": ["scripts/turbo.mjs", ".cargo/**"],
+  "globalEnv": [
+    "DDK_TOOLCHAIN",
+    "RUSTFLAGS",
+    "CARGO_ENCODED_RUSTFLAGS",
+    "CC",
+    "CXX",
+    "AR",
+    "CFLAGS",
+    "CXXFLAGS",
+    "WASM_CC",
+    "WASM_AR",
+    "SDKROOT",
+    "MACOSX_DEPLOYMENT_TARGET",
+    "IPHONEOS_DEPLOYMENT_TARGET",
+    "RCT_NEW_ARCH_ENABLED",
+    "USE_FRAMEWORKS",
+    "ORG_GRADLE_PROJECT_*"
+  ],
+  "globalPassThroughEnv": [
+    "ANDROID_HOME",
+    "ANDROID_SDK_ROOT",
+    "ANDROID_NDK_HOME",
+    "JAVA_HOME",
+    "DEVELOPER_DIR",
+    "CARGO_HOME",
+    "RUSTUP_HOME",
+    "PNPM_HOME",
+    "CI",
+    "GITHUB_ACTIONS"
+  ],
+  "tasks": {
+    "@bennyblader/ddk#build:node": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "!node/generated/**",
+        "!browser/**",
+        "$TURBO_ROOT$/ffi/src/**",
+        "$TURBO_ROOT$/ffi/Cargo.toml",
+        "$TURBO_ROOT$/ffi/Cargo.lock",
+        "$TURBO_ROOT$/ffi/uniffi.toml"
+      ],
+      "outputs": ["dist/node/**", "platform/**", "node/generated/**"]
+    },
+    "@bennyblader/ddk#generate:debug": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "!node/generated/**",
+        "!browser/**",
+        "$TURBO_ROOT$/ffi/src/**",
+        "$TURBO_ROOT$/ffi/Cargo.toml",
+        "$TURBO_ROOT$/ffi/Cargo.lock",
+        "$TURBO_ROOT$/ffi/uniffi.toml"
+      ],
+      "outputs": ["dist/node/**", "platform/**", "node/generated/**"]
+    },
+    "@bennyblader/ddk#link:node": {
+      "dependsOn": ["build:node"],
+      "cache": false
+    },
+    "@bennyblader/ddk#build:browser": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "!browser/generated/**",
+        "!node/**",
+        "$TURBO_ROOT$/ffi/src/**",
+        "$TURBO_ROOT$/ffi/Cargo.toml",
+        "$TURBO_ROOT$/ffi/Cargo.lock",
+        "$TURBO_ROOT$/ffi/uniffi.toml"
+      ],
+      "outputs": ["dist/wasm/**", "browser/generated/**"]
+    },
+    "@bennyblader/ddk#build:wasm:debug": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "!browser/generated/**",
+        "!node/**",
+        "$TURBO_ROOT$/ffi/src/**",
+        "$TURBO_ROOT$/ffi/Cargo.toml",
+        "$TURBO_ROOT$/ffi/Cargo.lock",
+        "$TURBO_ROOT$/ffi/uniffi.toml"
+      ],
+      "outputs": ["dist/wasm/**", "browser/generated/**"]
+    },
+    "@bennyblader/ddk-rn#build:ios": {
+      "inputs": [
+        "package.json",
+        "ubrn.config.yaml",
+        "justfile",
+        "scripts/**",
+        "$TURBO_ROOT$/ffi/src/**",
+        "$TURBO_ROOT$/ffi/Cargo.toml",
+        "$TURBO_ROOT$/ffi/Cargo.lock",
+        "$TURBO_ROOT$/ffi/uniffi.toml"
+      ],
+      "outputs": [
+        "ios/DdkRn.xcframework/**",
+        "ios/DdkRn.h",
+        "ios/DdkRn.mm",
+        "src/generated/**",
+        "cpp/**"
+      ]
+    },
+    "@bennyblader/ddk-rn#build:android": {
+      "inputs": [
+        "package.json",
+        "ubrn.config.yaml",
+        "justfile",
+        "scripts/**",
+        "$TURBO_ROOT$/ffi/src/**",
+        "$TURBO_ROOT$/ffi/Cargo.toml",
+        "$TURBO_ROOT$/ffi/Cargo.lock",
+        "$TURBO_ROOT$/ffi/uniffi.toml"
+      ],
+      "outputs": [
+        "android/src/main/jniLibs/**",
+        "android/src/main/java/**",
+        "android/build.gradle",
+        "android/CMakeLists.txt",
+        "android/cpp-adapter.cpp",
+        "src/generated/**",
+        "cpp/**"
+      ]
+    },
+    "@bennyblader/ddk-rn#build": {
+      "outputs": ["lib/**"]
+    },
+    "ddk-example#build": {
+      "dependsOn": ["@bennyblader/ddk#link:node"],
+      "outputs": ["dist/**"]
+    },
+    "ddk-example-browser#build": {
+      "dependsOn": ["@bennyblader/ddk#build:browser"],
+      "outputs": ["dist/**"]
+    },
+    "ddk-rn-example#build:ios": {
+      "dependsOn": ["@bennyblader/ddk-rn#build:ios"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "!android/**",
+        "$TURBO_ROOT$/packages/react-native/src/index.tsx",
+        "$TURBO_ROOT$/packages/react-native/DdkRn.podspec"
+      ],
+      "outputs": [
+        "ios/build/Build/Products/Release-iphonesimulator/DdkRnExample.app/**"
+      ]
+    },
+    "ddk-rn-example#build:android": {
+      "dependsOn": ["@bennyblader/ddk-rn#build:android"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "!ios/**",
+        "$TURBO_ROOT$/packages/react-native/android/**",
+        "!$TURBO_ROOT$/packages/react-native/android/build/**",
+        "!$TURBO_ROOT$/packages/react-native/android/.cxx/**",
+        "!$TURBO_ROOT$/packages/react-native/android/.gradle/**",
+        "!$TURBO_ROOT$/packages/react-native/android/src/main/jniLibs/**",
+        "$TURBO_ROOT$/packages/react-native/src/index.tsx",
+        "!$TURBO_ROOT$/packages/react-native/android/build.gradle",
+        "!$TURBO_ROOT$/packages/react-native/android/CMakeLists.txt",
+        "!$TURBO_ROOT$/packages/react-native/android/cpp-adapter.cpp",
+        "!$TURBO_ROOT$/packages/react-native/android/src/main/java/**"
+      ],
+      "outputs": ["android/app/build/outputs/apk/release/**"]
+    },
+    "//#check:rust": {
+      "cache": false
+    },
+    "check": {
+      "cache": false
+    },
+    "@bennyblader/ddk#check": {
+      "dependsOn": ["build:node", "build:browser"],
+      "cache": false
+    },
+    "@bennyblader/ddk-rn#check": {
+      "dependsOn": ["build"],
+      "cache": false
+    },
+    "ddk-example#check": {
+      "dependsOn": ["@bennyblader/ddk#build:node"],
+      "cache": false
+    },
+    "ddk-rn-example#check": {
+      "dependsOn": ["@bennyblader/ddk-rn#build"],
+      "cache": false
+    },
+    "format": {
+      "cache": false
+    },
+    "//#check:root": {
+      "cache": false
+    }
+  }
+}

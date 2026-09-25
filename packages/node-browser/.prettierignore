@@ -13,4 +13,5 @@ platform
 ../../examples/browser/dist
 
 # Lockfile: pnpm owns the formatting.
-pnpm-lock.yaml
+
+.turbo/

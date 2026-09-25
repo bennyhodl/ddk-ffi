@@ -1,0 +1,12 @@
+packages:
+  - packages/*
+  - examples/*
+  - tests/*
+
+patchedDependencies:
+  '@bennyblader/ddk-ts@0.3.42': tests/compatibility/patches/@bennyblader__ddk-ts@0.3.42.patch
+onlyBuiltDependencies:
+  - es5-ext
+  - esbuild
+  - secp256k1
+  - tiny-secp256k1
