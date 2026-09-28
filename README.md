@@ -200,9 +200,9 @@ const psbt = signFundingPsbtWithDescriptor(
 );
 
 // 4. Sign
-const signed = signAccept(offer, accepted.accept, offererKeys, psbt, []);
+const signed = signAccept(offer, accepted.accept, offererKeys, psbt);
 validateSign(offer, accepted.accept, signed.sign);
-const fundingTx = finalizeSign(offer, accepted.accept, signed.sign, psbt, acceptorKeys, []);
+const fundingTx = finalizeSign(offer, accepted.accept, signed.sign, psbt, acceptorKeys);
 
 const contractId = computeContractId(offer, accepted.accept); // the funded contract's id
 

@@ -104,8 +104,8 @@ function runFullFlow() {
   const signedPsbt = ddk.signFundingPsbtWithDescriptor(offer, accept, fundingPsbt, OFFERER_DESCRIPTOR, [
     { inputSerialId: FUNDING_SERIAL, derivationIndex: 0 },
   ])
-  const signResult = ddk.signAccept(offer, accept, offererKeys, signedPsbt, [])
-  const fundingTx = ddk.finalizeSign(offer, accept, signResult.sign, fundingPsbt, acceptorKeys, [])
+  const signResult = ddk.signAccept(offer, accept, offererKeys, signedPsbt)
+  const fundingTx = ddk.finalizeSign(offer, accept, signResult.sign, fundingPsbt, acceptorKeys)
 
   return {
     offererKeys,
@@ -572,7 +572,7 @@ describe('splicing', () => {
   test('a splice cannot be signed without the spliced contract', () => {
     const psbt = ddk.createFundingPsbt(splice.offerB, splice.acceptB)
     try {
-      ddk.signAccept(splice.offerB, splice.acceptB, flow.offererKeys, psbt, [])
+      ddk.signAccept(splice.offerB, splice.acceptB, flow.offererKeys, psbt)
       throw new Error('should have thrown')
     } catch (e) {
       expect((e as { tag?: string }).tag).toBe('InvalidFundingInput')

@@ -1099,7 +1099,7 @@ export function extractEcdsaSignatureFromOracleSignatures(
  *
  * `keys` and `spliced_contracts` are only used when the offer carries splice
  * (DLC) funding inputs: this party's half of each previous contract's 2-of-2
- * is derived from them, as in [`sign_accept`]. Pass an empty list otherwise.
+ * is derived from them, as in [`sign_accept`]. Omit it otherwise.
  */
 export function finalizeSign(
   offer: Uint8Array,
@@ -1107,7 +1107,7 @@ export function finalizeSign(
   sign: Uint8Array,
   signedFundingPsbt: Uint8Array,
   keys: ContractKeyProviderLike,
-  splicedContracts: Array<SplicedContract>
+  splicedContracts: Array<SplicedContract> = []
 ): Uint8Array /*throws*/ {
   const __rb: Uint8Array = uniffiCaller.rustCallWithError(
     /*liftError:*/ FfiConverterTypeContractError.lift.bind(
@@ -1156,7 +1156,7 @@ export function finalizeSignWithSignatures(
   accept: Uint8Array,
   sign: Uint8Array,
   signedFundingPsbt: Uint8Array,
-  dlcInputSignatures: Array<DlcInputSignature>
+  dlcInputSignatures: Array<DlcInputSignature> = []
 ): Uint8Array /*throws*/ {
   const __rb: Uint8Array = uniffiCaller.rustCallWithError(
     /*liftError:*/ FfiConverterTypeContractError.lift.bind(
@@ -1326,14 +1326,14 @@ export function getXpubFromXpriv(
  *
  * When the offer carries splice (DLC) funding inputs, this party also signs
  * its half of each previous contract's 2-of-2; `spliced_contracts` names those
- * contracts (see [`SplicedContract`]). Pass an empty list otherwise.
+ * contracts (see [`SplicedContract`]). Omit it otherwise.
  */
 export function signAccept(
   offer: Uint8Array,
   accept: Uint8Array,
   keys: ContractKeyProviderLike,
   signedFundingPsbt: Uint8Array,
-  splicedContracts: Array<SplicedContract>
+  splicedContracts: Array<SplicedContract> = []
 ): SignResult /*throws*/ {
   const __rb: Uint8Array = uniffiCaller.rustCallWithError(
     /*liftError:*/ FfiConverterTypeContractError.lift.bind(
@@ -1400,14 +1400,14 @@ export function signAcceptRequest(
  *
  * `signed_funding_psbt` carries finalized witnesses for the offering party's
  * wallet inputs, as for `sign_accept`. `dlc_input_signatures` carries this
- * party's half of each splice input; pass an empty list otherwise.
+ * party's half of each splice input; omit it otherwise.
  */
 export function signAcceptWithSignatures(
   offer: Uint8Array,
   accept: Uint8Array,
   signatures: ContractSignatures,
   signedFundingPsbt: Uint8Array,
-  dlcInputSignatures: Array<DlcInputSignature>
+  dlcInputSignatures: Array<DlcInputSignature> = []
 ): SignResult /*throws*/ {
   const __rb: Uint8Array = uniffiCaller.rustCallWithError(
     /*liftError:*/ FfiConverterTypeContractError.lift.bind(
@@ -6168,7 +6168,7 @@ function uniffiEnsureInitialized() {
     );
   }
   if (
-    nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_finalize_sign() !== 42102
+    nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_finalize_sign() !== 15138
   ) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       'uniffi_ddk_ffi_checksum_func_finalize_sign'
@@ -6176,7 +6176,7 @@ function uniffiEnsureInitialized() {
   }
   if (
     nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_finalize_sign_with_signatures() !==
-    6383
+    49937
   ) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       'uniffi_ddk_ffi_checksum_func_finalize_sign_with_signatures'
@@ -6214,7 +6214,7 @@ function uniffiEnsureInitialized() {
     );
   }
   if (
-    nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_sign_accept() !== 26774
+    nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_sign_accept() !== 44481
   ) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       'uniffi_ddk_ffi_checksum_func_sign_accept'
@@ -6230,7 +6230,7 @@ function uniffiEnsureInitialized() {
   }
   if (
     nativeModule().ubrn_uniffi_ddk_ffi_checksum_func_sign_accept_with_signatures() !==
-    17014
+    42228
   ) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       'uniffi_ddk_ffi_checksum_func_sign_accept_with_signatures'

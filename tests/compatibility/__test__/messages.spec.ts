@@ -53,9 +53,9 @@ function runOfflineFlow(scenario = upDownScenario()) {
   const accept = acceptResult.accept
 
   const offererSignedPsbt = offerer.signFundingPsbt(offer, accept, acceptResult.fundingPsbt, [offererInput])
-  const signResult = ddk.signAccept(offer, accept, offerer.keys, offererSignedPsbt, [])
+  const signResult = ddk.signAccept(offer, accept, offerer.keys, offererSignedPsbt)
   const acceptorSignedPsbt = acceptor.signFundingPsbt(offer, accept, acceptResult.fundingPsbt, [acceptorInput])
-  const fundingTx = ddk.finalizeSign(offer, accept, signResult.sign, acceptorSignedPsbt, acceptor.keys, [])
+  const fundingTx = ddk.finalizeSign(offer, accept, signResult.sign, acceptorSignedPsbt, acceptor.keys)
 
   return { scenario, offer, accept, acceptResult, sign: signResult.sign, signResult, fundingTx }
 }

@@ -139,8 +139,8 @@ pub fn sign_accept_request(
 ///
 /// `signed_funding_psbt` carries finalized witnesses for the offering party's
 /// wallet inputs, as for `sign_accept`. `dlc_input_signatures` carries this
-/// party's half of each splice input; pass an empty list otherwise.
-#[uniffi::export]
+/// party's half of each splice input; omit it otherwise.
+#[uniffi::export(default(dlc_input_signatures))]
 pub fn sign_accept_with_signatures(
     offer: Vec<u8>,
     accept: Vec<u8>,
@@ -209,7 +209,7 @@ pub fn sign_accept_with_signatures(
 ///
 /// `signed_funding_psbt` carries finalized witnesses for the accepting party's
 /// wallet inputs; with none, the unsigned funding PSBT is enough.
-#[uniffi::export]
+#[uniffi::export(default(dlc_input_signatures))]
 pub fn finalize_sign_with_signatures(
     offer: Vec<u8>,
     accept: Vec<u8>,

@@ -308,7 +308,7 @@ export default function App() {
       );
 
       // 5) Offerer produces the sign message.
-      const signResult = signAccept(offer, accept, offererKeys, signedPsbt, []);
+      const signResult = signAccept(offer, accept, offererKeys, signedPsbt);
 
       // The acceptor independently validates the sign before finalizing.
       validateSign(offer, accept, signResult.sign);
@@ -332,8 +332,7 @@ export default function App() {
         accept,
         signResult.sign,
         fundingPsbt,
-        acceptorKeys,
-        []
+        acceptorKeys
       );
 
       setResult({

@@ -128,12 +128,12 @@ const signedPsbt = signFundingPsbtWithDescriptor(offer, accept, fundingPsbt, OFF
 ])
 console.log(`✅ signFundingPsbtWithDescriptor -> signed PSBT (${signedPsbt.length} bytes)`)
 
-const signResult = signAccept(offer, accept, offererKeys, signedPsbt, [])
+const signResult = signAccept(offer, accept, offererKeys, signedPsbt)
 console.log(`✅ signAccept   -> SignDlc (${signResult.sign.length} bytes)`)
 validateSign(offer, accept, signResult.sign)
 console.log('✅ validateSign passed')
 
-const fundingTx = finalizeSign(offer, accept, signResult.sign, fundingPsbt, acceptorKeys, [])
+const fundingTx = finalizeSign(offer, accept, signResult.sign, fundingPsbt, acceptorKeys)
 console.log(`✅ finalizeSign -> signed funding transaction (${fundingTx.length} bytes)`)
 
 // 5) Inspect: contract id + the payout table for display.
