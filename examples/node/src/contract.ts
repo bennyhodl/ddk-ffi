@@ -12,6 +12,7 @@
  */
 import {
   ContractKeyProvider,
+  Party,
   chainHashFromNetwork,
   fundingInput,
   createOffer,
@@ -112,7 +113,6 @@ const acceptResult = acceptOffer(
     nowUnix: 100n,
   },
   acceptorKeys,
-  acceptTempId,
 )
 console.log(`✅ acceptOffer  -> AcceptDlc (${acceptResult.accept.length} bytes)`)
 validateAccept(offer, acceptResult.accept)
@@ -152,12 +152,12 @@ for (const row of payouts.rows) {
 //    offer's cetLocktime and the refund its refundLocktime, and deciding which
 //    path to take is the caller's policy.
 console.log('')
-const cet = signContractCet(offer, accept, signResult.sign, offererKeys, offerTempId, [
+const cet = signContractCet(offer, accept, signResult.sign, offererKeys, Party.Offer, [
   { oracleIndex: 0, attestation: Buffer.from(ATTESTATION_UP_HEX, 'hex') },
 ])
 console.log(`✅ signContractCet    -> CET for the attested "up" (${cet.length} bytes), signed by the offerer`)
 
-const refund = signContractRefund(offer, accept, signResult.sign, acceptorKeys, acceptTempId)
+const refund = signContractRefund(offer, accept, signResult.sign, acceptorKeys, Party.Accept)
 console.log(`✅ signContractRefund -> refund transaction (${refund.length} bytes), signed by the acceptor`)
 
 console.log('\n✅ Stateless contract API works in Node — offer to settlement.')

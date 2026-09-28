@@ -134,7 +134,11 @@ export function buildOffer(ddk: any, vectors: CompatVectors): Uint8Array {
 }
 
 /** Accepts contract 1's offer (fresh adaptor signatures — not reproducible). */
-export function buildAccept(ddk: any, vectors: CompatVectors, offer: Uint8Array): { accept: Uint8Array; fundingPsbt: Uint8Array } {
+export function buildAccept(
+  ddk: any,
+  vectors: CompatVectors,
+  offer: Uint8Array,
+): { accept: Uint8Array; fundingPsbt: Uint8Array } {
   const { acceptor, contract } = vectors
   const acceptorKeys = ddk.ContractKeyProvider.fromDescriptor(acceptor.descriptor)
   const acceptTempId = fromHexString(contract.acceptTempIdHex)
@@ -162,13 +166,18 @@ export function buildAccept(ddk: any, vectors: CompatVectors, offer: Uint8Array)
       nowUnix: BigInt(contract.nowUnix),
     },
     acceptorKeys,
-    acceptTempId,
   )
   return { accept: result.accept, fundingPsbt: result.fundingPsbt }
 }
 
 /** Builds contract 2's (splice successor) offer — fully deterministic. */
-export function buildSpliceOffer(ddk: any, vectors: CompatVectors, offer: Uint8Array, accept: Uint8Array, sign: Uint8Array): { spliceInput: Uint8Array; offer2: Uint8Array } {
+export function buildSpliceOffer(
+  ddk: any,
+  vectors: CompatVectors,
+  offer: Uint8Array,
+  accept: Uint8Array,
+  sign: Uint8Array,
+): { spliceInput: Uint8Array; offer2: Uint8Array } {
   const { offerer, contract, splice } = vectors
   const offererKeys = ddk.ContractKeyProvider.fromDescriptor(offerer.descriptor)
   const offer2TempId = fromHexString(splice.offerTempIdHex)
@@ -196,7 +205,11 @@ export function buildSpliceOffer(ddk: any, vectors: CompatVectors, offer: Uint8A
 }
 
 /** Accepts contract 2 (single-funded; fresh adaptor signatures). */
-export function buildSpliceAccept(ddk: any, vectors: CompatVectors, offer2: Uint8Array): { accept2: Uint8Array; fundingPsbt2: Uint8Array } {
+export function buildSpliceAccept(
+  ddk: any,
+  vectors: CompatVectors,
+  offer2: Uint8Array,
+): { accept2: Uint8Array; fundingPsbt2: Uint8Array } {
   const { acceptor, contract, splice } = vectors
   const acceptorKeys = ddk.ContractKeyProvider.fromDescriptor(acceptor.descriptor)
   const accept2TempId = fromHexString(splice.acceptTempIdHex)
@@ -216,7 +229,6 @@ export function buildSpliceAccept(ddk: any, vectors: CompatVectors, offer2: Uint
       nowUnix: BigInt(contract.nowUnix),
     },
     acceptorKeys,
-    accept2TempId,
   )
   return { accept2: result.accept, fundingPsbt2: result.fundingPsbt }
 }
@@ -235,6 +247,12 @@ export function runDdkReplay(ddk: any, vectors: CompatVectors): Record<string, s
   const offerTempId = fromHexString(contract.offerTempIdHex)
   const acceptTempId = fromHexString(contract.acceptTempIdHex)
 
+  // Restore the deterministic keys used by this committed current-scheme fixture.
+  offererKeys.fundingPubkey(offerTempId)
+  acceptorKeys.fundingPubkey(acceptTempId)
+  offererKeys.fundingPubkey(fromHexString(splice.offerTempIdHex))
+  acceptorKeys.fundingPubkey(fromHexString(splice.acceptTempIdHex))
+
   // --- contract 1: the offer must reproduce byte-exactly ---
   out.offerHex = toHexString(buildOffer(ddk, vectors))
 
@@ -251,25 +269,33 @@ export function runDdkReplay(ddk: any, vectors: CompatVectors): Record<string, s
   const fresh = buildAccept(ddk, vectors, offer)
   ddk.validateAccept(offer, fresh.accept)
   out.freshAcceptPsbtHex = toHexString(fresh.fundingPsbt)
-  const freshSignedPsbt = ddk.signFundingPsbtWithDescriptor(offer, fresh.accept, fresh.fundingPsbt, offerer.descriptor, [
-    { inputSerialId: BigInt(offerer.fundingSerialId), derivationIndex: offerer.derivationIndex },
-  ])
+  const freshSignedPsbt = ddk.signFundingPsbtWithDescriptor(
+    offer,
+    fresh.accept,
+    fresh.fundingPsbt,
+    offerer.descriptor,
+    [{ inputSerialId: BigInt(offerer.fundingSerialId), derivationIndex: offerer.derivationIndex }],
+  )
   const freshSign = ddk.signAccept(offer, fresh.accept, offererKeys, freshSignedPsbt)
   ddk.validateSign(offer, fresh.accept, freshSign.sign)
 
   // --- deterministic derivations from the committed transcript ---
   out.fundingPsbtHex = toHexString(ddk.createFundingPsbt(offer, accept))
-  const acceptorSignedPsbt = ddk.signFundingPsbtWithDescriptor(offer, accept, fromHexString(out.fundingPsbtHex), acceptor.descriptor, [
-    { inputSerialId: BigInt(acceptor.fundingSerialId), derivationIndex: acceptor.derivationIndex },
-  ])
+  const acceptorSignedPsbt = ddk.signFundingPsbtWithDescriptor(
+    offer,
+    accept,
+    fromHexString(out.fundingPsbtHex),
+    acceptor.descriptor,
+    [{ inputSerialId: BigInt(acceptor.fundingSerialId), derivationIndex: acceptor.derivationIndex }],
+  )
   out.fundingTxHex = toHexString(ddk.finalizeSign(offer, accept, sign, acceptorSignedPsbt, acceptorKeys))
   out.contractIdHex = toHexString(ddk.computeContractId(offer, accept))
   out.cetHex = toHexString(
-    ddk.signContractCet(offer, accept, sign, offererKeys, offerTempId, [
+    ddk.signContractCet(offer, accept, sign, offererKeys, ddk.Party.Offer, [
       { oracleIndex: 0, attestation: fromHexString(contract.attestationHex) },
     ]),
   )
-  out.refundHex = toHexString(ddk.signContractRefund(offer, accept, sign, acceptorKeys, acceptTempId))
+  out.refundHex = toHexString(ddk.signContractRefund(offer, accept, sign, acceptorKeys, ddk.Party.Accept))
 
   // --- contract 2: splice successor ---
   const { spliceInput, offer2 } = buildSpliceOffer(ddk, vectors, offer, accept, sign)
@@ -285,21 +311,16 @@ export function runDdkReplay(ddk: any, vectors: CompatVectors): Record<string, s
 
   const fresh2 = buildSpliceAccept(ddk, vectors, offer2Committed)
   ddk.validateAccept(offer2Committed, fresh2.accept2)
-  const contractId1 = ddk.computeContractId(offer, accept)
-  const freshSign2 = ddk.signAccept(offer2Committed, fresh2.accept2, offererKeys, fresh2.fundingPsbt2, [
-    { contractId: contractId1, temporaryContractId: offerTempId },
-  ])
+  const freshSign2 = ddk.signAccept(offer2Committed, fresh2.accept2, offererKeys, fresh2.fundingPsbt2)
   ddk.validateSign(offer2Committed, fresh2.accept2, freshSign2.sign)
 
   out.fundingPsbt2Hex = toHexString(ddk.createFundingPsbt(offer2Committed, accept2))
   out.fundingTx2Hex = toHexString(
-    ddk.finalizeSign(offer2Committed, accept2, sign2, fromHexString(out.fundingPsbt2Hex), acceptorKeys, [
-      { contractId: contractId1, temporaryContractId: acceptTempId },
-    ]),
+    ddk.finalizeSign(offer2Committed, accept2, sign2, fromHexString(out.fundingPsbt2Hex), acceptorKeys),
   )
   out.contractId2Hex = toHexString(ddk.computeContractId(offer2Committed, accept2))
   out.cet2Hex = toHexString(
-    ddk.signContractCet(offer2Committed, accept2, sign2, acceptorKeys, fromHexString(splice.acceptTempIdHex), [
+    ddk.signContractCet(offer2Committed, accept2, sign2, acceptorKeys, ddk.Party.Accept, [
       { oracleIndex: 0, attestation: fromHexString(splice.attestationHex) },
     ]),
   )
