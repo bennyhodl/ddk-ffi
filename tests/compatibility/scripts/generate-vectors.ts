@@ -104,7 +104,7 @@ const vectors: CompatVectors = {
   const signedPsbt = ddk.signFundingPsbtWithDescriptor(offer, accept, fundingPsbt, offerer.descriptor, [
     { inputSerialId: 100n, derivationIndex: 0 },
   ])
-  const sign = ddk.signAccept(offer, accept, offererKeys, signedPsbt, []).sign
+  const sign = ddk.signAccept(offer, accept, offererKeys, signedPsbt).sign
 
   const { offer2 } = buildSpliceOffer(ddk, vectors, offer, accept, sign)
   const { accept2, fundingPsbt2 } = buildSpliceAccept(ddk, vectors, offer2)

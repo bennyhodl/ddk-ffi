@@ -878,8 +878,8 @@ pub fn dlc_transactions_from_signed_messages(
 ///
 /// When the offer carries splice (DLC) funding inputs, this party also signs
 /// its half of each previous contract's 2-of-2; `spliced_contracts` names those
-/// contracts (see [`SplicedContract`]). Pass an empty list otherwise.
-#[uniffi::export]
+/// contracts (see [`SplicedContract`]). Omit it otherwise.
+#[uniffi::export(default(spliced_contracts))]
 pub fn sign_accept(
     offer: Vec<u8>,
     accept: Vec<u8>,
@@ -908,8 +908,8 @@ pub fn sign_accept(
 ///
 /// `keys` and `spliced_contracts` are only used when the offer carries splice
 /// (DLC) funding inputs: this party's half of each previous contract's 2-of-2
-/// is derived from them, as in [`sign_accept`]. Pass an empty list otherwise.
-#[uniffi::export]
+/// is derived from them, as in [`sign_accept`]. Omit it otherwise.
+#[uniffi::export(default(spliced_contracts))]
 pub fn finalize_sign(
     offer: Vec<u8>,
     accept: Vec<u8>,

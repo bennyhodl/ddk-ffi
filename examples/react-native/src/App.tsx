@@ -240,7 +240,7 @@ export default function App() {
         OFFERER_DESCRIPTOR,
         [{ inputSerialId: FUNDING_INPUT_SERIAL_ID, derivationIndex: 0 }]
       );
-      const signResult = signAccept(offer, accept, offererKeys, signedPsbt, []);
+      const signResult = signAccept(offer, accept, offererKeys, signedPsbt);
       validateSign(offer, accept, signResult.sign);
 
       // 4) Inspect: contract id + payout table.
@@ -258,8 +258,7 @@ export default function App() {
         accept,
         signResult.sign,
         fundingPsbt,
-        acceptorKeys,
-        []
+        acceptorKeys
       );
 
       // 6) Settle. Both paths are rebuilt from the three wire messages alone —

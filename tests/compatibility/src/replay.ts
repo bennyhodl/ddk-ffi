@@ -254,7 +254,7 @@ export function runDdkReplay(ddk: any, vectors: CompatVectors): Record<string, s
   const freshSignedPsbt = ddk.signFundingPsbtWithDescriptor(offer, fresh.accept, fresh.fundingPsbt, offerer.descriptor, [
     { inputSerialId: BigInt(offerer.fundingSerialId), derivationIndex: offerer.derivationIndex },
   ])
-  const freshSign = ddk.signAccept(offer, fresh.accept, offererKeys, freshSignedPsbt, [])
+  const freshSign = ddk.signAccept(offer, fresh.accept, offererKeys, freshSignedPsbt)
   ddk.validateSign(offer, fresh.accept, freshSign.sign)
 
   // --- deterministic derivations from the committed transcript ---
@@ -262,7 +262,7 @@ export function runDdkReplay(ddk: any, vectors: CompatVectors): Record<string, s
   const acceptorSignedPsbt = ddk.signFundingPsbtWithDescriptor(offer, accept, fromHexString(out.fundingPsbtHex), acceptor.descriptor, [
     { inputSerialId: BigInt(acceptor.fundingSerialId), derivationIndex: acceptor.derivationIndex },
   ])
-  out.fundingTxHex = toHexString(ddk.finalizeSign(offer, accept, sign, acceptorSignedPsbt, acceptorKeys, []))
+  out.fundingTxHex = toHexString(ddk.finalizeSign(offer, accept, sign, acceptorSignedPsbt, acceptorKeys))
   out.contractIdHex = toHexString(ddk.computeContractId(offer, accept))
   out.cetHex = toHexString(
     ddk.signContractCet(offer, accept, sign, offererKeys, offerTempId, [
