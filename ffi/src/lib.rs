@@ -9,7 +9,7 @@ use bitcoin::bip32::{IntoDerivationPath, Xpriv, Xpub};
 use bitcoin::hashes::Hash;
 use bitcoin::sighash::EcdsaSighashType;
 use bitcoin::{
-    Amount, Network, OutPoint, Psbt, ScriptBuf, Sequence, Transaction as BtcTransaction, TxIn,
+    Amount, Network, OutPoint, ScriptBuf, Sequence, Transaction as BtcTransaction, TxIn,
     TxOut as BtcTxOut, Txid, Witness,
 };
 use bitcoin::{Script, WPubkeyHash};
@@ -452,36 +452,39 @@ impl Transaction {
 
         let dlc_input = dlc_input_info_to_rust(&dlc_input)?;
 
+        // `fund_vout` indexes the previous funding transaction's outputs; the
+        // input that spends it can sit at any position in this one.
+        let spent = OutPoint::new(dlc_input.fund_tx.compute_txid(), dlc_input.fund_vout);
+        let input_index = btc_tx
+            .input
+            .iter()
+            .position(|input| input.previous_output == spent)
+            .ok_or_else(|| DLCError::InvalidArgument {
+                message: format!("transaction does not spend the DLC input {spent}"),
+            })?;
+
         let signature = ddk_dlc::dlc_input::create_dlc_funding_input_signature(
             secp,
             &btc_tx,
-            dlc_input.fund_vout as usize,
+            input_index,
             &dlc_input,
             &sk,
         )
         .map_err(|_| DLCError::InvalidSignature)?;
 
-        let (first, second) = if local_pk < remote_pk {
-            (local_pk, remote_pk)
-        } else {
-            (remote_pk, local_pk)
-        };
-
+        // Orders the two signatures by their own pubkeys, as the 2-of-2 script does.
         let witness = ddk_dlc::dlc_input::combine_dlc_input_signatures(
             &dlc_input,
             &signature,
             &remote_signature,
-            &first,
-            &second,
+            &local_pk,
+            &remote_pk,
         );
 
-        let mut fund_psbt =
-            Psbt::from_unsigned_tx(btc_tx).map_err(|_| DLCError::InvalidTransaction)?;
-        fund_psbt.inputs[dlc_input.fund_vout as usize].final_script_witness = Some(witness);
-
-        Ok(btc_tx_to_transaction(
-            &fund_psbt.extract_tx_unchecked_fee_rate(),
-        ))
+        // Set in place: the transaction's other inputs may already be signed.
+        let mut btc_tx = btc_tx;
+        btc_tx.input[input_index].witness = witness;
+        Ok(btc_tx_to_transaction(&btc_tx))
     }
 
     /// Finalize this CET by attaching the adaptor signature decrypted with the oracle signatures.
@@ -1727,6 +1730,113 @@ mod tests {
             collateral,
             dlc_inputs: vec![],
         }
+    }
+
+    /// A splice input rarely sits at the index its previous funding output had,
+    /// the local key need not sort first in the 2-of-2 script, and the
+    /// transaction's other inputs may already be signed. All three at once.
+    #[test]
+    fn sign_multi_sig_input_signs_the_input_that_spends_the_dlc_output() {
+        let secp = Secp256k1::new();
+        let (remote_sk, remote_pk, local_sk, local_pk) = create_test_keys();
+        assert!(
+            local_pk > remote_pk,
+            "the fixture needs the local key to sort second"
+        );
+
+        // The previous contract's funding transaction: its 2-of-2 is output 1.
+        let funding_script = ddk_dlc::make_funding_redeemscript(&local_pk, &remote_pk);
+        let prev_fund_tx = BtcTransaction {
+            version: bitcoin::transaction::Version::TWO,
+            lock_time: LockTime::ZERO,
+            input: vec![],
+            output: vec![
+                BtcTxOut {
+                    value: Amount::from_sat(1_000),
+                    script_pubkey: ScriptBuf::new_op_return([]),
+                },
+                BtcTxOut {
+                    value: Amount::from_sat(100_000),
+                    script_pubkey: funding_script.to_p2wsh(),
+                },
+            ],
+        };
+        let dlc_input = DlcInputInfo {
+            fund_tx: btc_tx_to_transaction(&prev_fund_tx),
+            fund_vout: 1,
+            local_fund_pubkey: local_pk.serialize().to_vec(),
+            remote_fund_pubkey: remote_pk.serialize().to_vec(),
+            fund_amount: 100_000,
+            max_witness_len: 220,
+            input_serial_id: 7,
+            contract_id: vec![9; 32],
+        };
+
+        // The new funding transaction spends it as input 0; input 1 is a wallet
+        // input its owner has already signed.
+        let wallet_witness = Witness::from_slice(&[vec![1; 71], vec![2; 33]]);
+        let unsigned = BtcTransaction {
+            version: bitcoin::transaction::Version::TWO,
+            lock_time: LockTime::ZERO,
+            input: vec![
+                TxIn {
+                    previous_output: OutPoint::new(prev_fund_tx.compute_txid(), 1),
+                    script_sig: ScriptBuf::new(),
+                    sequence: Sequence::MAX,
+                    witness: Witness::new(),
+                },
+                TxIn {
+                    previous_output: OutPoint::new(Txid::all_zeros(), 0),
+                    script_sig: ScriptBuf::new(),
+                    sequence: Sequence::MAX,
+                    witness: Witness::new(),
+                },
+            ],
+            output: vec![BtcTxOut {
+                value: Amount::from_sat(99_000),
+                script_pubkey: funding_script.to_p2wsh(),
+            }],
+        };
+        let rust_dlc_input = dlc_input_info_to_rust(&dlc_input).unwrap();
+        let remote_signature = ddk_dlc::dlc_input::create_dlc_funding_input_signature(
+            &secp,
+            &unsigned,
+            0,
+            &rust_dlc_input,
+            &remote_sk,
+        )
+        .unwrap();
+
+        let mut partially_signed = unsigned.clone();
+        partially_signed.input[1].witness = wallet_witness.clone();
+        let signed = btc_tx_to_transaction(&partially_signed)
+            .sign_multi_sig_input(
+                dlc_input,
+                local_sk.secret_bytes().to_vec(),
+                remote_signature,
+            )
+            .unwrap();
+        let signed = transaction_to_btc_tx(&signed).unwrap();
+
+        // Script order: the remote key sorts first here, so its signature does.
+        let witness = &signed.input[0].witness;
+        assert_eq!(witness.len(), 4);
+        for (element, pubkey) in [(1, remote_pk), (2, local_pk)] {
+            ddk_dlc::dlc_input::verify_dlc_funding_input_signature(
+                &secp,
+                &unsigned,
+                0,
+                &rust_dlc_input,
+                witness.nth(element).unwrap().to_vec(),
+                &pubkey,
+            )
+            .unwrap();
+        }
+        assert_eq!(witness.nth(3).unwrap(), funding_script.as_bytes());
+        assert_eq!(
+            signed.input[1].witness, wallet_witness,
+            "the wallet input keeps its witness"
+        );
     }
 
     #[test]
