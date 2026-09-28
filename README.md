@@ -200,9 +200,9 @@ const psbt = signFundingPsbtWithDescriptor(
 );
 
 // 4. Sign
-const signed = signAccept(offer, accepted.accept, offererKeys, offerTempId, psbt);
+const signed = signAccept(offer, accepted.accept, offererKeys, psbt, []);
 validateSign(offer, accepted.accept, signed.sign);
-const fundingTx = finalizeSign(offer, accepted.accept, signed.sign, psbt);
+const fundingTx = finalizeSign(offer, accepted.accept, signed.sign, psbt, acceptorKeys, []);
 
 const contractId = computeContractId(offer, accepted.accept); // the funded contract's id
 
@@ -242,36 +242,75 @@ ContractKeyProvider.fromDescriptor(descriptor); // must carry an xprv; watch-onl
 provider.fundingPubkey(temporaryContractId); // 33-byte compressed pubkey
 ```
 
-The only thing to persist per contract is its 32-byte `temporaryContractId`. The
-provider re-derives the funding secret key from it whenever one is needed, so the
-same provider serves every contract.
+The only thing to persist per contract is your own 32-byte `temporaryContractId`.
+The provider re-derives the funding secret key from it whenever one is needed, so
+the same provider serves every contract. The offering party's is the offer's own,
+so `signAccept` reads it from the offer; the accepting party's appears in no
+message, which is why `acceptOffer` and settlement take it.
 
 ### Splicing
 
 A contract can be rolled into a new one that spends its funding output directly,
-with no on-chain settlement in between. Only the offering party contributes the
-splice input.
+with no on-chain settlement in between. A splice is an ordinary offer whose
+funding inputs include a DLC input: only the offering party contributes one, and
+it carries the previous contract's id and both of its funding pubkeys.
 
 ```typescript
 const spliceInput = createDlcSpliceInput(
   prevOffer,
   prevAccept,
   prevSign, // selects the fee rule, so contracts from before ddk-dlc 2.0.0-rc.4 splice too
-  Party.Offer,
-  200n,
-  dlcInputMaxWitnessLen() // 220 — the required max witness length for a DLC input
+  Party.Offer, // the side the new offerer was on in the previous contract
+  200n // serial id; random when omitted
 );
-// …place it in the offering party's `fundingInputs`, then use the spliced variants:
-signAcceptSpliced(offer, accept, keys, tempId, psbt, [
-  { inputSerialId: 200n, priorTemporaryContractId: prevTempId },
+// …place it in the offering party's `fundingInputs` and create the offer as usual.
+
+// Signing needs each party's own temporary id for the previous contract.
+// The acceptor finds which contract that is from the offer alone:
+const [prevContractId] = splicedContractIds(offer);
+signAccept(offer, accept, keys, psbt, [
+  { contractId: prevContractId, temporaryContractId: myPrevTempId },
 ]);
-finalizeSignSpliced(offer, accept, sign, psbt, keys, [
-  { inputSerialId: 200n, priorTemporaryContractId: prevTempId },
+finalizeSign(offer, accept, sign, psbt, keys, [
+  { contractId: prevContractId, temporaryContractId: myPrevTempId },
 ]);
 ```
 
-The prior contract's funding key is re-derived inside Rust from the provider and
-the prior temporary id — like everything else, it never leaves.
+The previous contract's funding key is re-derived inside Rust from the provider
+and that temporary id — like everything else, it never leaves.
+
+### External signing
+
+For a contract key held by a signer that cannot answer inside the call — a
+custody vault that needs a person to approve — each step that signs with the
+contract key is a pair: a request, and the same step completed with the
+signatures. Requests are PSBTs; the messages are the only state between the two
+calls, and every returned signature is verified before anything is built from it.
+
+```typescript
+// Accepting party
+const request = acceptOfferRequest(offer, params); // params must fix both serial ids
+// → { fundingPubkey, refundPsbt, cets: [{ psbt, adaptorPoint }], fundingPsbt, dlcInputIndexes }
+const accepted = acceptOfferWithSignatures(offer, params, {
+  refundSignature, // 64-byte compact ECDSA
+  cetAdaptorSignatures, // 162-byte adaptor signatures, in `cets` order
+});
+
+// Offering party
+const request = signAcceptRequest(offer, accept);
+const signed = signAcceptWithSignatures(offer, accept, signatures, signedFundingPsbt, dlcInputSignatures);
+
+// Accepting party, completing the funding transaction
+const fundingTx = finalizeSignWithSignatures(offer, accept, sign, signedFundingPsbt, dlcInputSignatures);
+```
+
+When the offer splices a contract, the request's `fundingPsbt` carries each DLC
+input's `witness_utxo` and 2-of-2 `witness_script`, and `dlcInputIndexes` lists
+them; the signer's half of each comes back as a `DlcInputSignature`. Wallet
+inputs are signed through the funding PSBT, as in the key-based flow.
+
+Enum-outcome contracts only for now; a numeric-outcome contract throws
+`ContractError.Unsupported`.
 
 ### Validation and inspection
 
@@ -402,9 +441,32 @@ interface SignResult {
   transactions: DlcTransactions;
 }
 
-interface SpliceKeyRef {
-  inputSerialId: bigint;
-  priorTemporaryContractId: Bytes;
+interface SplicedContract {
+  contractId: Bytes; // as carried by the offer's DLC input
+  temporaryContractId: Bytes; // your own temporary id for that contract
+}
+
+interface SigningRequest {
+  fundingPubkey: Bytes; // the key every refund and CET signature verifies against
+  refundPsbt: Bytes;
+  cets: CetSigningRequest[]; // one per adaptor signature, in return order
+  fundingPsbt: Bytes; // DLC inputs carry witness_utxo + witness_script
+  dlcInputIndexes: number[]; // splice inputs this party signs a half of
+}
+
+interface CetSigningRequest {
+  psbt: Bytes;
+  adaptorPoint: Bytes; // 33 bytes
+}
+
+interface ContractSignatures {
+  refundSignature: Bytes; // 64-byte compact ECDSA, SIGHASH_ALL
+  cetAdaptorSignatures: Bytes[]; // 162 bytes each
+}
+
+interface DlcInputSignature {
+  inputIndex: number;
+  signature: Bytes; // 64-byte compact ECDSA, SIGHASH_ALL
 }
 
 interface OracleAttestationRef {

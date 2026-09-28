@@ -33,6 +33,7 @@ uniffi::setup_scaffolding!();
 /// Public so Rust consumers (e.g. the ddk-ts NAPI crate) can wrap the same
 /// surface; uniffi/React-Native generation is unaffected by the visibility.
 pub mod contract;
+pub mod external;
 
 static SECP_CONTEXT: OnceLock<Secp256k1<All>> = OnceLock::new();
 

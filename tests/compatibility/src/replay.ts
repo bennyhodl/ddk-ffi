@@ -172,7 +172,7 @@ export function buildSpliceOffer(ddk: any, vectors: CompatVectors, offer: Uint8A
   const { offerer, contract, splice } = vectors
   const offererKeys = ddk.ContractKeyProvider.fromDescriptor(offerer.descriptor)
   const offer2TempId = fromHexString(splice.offerTempIdHex)
-  const spliceInput = ddk.createDlcSpliceInput(offer, accept, sign, ddk.Party.Offer, BigInt(splice.spliceSerialId), 220)
+  const spliceInput = ddk.createDlcSpliceInput(offer, accept, sign, ddk.Party.Offer, BigInt(splice.spliceSerialId))
   const offer2 = ddk.createOffer({
     chainHash: ddk.chainHashFromNetwork('regtest'),
     temporaryContractId: offer2TempId,
@@ -254,7 +254,7 @@ export function runDdkReplay(ddk: any, vectors: CompatVectors): Record<string, s
   const freshSignedPsbt = ddk.signFundingPsbtWithDescriptor(offer, fresh.accept, fresh.fundingPsbt, offerer.descriptor, [
     { inputSerialId: BigInt(offerer.fundingSerialId), derivationIndex: offerer.derivationIndex },
   ])
-  const freshSign = ddk.signAccept(offer, fresh.accept, offererKeys, offerTempId, freshSignedPsbt)
+  const freshSign = ddk.signAccept(offer, fresh.accept, offererKeys, freshSignedPsbt, [])
   ddk.validateSign(offer, fresh.accept, freshSign.sign)
 
   // --- deterministic derivations from the committed transcript ---
@@ -262,7 +262,7 @@ export function runDdkReplay(ddk: any, vectors: CompatVectors): Record<string, s
   const acceptorSignedPsbt = ddk.signFundingPsbtWithDescriptor(offer, accept, fromHexString(out.fundingPsbtHex), acceptor.descriptor, [
     { inputSerialId: BigInt(acceptor.fundingSerialId), derivationIndex: acceptor.derivationIndex },
   ])
-  out.fundingTxHex = toHexString(ddk.finalizeSign(offer, accept, sign, acceptorSignedPsbt))
+  out.fundingTxHex = toHexString(ddk.finalizeSign(offer, accept, sign, acceptorSignedPsbt, acceptorKeys, []))
   out.contractIdHex = toHexString(ddk.computeContractId(offer, accept))
   out.cetHex = toHexString(
     ddk.signContractCet(offer, accept, sign, offererKeys, offerTempId, [
@@ -285,15 +285,16 @@ export function runDdkReplay(ddk: any, vectors: CompatVectors): Record<string, s
 
   const fresh2 = buildSpliceAccept(ddk, vectors, offer2Committed)
   ddk.validateAccept(offer2Committed, fresh2.accept2)
-  const freshSign2 = ddk.signAcceptSpliced(offer2Committed, fresh2.accept2, offererKeys, fromHexString(splice.offerTempIdHex), fresh2.fundingPsbt2, [
-    { inputSerialId: BigInt(splice.spliceSerialId), priorTemporaryContractId: offerTempId },
+  const contractId1 = ddk.computeContractId(offer, accept)
+  const freshSign2 = ddk.signAccept(offer2Committed, fresh2.accept2, offererKeys, fresh2.fundingPsbt2, [
+    { contractId: contractId1, temporaryContractId: offerTempId },
   ])
   ddk.validateSign(offer2Committed, fresh2.accept2, freshSign2.sign)
 
   out.fundingPsbt2Hex = toHexString(ddk.createFundingPsbt(offer2Committed, accept2))
   out.fundingTx2Hex = toHexString(
-    ddk.finalizeSignSpliced(offer2Committed, accept2, sign2, fromHexString(out.fundingPsbt2Hex), acceptorKeys, [
-      { inputSerialId: BigInt(splice.spliceSerialId), priorTemporaryContractId: acceptTempId },
+    ddk.finalizeSign(offer2Committed, accept2, sign2, fromHexString(out.fundingPsbt2Hex), acceptorKeys, [
+      { contractId: contractId1, temporaryContractId: acceptTempId },
     ]),
   )
   out.contractId2Hex = toHexString(ddk.computeContractId(offer2Committed, accept2))

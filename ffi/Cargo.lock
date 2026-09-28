@@ -436,6 +436,7 @@ dependencies = [
  "ddk",
  "ddk-dlc",
  "ddk-messages",
+ "ddk-trie",
  "getrandom 0.2.17",
  "lightning",
  "secp256k1-zkp",

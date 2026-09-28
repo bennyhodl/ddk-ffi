@@ -6,16 +6,18 @@
 //! [`ContractKeyProvider`] is a uniffi object: secret keys are created and held
 //! inside Rust and never cross the FFI boundary. Foreign consumers construct a
 //! provider from their key material (mnemonic, seed, xprv, or descriptor), then
-//! ask for a `funding_pubkey` to publish. The splice sign/finalize functions
-//! (added alongside this) take the provider plus contract temporary ids and
-//! re-derive the required secret keys internally, so a `SecretKey` is never
-//! marshalled out. The only thing a consumer must persist per contract is its
-//! 32-byte `temporary_contract_id`.
+//! ask for a `funding_pubkey` to publish. The sign, finalize and settle
+//! functions take the provider and re-derive the required secret keys
+//! internally, so a `SecretKey` is never marshalled out. The only thing a
+//! consumer must persist per contract is its own 32-byte
+//! `temporary_contract_id`: the offerer's is the offer's, but the acceptor's
+//! appears in no message.
 
 use std::str::FromStr;
 use std::sync::Arc;
 
 use bitcoin::bip32::Xpriv;
+use bitcoin::hex::DisplayHex;
 use bitcoin::psbt::Psbt;
 use bitcoin::{Amount, Network, ScriptBuf, Transaction};
 use lightning::util::ser::{Readable, Writeable};
@@ -79,6 +81,10 @@ pub enum ContractError {
         expected: u32,
         actual: u32,
     },
+    /// The operation does not support this contract, e.g. external signing of
+    /// a numeric-outcome contract.
+    #[error("unsupported: {message}")]
+    Unsupported { message: String },
 }
 
 impl From<ddk_contract::ContractError> for ContractError {
@@ -201,18 +207,18 @@ impl ContractKeyProvider {
 // signed funding transaction uses Bitcoin consensus serialization.
 // ---------------------------------------------------------------------------
 
-fn encode_msg<T: Writeable>(msg: &T) -> Vec<u8> {
+pub(crate) fn encode_msg<T: Writeable>(msg: &T) -> Vec<u8> {
     msg.encode()
 }
 
-fn decode_msg<T: Readable>(bytes: &[u8], what: &str) -> Result<T, ContractError> {
+pub(crate) fn decode_msg<T: Readable>(bytes: &[u8], what: &str) -> Result<T, ContractError> {
     let mut cursor = lightning::io::Cursor::new(bytes);
     T::read(&mut cursor).map_err(|e| ContractError::Serialization {
         message: format!("failed to decode {what}: {e:?}"),
     })
 }
 
-fn decode_psbt(bytes: &[u8]) -> Result<Psbt, ContractError> {
+pub(crate) fn decode_psbt(bytes: &[u8]) -> Result<Psbt, ContractError> {
     Psbt::deserialize(bytes).map_err(|e| ContractError::Serialization {
         message: format!("failed to decode PSBT: {e}"),
     })
@@ -251,65 +257,83 @@ fn funding_secret_key_for(
         })
 }
 
-/// Which of a splice input's two prior funding public keys is the local party's.
+/// Re-derives the previous contract's funding secret key for every splice (DLC)
+/// input in the offer. Secret keys stay inside Rust — only temporary ids cross
+/// the FFI boundary.
 ///
-/// A DLC funding input names both. ddk requires the offering party to sign with
-/// `local_fund_pubkey` and the accepting party with `remote_fund_pubkey`, and
-/// rejects a key that matches the other side.
-#[derive(Clone, Copy)]
-enum SpliceSide {
-    Offer,
-    Accept,
-}
-
-/// Re-derives each splice input's previous-contract funding secret key from the
-/// provider, keyed by (prior temporary id, input serial id). Secret keys stay
-/// inside Rust — only the temporary ids cross the FFI boundary.
+/// Each DLC input names the contract it spends by contract id, and that is what
+/// `spliced_contracts` is matched on. Both directions are checked: an input
+/// with no supplied contract cannot be signed, and a supplied contract that no
+/// input spends is a caller mistake that would otherwise pass silently.
+///
+/// `party` is the local party in the new contract. ddk requires the offering
+/// party to sign with the input's `local_fund_pubkey` and the accepting party
+/// with its `remote_fund_pubkey`; that key also selects the derivation scheme
+/// the previous contract was made under, so contracts funded before ddk
+/// 2.0.0-rc.3 still splice. Splice inputs only ever appear on the offer side.
 fn resolve_splice_keys(
     keys: &ContractKeyProvider,
     offer: &OfferDlc,
-    side: SpliceSide,
-    refs: &[SpliceKeyRef],
+    party: RustParty,
+    spliced_contracts: &[SplicedContract],
 ) -> Result<Vec<DlcInputSigningKey>, ContractError> {
-    refs.iter()
-        .map(|r| {
-            let prior = to_array_32(
-                &r.prior_temporary_contract_id,
-                "prior_temporary_contract_id",
-            )?;
-            let prior_funding_pubkey = prior_funding_pubkey(offer, side, r.input_serial_id)?;
+    let spliced = spliced_contracts
+        .iter()
+        .map(|contract| {
+            Ok((
+                to_array_32(&contract.contract_id, "contract_id")?,
+                to_array_32(
+                    &contract.temporary_contract_id,
+                    "spliced temporary_contract_id",
+                )?,
+            ))
+        })
+        .collect::<Result<Vec<_>, ContractError>>()?;
+
+    let dlc_inputs = offer
+        .funding_inputs
+        .iter()
+        .filter_map(|input| Some((input.input_serial_id, input.dlc_input.as_ref()?)))
+        .collect::<Vec<_>>();
+
+    if let Some((contract_id, _)) = spliced.iter().find(|(contract_id, _)| {
+        !dlc_inputs
+            .iter()
+            .any(|(_, d)| d.contract_id == *contract_id)
+    }) {
+        return Err(ContractError::InvalidFundingInput {
+            message: format!(
+                "spliced contract {} is not spent by any DLC input in the offer",
+                contract_id.as_hex()
+            ),
+        });
+    }
+
+    dlc_inputs
+        .into_iter()
+        .map(|(input_serial_id, dlc_input)| {
+            let (_, temporary_contract_id) = spliced
+                .iter()
+                .find(|(contract_id, _)| *contract_id == dlc_input.contract_id)
+                .ok_or_else(|| ContractError::InvalidFundingInput {
+                    message: format!(
+                        "no spliced contract supplied for the DLC input spending contract {}",
+                        dlc_input.contract_id.as_hex()
+                    ),
+                })?;
+            let prior_funding_pubkey = match party {
+                RustParty::Offer => dlc_input.local_fund_pubkey,
+                RustParty::Accept => dlc_input.remote_fund_pubkey,
+            };
             keys.inner
-                .dlc_input_signing_key(prior, &prior_funding_pubkey, r.input_serial_id)
+                .dlc_input_signing_key(
+                    *temporary_contract_id,
+                    &prior_funding_pubkey,
+                    input_serial_id,
+                )
                 .map_err(ContractError::from)
         })
         .collect()
-}
-
-/// The local party's prior funding public key for one splice input, read from
-/// the offer message that carries it.
-///
-/// ddk needs this key to pick the derivation scheme the previous contract was
-/// made under, so contracts funded before ddk 2.0.0-rc.3 still splice. It is not
-/// a parameter of the FFI: the offer already carries both parties' prior funding
-/// public keys, and ddk checks the re-derived key against exactly this value.
-/// Splice inputs only ever appear on the offer side.
-fn prior_funding_pubkey(
-    offer: &OfferDlc,
-    side: SpliceSide,
-    input_serial_id: u64,
-) -> Result<PublicKey, ContractError> {
-    let dlc_input = offer
-        .funding_inputs
-        .iter()
-        .find(|input| input.input_serial_id == input_serial_id)
-        .and_then(|input| input.dlc_input.as_ref())
-        .ok_or_else(|| ContractError::InvalidFundingInput {
-            message: format!("offer has no DLC funding input with serial id {input_serial_id}"),
-        })?;
-    Ok(match side {
-        SpliceSide::Offer => dlc_input.local_fund_pubkey,
-        SpliceSide::Accept => dlc_input.remote_fund_pubkey,
-    })
 }
 
 // ---------------------------------------------------------------------------
@@ -335,7 +359,7 @@ impl From<Party> for RustParty {
 }
 
 /// One party's Bitcoin-level contract data (mirrors [`ddk::contract::PartyParams`]).
-#[derive(uniffi::Record)]
+#[derive(Clone, uniffi::Record)]
 pub struct ContractPartyParams {
     /// The 33-byte compressed DLC funding public key.
     pub funding_pubkey: Vec<u8>,
@@ -422,7 +446,7 @@ impl CreateOfferParams {
 }
 
 /// Parameters for [`accept_offer`] (mirrors [`ddk::contract::AcceptOfferParams`]).
-#[derive(uniffi::Record)]
+#[derive(Clone, uniffi::Record)]
 pub struct AcceptOfferParams {
     /// The accepting party's Bitcoin-level contract data.
     pub party: ContractPartyParams,
@@ -438,7 +462,7 @@ pub struct AcceptOfferParams {
 }
 
 impl AcceptOfferParams {
-    fn into_rust(self) -> Result<RustAcceptOfferParams, ContractError> {
+    pub(crate) fn into_rust(self) -> Result<RustAcceptOfferParams, ContractError> {
         Ok(RustAcceptOfferParams {
             party: self.party.into_rust()?,
             min_timeout_interval: self.min_timeout_interval,
@@ -460,7 +484,7 @@ pub struct AcceptResult {
 }
 
 impl AcceptResult {
-    fn from_rust(result: ddk_contract::AcceptResult) -> Self {
+    pub(crate) fn from_rust(result: ddk_contract::AcceptResult) -> Self {
         AcceptResult {
             accept: encode_msg(&result.accept),
             transactions: crate::rust_dlc_transactions_to_uniffi(result.transactions),
@@ -469,7 +493,7 @@ impl AcceptResult {
     }
 }
 
-/// The result of [`sign_accept`] / [`sign_accept_spliced`].
+/// The result of [`sign_accept`].
 #[derive(uniffi::Record)]
 pub struct SignResult {
     /// The wire-encoded `SignDlc` message to send to the accepting party.
@@ -479,7 +503,7 @@ pub struct SignResult {
 }
 
 impl SignResult {
-    fn from_rust(result: ddk_contract::SignResult) -> Self {
+    pub(crate) fn from_rust(result: ddk_contract::SignResult) -> Self {
         SignResult {
             sign: encode_msg(&result.sign),
             transactions: crate::rust_dlc_transactions_to_uniffi(result.transactions),
@@ -487,14 +511,17 @@ impl SignResult {
     }
 }
 
-/// References a splice (DLC) funding input and the previous contract whose
-/// 2-of-2 output it spends, so the provider can re-derive the signing key.
+/// A previous contract that a splice (DLC) funding input in the offer spends.
+///
+/// The input carries the contract id, not this party's temporary id for that
+/// contract — which is what the provider derives the contract's funding key
+/// from. Look the contract up by [`spliced_contract_ids`] and supply both.
 #[derive(Clone, uniffi::Record)]
-pub struct SpliceKeyRef {
-    /// The serial id of the DLC (splice) funding input this key signs.
-    pub input_serial_id: u64,
-    /// The 32-byte temporary id of the previous contract being spliced from.
-    pub prior_temporary_contract_id: Vec<u8>,
+pub struct SplicedContract {
+    /// The 32-byte contract id, as carried by the offer's DLC input.
+    pub contract_id: Vec<u8>,
+    /// This party's own 32-byte temporary id for that contract.
+    pub temporary_contract_id: Vec<u8>,
 }
 
 /// An oracle attestation paired with the position of the oracle that produced it
@@ -844,44 +871,28 @@ pub fn dlc_transactions_from_signed_messages(
 }
 
 /// The offering party verifies the accept message and produces its `SignDlc`.
-/// The offer party's funding secret key is derived from `keys` +
-/// `temporary_contract_id` (the new contract's id).
+///
+/// The offering party's funding secret key is derived from `keys` and the
+/// offer's own temporary contract id, which is the id the offering party
+/// published its funding public key under.
+///
+/// When the offer carries splice (DLC) funding inputs, this party also signs
+/// its half of each previous contract's 2-of-2; `spliced_contracts` names those
+/// contracts (see [`SplicedContract`]). Pass an empty list otherwise.
 #[uniffi::export]
 pub fn sign_accept(
     offer: Vec<u8>,
     accept: Vec<u8>,
     keys: Arc<ContractKeyProvider>,
-    temporary_contract_id: Vec<u8>,
     signed_funding_psbt: Vec<u8>,
-) -> Result<SignResult, ContractError> {
-    sign_accept_spliced(
-        offer,
-        accept,
-        keys,
-        temporary_contract_id,
-        signed_funding_psbt,
-        Vec::new(),
-    )
-}
-
-/// Like [`sign_accept`], but additionally co-signs any splice (DLC) funding
-/// inputs. For each splice input, `splice_keys` names the previous contract; the
-/// prior funding secret key is re-derived inside Rust from `keys`.
-#[uniffi::export]
-pub fn sign_accept_spliced(
-    offer: Vec<u8>,
-    accept: Vec<u8>,
-    keys: Arc<ContractKeyProvider>,
-    temporary_contract_id: Vec<u8>,
-    signed_funding_psbt: Vec<u8>,
-    splice_keys: Vec<SpliceKeyRef>,
+    spliced_contracts: Vec<SplicedContract>,
 ) -> Result<SignResult, ContractError> {
     let offer: OfferDlc = decode_msg(&offer, "offer")?;
     let accept: AcceptDlc = decode_msg(&accept, "accept")?;
     let funding_secret_key =
-        funding_secret_key_for(&keys, &temporary_contract_id, &[offer.funding_pubkey])?;
+        funding_secret_key_for(&keys, &offer.temporary_contract_id, &[offer.funding_pubkey])?;
     let psbt = decode_psbt(&signed_funding_psbt)?;
-    let dlc_input_keys = resolve_splice_keys(&keys, &offer, SpliceSide::Offer, &splice_keys)?;
+    let dlc_input_keys = resolve_splice_keys(&keys, &offer, RustParty::Offer, &spliced_contracts)?;
     let result = ddk_contract::sign_accept_spliced(
         &offer,
         &accept,
@@ -894,38 +905,24 @@ pub fn sign_accept_spliced(
 
 /// The accepting party verifies the sign message and completes the funding
 /// transaction. Returns the Bitcoin consensus-serialized signed transaction.
+///
+/// `keys` and `spliced_contracts` are only used when the offer carries splice
+/// (DLC) funding inputs: this party's half of each previous contract's 2-of-2
+/// is derived from them, as in [`sign_accept`]. Pass an empty list otherwise.
 #[uniffi::export]
 pub fn finalize_sign(
     offer: Vec<u8>,
     accept: Vec<u8>,
     sign: Vec<u8>,
     signed_funding_psbt: Vec<u8>,
-) -> Result<Vec<u8>, ContractError> {
-    let offer: OfferDlc = decode_msg(&offer, "offer")?;
-    let accept: AcceptDlc = decode_msg(&accept, "accept")?;
-    let sign: SignDlc = decode_msg(&sign, "sign")?;
-    let psbt = decode_psbt(&signed_funding_psbt)?;
-    let tx = ddk_contract::finalize_sign(&offer, &accept, &sign, &psbt)?;
-    Ok(bitcoin::consensus::serialize(&tx))
-}
-
-/// Like [`finalize_sign`], but additionally completes the 2-of-2 witness for any
-/// splice (DLC) funding input using this (accepting) party's prior funding keys,
-/// re-derived inside Rust from `keys`.
-#[uniffi::export]
-pub fn finalize_sign_spliced(
-    offer: Vec<u8>,
-    accept: Vec<u8>,
-    sign: Vec<u8>,
-    signed_funding_psbt: Vec<u8>,
     keys: Arc<ContractKeyProvider>,
-    splice_keys: Vec<SpliceKeyRef>,
+    spliced_contracts: Vec<SplicedContract>,
 ) -> Result<Vec<u8>, ContractError> {
     let offer: OfferDlc = decode_msg(&offer, "offer")?;
     let accept: AcceptDlc = decode_msg(&accept, "accept")?;
     let sign: SignDlc = decode_msg(&sign, "sign")?;
     let psbt = decode_psbt(&signed_funding_psbt)?;
-    let dlc_input_keys = resolve_splice_keys(&keys, &offer, SpliceSide::Accept, &splice_keys)?;
+    let dlc_input_keys = resolve_splice_keys(&keys, &offer, RustParty::Accept, &spliced_contracts)?;
     let tx = ddk_contract::finalize_sign_spliced(&offer, &accept, &sign, &psbt, &dlc_input_keys)?;
     Ok(bitcoin::consensus::serialize(&tx))
 }
@@ -1024,9 +1021,14 @@ pub fn sign_contract_refund(
 /// Rebuilds the splice `FundingInput` (wire-encoded) that spends a previous
 /// contract's 2-of-2 funding output, from that contract's offer, accept and
 /// sign messages. The sign message selects the fee rule, so a contract created
-/// before ddk-dlc 2.0.0-rc.4 can be spliced too. Only the offering party contributes a splice input; place the
-/// result in the offering party's `funding_inputs`. `max_witness_len` must be
-/// greater than 108 — use [`dlc_input_max_witness_len`].
+/// before ddk-dlc 2.0.0-rc.4 can be spliced too.
+///
+/// A splice is an ordinary offer whose funding inputs include this one: place
+/// it in the offering party's `funding_inputs` (only the offering party
+/// contributes splice inputs). `local_party` is the side the new offering party
+/// was on in the previous contract. The input carries the previous contract's
+/// id, which is how both parties find it again when signing
+/// ([`SplicedContract`]).
 #[uniffi::export]
 pub fn create_dlc_splice_input(
     prev_offer: Vec<u8>,
@@ -1034,7 +1036,6 @@ pub fn create_dlc_splice_input(
     prev_sign: Vec<u8>,
     local_party: Party,
     input_serial_id: Option<u64>,
-    max_witness_len: u16,
 ) -> Result<Vec<u8>, ContractError> {
     let prev_offer: OfferDlc = decode_msg(&prev_offer, "previous offer")?;
     let prev_accept: AcceptDlc = decode_msg(&prev_accept, "previous accept")?;
@@ -1045,19 +1046,37 @@ pub fn create_dlc_splice_input(
         &prev_sign,
         local_party.into(),
         input_serial_id,
-        max_witness_len,
+        ddk_contract::DLC_INPUT_MAX_WITNESS_LEN,
     )?;
     Ok(encode_msg(&input))
 }
 
-/// The required `max_witness_len` for a DLC (splice) funding input (220).
+/// The ids of the previous contracts an offer splices, one per splice (DLC)
+/// funding input, in funding-input order. Empty for an offer that splices
+/// nothing.
+///
+/// This is how the accepting party finds its own records of those contracts,
+/// to supply them as [`SplicedContract`]s to [`finalize_sign`].
+#[uniffi::export]
+pub fn spliced_contract_ids(offer: Vec<u8>) -> Result<Vec<Vec<u8>>, ContractError> {
+    let offer: OfferDlc = decode_msg(&offer, "offer")?;
+    Ok(offer
+        .funding_inputs
+        .iter()
+        .filter_map(|input| input.dlc_input.as_ref())
+        .map(|dlc_input| dlc_input.contract_id.to_vec())
+        .collect())
+}
+
+/// The `max_witness_len` of a DLC (splice) funding input (220), for building a
+/// low-level `DlcInputInfo`. [`create_dlc_splice_input`] applies it itself.
 #[uniffi::export]
 pub fn dlc_input_max_witness_len() -> u16 {
     ddk_contract::DLC_INPUT_MAX_WITNESS_LEN
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
     const MNEMONIC: &str =
@@ -1196,7 +1215,7 @@ mod tests {
         }
     }
 
-    fn attestation_ref(outcome: &str) -> OracleAttestationRef {
+    pub(crate) fn attestation_ref(outcome: &str) -> OracleAttestationRef {
         OracleAttestationRef {
             oracle_index: 0,
             attestation: encode_msg(&attestation(outcome)),
@@ -1531,6 +1550,8 @@ mod tests {
             contract.accept,
             contract.sign,
             contract.funding_psbt,
+            contract.acceptor_keys,
+            vec![],
         )
         .unwrap();
 
@@ -1546,24 +1567,22 @@ mod tests {
         );
     }
 
-    /// A funded single-funded contract: the three wire messages plus each
-    /// party's key provider and its own temporary contract id, which is what
-    /// settlement needs.
-    struct FundedContract {
-        offer: Vec<u8>,
-        accept: Vec<u8>,
-        sign: Vec<u8>,
-        funding_psbt: Vec<u8>,
-        offerer_keys: Arc<ContractKeyProvider>,
-        offer_temp_id: Vec<u8>,
-        acceptor_keys: Arc<ContractKeyProvider>,
-        accept_temp_id: Vec<u8>,
+    /// The offer of a 100 000 sat two-outcome enum contract funded solely by the
+    /// offerer, and the parameters the acceptor accepts it with. Each party's
+    /// key provider and its own temporary contract id come with it, which is
+    /// what signing and settlement need.
+    pub(crate) struct SingleFundedOffer {
+        pub offer: Vec<u8>,
+        pub accept_params: AcceptOfferParams,
+        /// Signs the offerer's one wallet input (serial id 100, index 0).
+        pub offerer_descriptor: String,
+        pub offerer_keys: Arc<ContractKeyProvider>,
+        pub offer_temp_id: Vec<u8>,
+        pub acceptor_keys: Arc<ContractKeyProvider>,
+        pub accept_temp_id: Vec<u8>,
     }
 
-    /// Drives offer -> accept -> funding PSBT -> sign entirely through the FFI
-    /// surface, for a 100 000 sat two-outcome enum contract funded solely by the
-    /// offerer.
-    fn single_funded_contract() -> FundedContract {
+    pub(crate) fn single_funded_offer() -> SingleFundedOffer {
         let secp = Secp256k1::new();
         let path = DerivationPath::from_str("84h/1h/0h/0/0").unwrap();
 
@@ -1621,49 +1640,89 @@ mod tests {
         })
         .unwrap();
 
-        // Accept: the acceptor contributes no inputs and no collateral.
-        let accept = accept_offer(
-            offer.clone(),
-            AcceptOfferParams {
-                party: ContractPartyParams {
-                    funding_pubkey: acceptor_funding_pubkey,
-                    funding_inputs: vec![],
-                    payout_spk: acceptor_script.clone(),
-                    payout_serial_id: Some(4),
-                    change_spk: acceptor_script,
-                    change_serial_id: Some(5),
-                },
-                min_timeout_interval: 100,
-                max_timeout_interval: 100_000,
-                now_unix: NOW_UNIX,
+        // The acceptor contributes no inputs and no collateral.
+        let accept_params = AcceptOfferParams {
+            party: ContractPartyParams {
+                funding_pubkey: acceptor_funding_pubkey,
+                funding_inputs: vec![],
+                payout_spk: acceptor_script.clone(),
+                payout_serial_id: Some(4),
+                change_spk: acceptor_script,
+                change_serial_id: Some(5),
             },
-            acceptor_keys.clone(),
-            accept_temp_id.clone(),
-        )
-        .unwrap()
-        .accept;
+            min_timeout_interval: 100,
+            max_timeout_interval: 100_000,
+            now_unix: NOW_UNIX,
+        };
 
-        // Offerer builds the funding PSBT and signs its input with its descriptor.
-        let funding_psbt = create_funding_psbt(offer.clone(), accept.clone()).unwrap();
-        let signed_psbt = sign_funding_psbt_with_descriptor(
-            offer.clone(),
-            accept.clone(),
-            funding_psbt.clone(),
+        SingleFundedOffer {
+            offer,
+            accept_params,
             offerer_descriptor,
+            offerer_keys,
+            offer_temp_id,
+            acceptor_keys,
+            accept_temp_id,
+        }
+    }
+
+    /// The offerer's funding PSBT with its one wallet input signed.
+    pub(crate) fn offerer_signed_funding_psbt(
+        offer: &[u8],
+        accept: &[u8],
+        descriptor: &str,
+    ) -> Vec<u8> {
+        sign_funding_psbt_with_descriptor(
+            offer.to_vec(),
+            accept.to_vec(),
+            create_funding_psbt(offer.to_vec(), accept.to_vec()).unwrap(),
+            descriptor.to_string(),
             vec![DescriptorInput {
                 input_serial_id: 100,
                 derivation_index: 0,
             }],
         )
-        .unwrap();
+        .unwrap()
+    }
 
-        // Offerer produces the sign message; acceptor (no inputs) finalizes.
+    /// A funded single-funded contract: the three wire messages plus each
+    /// party's key provider and its own temporary contract id, which is what
+    /// settlement needs.
+    struct FundedContract {
+        offer: Vec<u8>,
+        accept: Vec<u8>,
+        sign: Vec<u8>,
+        funding_psbt: Vec<u8>,
+        offerer_keys: Arc<ContractKeyProvider>,
+        offer_temp_id: Vec<u8>,
+        acceptor_keys: Arc<ContractKeyProvider>,
+        accept_temp_id: Vec<u8>,
+    }
+
+    /// Drives [`single_funded_offer`] through accept -> funding PSBT -> sign
+    /// entirely through the FFI surface.
+    fn single_funded_contract() -> FundedContract {
+        let fixture = single_funded_offer();
+        let offer = fixture.offer;
+        let accept = accept_offer(
+            offer.clone(),
+            fixture.accept_params,
+            fixture.acceptor_keys.clone(),
+            fixture.accept_temp_id.clone(),
+        )
+        .unwrap()
+        .accept;
+
+        // Offerer signs its wallet input and produces the sign message; the
+        // acceptor (no inputs) finalizes.
+        let funding_psbt = create_funding_psbt(offer.clone(), accept.clone()).unwrap();
+        let signed_psbt = offerer_signed_funding_psbt(&offer, &accept, &fixture.offerer_descriptor);
         let sign = sign_accept(
             offer.clone(),
             accept.clone(),
-            offerer_keys.clone(),
-            offer_temp_id.clone(),
+            fixture.offerer_keys.clone(),
             signed_psbt,
+            vec![],
         )
         .unwrap()
         .sign;
@@ -1673,10 +1732,10 @@ mod tests {
             accept,
             sign,
             funding_psbt,
-            offerer_keys,
-            offer_temp_id,
-            acceptor_keys,
-            accept_temp_id,
+            offerer_keys: fixture.offerer_keys,
+            offer_temp_id: fixture.offer_temp_id,
+            acceptor_keys: fixture.acceptor_keys,
+            accept_temp_id: fixture.accept_temp_id,
         }
     }
 
@@ -1804,8 +1863,8 @@ mod tests {
             offer.clone(),
             accept.clone(),
             offerer_keys.clone(),
-            offer_temp_id.clone(),
             signed_psbt,
+            vec![],
         )
         .unwrap()
         .sign;
@@ -2078,13 +2137,21 @@ mod tests {
         assert_eq!(down.accept_payout_sats, 100_000);
     }
 
-    // A splice-out rollover through the FFI: a prior dual-funded contract A is
-    // spliced into a new single-funded contract B whose only funding input is
-    // A's 2-of-2 output. Both parties co-sign the prior 2-of-2 with keys the
-    // provider re-derives from A's temporary id. Exercises create_dlc_splice_input
-    // + sign_accept_spliced + finalize_sign_spliced end-to-end.
-    #[test]
-    fn splice_out_round_trip_via_ffi() {
+    /// A contract A and the offer of a contract B that splices A: B's only
+    /// funding input spends A's 2-of-2 output. Both parties are the same wallets
+    /// as in A, with new temporary ids.
+    pub(crate) struct SpliceFixture {
+        pub offer_b: Vec<u8>,
+        pub accept_b: Vec<u8>,
+        /// What the acceptor accepted B with.
+        pub accept_params_b: AcceptOfferParams,
+        pub offerer_keys: Arc<ContractKeyProvider>,
+        pub acceptor_keys: Arc<ContractKeyProvider>,
+        /// What each party would find in its own store for contract A.
+        pub spliced_a: SplicedContract,
+    }
+
+    pub(crate) fn splice_fixture() -> SpliceFixture {
         let temp_id_a = vec![0xaa_u8; 32];
         let temp_id_b = vec![0xbb_u8; 32];
 
@@ -2140,26 +2207,19 @@ mod tests {
             offer_a.clone(),
             accept_a.clone(),
             offerer_a.provider.clone(),
-            temp_id_a.clone(),
             psbt_a.serialize(),
+            vec![],
         )
         .unwrap()
         .sign;
+        let contract_id_a = compute_contract_id(offer_a.clone(), accept_a.clone()).unwrap();
 
         // The splice input spends A's 2-of-2 funding output (value = A's 100k).
-        let splice_serial = 900_u64;
-        let splice_input = create_dlc_splice_input(
-            offer_a,
-            accept_a,
-            sign_a,
-            Party::Offer,
-            Some(splice_serial),
-            dlc_input_max_witness_len(),
-        )
-        .unwrap();
+        let splice_input =
+            create_dlc_splice_input(offer_a, accept_a, sign_a, Party::Offer, Some(900)).unwrap();
 
         // Contract B: single-funded by the offerer via the splice input
-        // (splice-out). Same parties as A (same providers), new temporary ids.
+        // (splice-out).
         let offerer_b = build_party(11, [0xbb; 32], 300);
         let acceptor_b = build_party(22, [0xbb; 32], 400);
         let collateral_b = 60_000_u64; // 100k prior value - 40k spliced out
@@ -2184,54 +2244,78 @@ mod tests {
             contract_flags: 0,
         })
         .unwrap();
+        let accept_params_b = AcceptOfferParams {
+            party: ContractPartyParams {
+                funding_pubkey: acceptor_b.rust.funding_pubkey.serialize().to_vec(),
+                funding_inputs: vec![],
+                payout_spk: acceptor_b.script.as_bytes().to_vec(),
+                payout_serial_id: Some(4),
+                change_spk: acceptor_b.script.as_bytes().to_vec(),
+                change_serial_id: Some(5),
+            },
+            min_timeout_interval: 100,
+            max_timeout_interval: 100_000,
+            now_unix: NOW_UNIX,
+        };
         let accept_b = accept_offer(
             offer_b.clone(),
-            AcceptOfferParams {
-                party: ContractPartyParams {
-                    funding_pubkey: acceptor_b.rust.funding_pubkey.serialize().to_vec(),
-                    funding_inputs: vec![],
-                    payout_spk: acceptor_b.script.as_bytes().to_vec(),
-                    payout_serial_id: Some(4),
-                    change_spk: acceptor_b.script.as_bytes().to_vec(),
-                    change_serial_id: Some(5),
-                },
-                min_timeout_interval: 100,
-                max_timeout_interval: 100_000,
-                now_unix: NOW_UNIX,
-            },
+            accept_params_b.clone(),
             acceptor_b.provider.clone(),
-            temp_id_b.clone(),
+            temp_id_b,
         )
         .unwrap()
         .accept;
 
-        let splice_keys = vec![SpliceKeyRef {
-            input_serial_id: splice_serial,
-            prior_temporary_contract_id: temp_id_a.clone(),
-        }];
+        SpliceFixture {
+            offer_b,
+            accept_b,
+            accept_params_b,
+            offerer_keys: offerer_b.provider,
+            acceptor_keys: acceptor_b.provider,
+            spliced_a: SplicedContract {
+                contract_id: contract_id_a,
+                temporary_contract_id: temp_id_a,
+            },
+        }
+    }
+
+    // A splice-out rollover through the FFI. Both parties co-sign A's 2-of-2
+    // with keys the provider re-derives from A's temporary id, which each
+    // finds from the contract id the offer's DLC input carries.
+    #[test]
+    fn splice_out_round_trip_via_ffi() {
+        let splice = splice_fixture();
+
+        // The accepting party learns which of its contracts is being spliced
+        // from the offer alone.
+        assert_eq!(
+            spliced_contract_ids(splice.offer_b.clone()).unwrap(),
+            vec![splice.spliced_a.contract_id.clone()]
+        );
 
         // Offerer signs its half of the prior 2-of-2 (no wallet inputs to sign).
-        let offer_psbt = create_funding_psbt(offer_b.clone(), accept_b.clone()).unwrap();
-        let sign = sign_accept_spliced(
-            offer_b.clone(),
-            accept_b.clone(),
-            offerer_b.provider.clone(),
-            temp_id_b,
+        let offer_psbt =
+            create_funding_psbt(splice.offer_b.clone(), splice.accept_b.clone()).unwrap();
+        let sign = sign_accept(
+            splice.offer_b.clone(),
+            splice.accept_b.clone(),
+            splice.offerer_keys.clone(),
             offer_psbt,
-            splice_keys.clone(),
+            vec![splice.spliced_a.clone()],
         )
         .unwrap()
         .sign;
 
         // Accepter completes the other half -> fully-signed funding transaction.
-        let accept_psbt = create_funding_psbt(offer_b.clone(), accept_b.clone()).unwrap();
-        let tx_bytes = finalize_sign_spliced(
-            offer_b,
-            accept_b,
+        let accept_psbt =
+            create_funding_psbt(splice.offer_b.clone(), splice.accept_b.clone()).unwrap();
+        let tx_bytes = finalize_sign(
+            splice.offer_b,
+            splice.accept_b,
             sign,
             accept_psbt,
-            acceptor_b.provider.clone(),
-            splice_keys,
+            splice.acceptor_keys,
+            vec![splice.spliced_a],
         )
         .unwrap();
 
@@ -2240,6 +2324,40 @@ mod tests {
         assert!(
             !tx.input[0].witness.is_empty(),
             "splice input 2-of-2 is signed"
+        );
+    }
+
+    /// Signing a splice needs the previous contract, and only that contract: a
+    /// missing one cannot be signed, and one the offer does not spend is the
+    /// caller looking up the wrong record.
+    #[test]
+    fn splice_signing_rejects_the_wrong_spliced_contracts() {
+        let splice = splice_fixture();
+        let psbt = create_funding_psbt(splice.offer_b.clone(), splice.accept_b.clone()).unwrap();
+        let sign_with = |spliced_contracts| {
+            sign_accept(
+                splice.offer_b.clone(),
+                splice.accept_b.clone(),
+                splice.offerer_keys.clone(),
+                psbt.clone(),
+                spliced_contracts,
+            )
+        };
+
+        let missing = sign_with(vec![]);
+        assert!(
+            matches!(&missing, Err(ContractError::InvalidFundingInput { message }) if message.contains("no spliced contract")),
+            "a splice input with no spliced contract is rejected"
+        );
+
+        let unrelated = SplicedContract {
+            contract_id: vec![0x42; 32],
+            temporary_contract_id: vec![0xaa; 32],
+        };
+        let extra = sign_with(vec![splice.spliced_a.clone(), unrelated]);
+        assert!(
+            matches!(&extra, Err(ContractError::InvalidFundingInput { message }) if message.contains("not spent by any DLC input")),
+            "a spliced contract the offer does not spend is rejected"
         );
     }
 
@@ -2284,15 +2402,7 @@ mod tests {
         assert_eq!(fund_txid(&signed), funding.compute_txid());
 
         let input: FundingInput = decode_msg(
-            &create_dlc_splice_input(
-                offer,
-                accept,
-                sign,
-                Party::Offer,
-                Some(900),
-                dlc_input_max_witness_len(),
-            )
-            .unwrap(),
+            &create_dlc_splice_input(offer, accept, sign, Party::Offer, Some(900)).unwrap(),
             "splice input",
         )
         .unwrap();
