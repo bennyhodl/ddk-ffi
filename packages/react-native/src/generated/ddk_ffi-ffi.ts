@@ -179,6 +179,17 @@ interface NativeModuleInterface {
     newTemporaryContractId: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus
   ): Uint8Array;
+  ubrn_uniffi_ddk_ffi_fn_func_accept_offer_request(
+    offer: Uint8Array,
+    params: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus
+  ): Uint8Array;
+  ubrn_uniffi_ddk_ffi_fn_func_accept_offer_with_signatures(
+    offer: Uint8Array,
+    params: Uint8Array,
+    signatures: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus
+  ): Uint8Array;
   ubrn_uniffi_ddk_ffi_fn_func_chain_hash_from_network(
     network: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus
@@ -246,7 +257,6 @@ interface NativeModuleInterface {
     prevSign: Uint8Array,
     localParty: Uint8Array,
     inputSerialId: Uint8Array,
-    maxWitnessLen: number,
     uniffi_out_err: UniffiRustCallStatus
   ): Uint8Array;
   ubrn_uniffi_ddk_ffi_fn_func_create_dlc_transactions(
@@ -364,15 +374,16 @@ interface NativeModuleInterface {
     accept: Uint8Array,
     sign: Uint8Array,
     signedFundingPsbt: Uint8Array,
+    keys: bigint,
+    splicedContracts: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus
   ): Uint8Array;
-  ubrn_uniffi_ddk_ffi_fn_func_finalize_sign_spliced(
+  ubrn_uniffi_ddk_ffi_fn_func_finalize_sign_with_signatures(
     offer: Uint8Array,
     accept: Uint8Array,
     sign: Uint8Array,
     signedFundingPsbt: Uint8Array,
-    keys: bigint,
-    spliceKeys: Uint8Array,
+    dlcInputSignatures: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus
   ): Uint8Array;
   ubrn_uniffi_ddk_ffi_fn_func_funding_input(
@@ -402,17 +413,21 @@ interface NativeModuleInterface {
     offer: Uint8Array,
     accept: Uint8Array,
     keys: bigint,
-    temporaryContractId: Uint8Array,
     signedFundingPsbt: Uint8Array,
+    splicedContracts: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus
   ): Uint8Array;
-  ubrn_uniffi_ddk_ffi_fn_func_sign_accept_spliced(
+  ubrn_uniffi_ddk_ffi_fn_func_sign_accept_request(
     offer: Uint8Array,
     accept: Uint8Array,
-    keys: bigint,
-    temporaryContractId: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus
+  ): Uint8Array;
+  ubrn_uniffi_ddk_ffi_fn_func_sign_accept_with_signatures(
+    offer: Uint8Array,
+    accept: Uint8Array,
+    signatures: Uint8Array,
     signedFundingPsbt: Uint8Array,
-    spliceKeys: Uint8Array,
+    dlcInputSignatures: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus
   ): Uint8Array;
   ubrn_uniffi_ddk_ffi_fn_func_sign_contract_cet(
@@ -438,6 +453,10 @@ interface NativeModuleInterface {
     fundingPsbt: Uint8Array,
     descriptor: Uint8Array,
     inputs: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus
+  ): Uint8Array;
+  ubrn_uniffi_ddk_ffi_fn_func_spliced_contract_ids(
+    offer: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus
   ): Uint8Array;
   ubrn_uniffi_ddk_ffi_fn_func_validate_accept(
@@ -588,6 +607,8 @@ interface NativeModuleInterface {
   ): Uint8Array;
   ubrn_ffi_ddk_ffi_uniffi_contract_version(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_accept_offer(): number;
+  ubrn_uniffi_ddk_ffi_checksum_func_accept_offer_request(): number;
+  ubrn_uniffi_ddk_ffi_checksum_func_accept_offer_with_signatures(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_chain_hash_from_network(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_compute_contract_id(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_contract_info_payouts(): number;
@@ -614,16 +635,18 @@ interface NativeModuleInterface {
   ubrn_uniffi_ddk_ffi_checksum_func_dlc_transactions_from_signed_messages(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_extract_ecdsa_signature_from_oracle_signatures(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_finalize_sign(): number;
-  ubrn_uniffi_ddk_ffi_checksum_func_finalize_sign_spliced(): number;
+  ubrn_uniffi_ddk_ffi_checksum_func_finalize_sign_with_signatures(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_funding_input(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_get_pubkey_from_extkey(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_get_total_input_vsize(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_get_xpub_from_xpriv(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_sign_accept(): number;
-  ubrn_uniffi_ddk_ffi_checksum_func_sign_accept_spliced(): number;
+  ubrn_uniffi_ddk_ffi_checksum_func_sign_accept_request(): number;
+  ubrn_uniffi_ddk_ffi_checksum_func_sign_accept_with_signatures(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_sign_contract_cet(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_sign_contract_refund(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_sign_funding_psbt_with_descriptor(): number;
+  ubrn_uniffi_ddk_ffi_checksum_func_spliced_contract_ids(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_validate_accept(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_validate_offer(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_validate_sign(): number;

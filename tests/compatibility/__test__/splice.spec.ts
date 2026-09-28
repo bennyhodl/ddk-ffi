@@ -53,7 +53,7 @@ describe('splice: ddk offers the successor contract, BAL accepts', () => {
     // The splice funding input, built independently by both stacks — they
     // must agree byte-for-byte.
     const spliceSerialId = 7n
-    const ddkSpliceInput = ddk.createDlcSpliceInput(base.offer, base.accept, base.sign, ddk.Party.Offer, spliceSerialId, 220)
+    const ddkSpliceInput = ddk.createDlcSpliceInput(base.offer, base.accept, base.sign, ddk.Party.Offer, spliceSerialId)
 
     const balInputInfo = balParty.client.dlc.createDlcInputInfo(
       base.fundTxId,
@@ -100,10 +100,10 @@ describe('splice: ddk offers the successor contract, BAL accepts', () => {
     ddk.validateAccept(offer2, accept2)
 
     // ddk signs: no wallet inputs, so the PSBT goes in unsigned; the DLC
-    // input signature comes from the splice key re-derivation.
+    // input signature comes from re-deriving the base contract's key.
     const psbt2 = ddk.createFundingPsbt(offer2, accept2)
-    const signResult2 = ddk.signAcceptSpliced(offer2, accept2, ddkParty.keys, tempId2, psbt2, [
-      { inputSerialId: spliceSerialId, priorTemporaryContractId: base.ddkTempId },
+    const signResult2 = ddk.signAccept(offer2, accept2, ddkParty.keys, psbt2, [
+      { contractId: ddk.computeContractId(base.offer, base.accept), temporaryContractId: base.ddkTempId },
     ])
     // BAL needs [signature, pubkey] witness elements for DLC inputs; ddk
     // emits [signature]. See shimSpliceSignForBal for the full story.
@@ -166,7 +166,7 @@ describe('splice: BAL offers the successor contract, ddk accepts', () => {
     // ddk rebuilds the same wire input from the messages alone. DlcInput's
     // local/remote fields are seat-relative and this input will appear in
     // BAL's offer, so both constructions use the base OFFERER's seat.
-    const ddkSpliceInput = ddk.createDlcSpliceInput(base.offer, base.accept, base.sign, ddk.Party.Offer, spliceSerialId, 220)
+    const ddkSpliceInput = ddk.createDlcSpliceInput(base.offer, base.accept, base.sign, ddk.Party.Offer, spliceSerialId)
     expect(balSpliceInput.serializeBody().toString('hex')).toBe(hex(ddkSpliceInput))
 
     // The client facade converts the FundingInput to the Input model that the
@@ -224,10 +224,11 @@ describe('splice: BAL offers the successor contract, ddk accepts', () => {
     const sign2: Uint8Array = signResponse2.dlcSign.serialize()
     ddk.validateSign(offer2, accept2, sign2)
 
-    // ddk finalizes: adds its half of the base 2-of-2 via the splice key and
-    // broadcasts the successor funding transaction.
-    const fundingTx2 = ddk.finalizeSignSpliced(offer2, accept2, sign2, acceptResult2.fundingPsbt, ddkParty.keys, [
-      { inputSerialId: spliceSerialId, priorTemporaryContractId: base.ddkTempId },
+    // ddk finalizes: adds its half of the base 2-of-2, found by the contract
+    // id BAL's offer carries, and broadcasts the successor funding transaction.
+    const [splicedId] = ddk.splicedContractIds(offer2)
+    const fundingTx2 = ddk.finalizeSign(offer2, accept2, sign2, acceptResult2.fundingPsbt, ddkParty.keys, [
+      { contractId: splicedId, temporaryContractId: base.ddkTempId },
     ])
     const fundTxId2 = await rpc.broadcastAndConfirm(hex(fundingTx2))
     await assertSpends(fundTxId2, base.fundTxId)

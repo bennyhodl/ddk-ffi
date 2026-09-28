@@ -279,6 +279,16 @@ const DEFINITIONS = {
       ret: FfiType.RustBuffer,
       hasRustCallStatus: true,
     },
+    uniffi_ddk_ffi_fn_func_accept_offer_request: {
+      args: [FfiType.RustBuffer, FfiType.RustBuffer],
+      ret: FfiType.RustBuffer,
+      hasRustCallStatus: true,
+    },
+    uniffi_ddk_ffi_fn_func_accept_offer_with_signatures: {
+      args: [FfiType.RustBuffer, FfiType.RustBuffer, FfiType.RustBuffer],
+      ret: FfiType.RustBuffer,
+      hasRustCallStatus: true,
+    },
     uniffi_ddk_ffi_fn_func_chain_hash_from_network: {
       args: [FfiType.RustBuffer],
       ret: FfiType.RustBuffer,
@@ -349,14 +359,7 @@ const DEFINITIONS = {
       hasRustCallStatus: true,
     },
     uniffi_ddk_ffi_fn_func_create_dlc_splice_input: {
-      args: [
-        FfiType.RustBuffer,
-        FfiType.RustBuffer,
-        FfiType.RustBuffer,
-        FfiType.RustBuffer,
-        FfiType.RustBuffer,
-        FfiType.UInt16,
-      ],
+      args: [FfiType.RustBuffer, FfiType.RustBuffer, FfiType.RustBuffer, FfiType.RustBuffer, FfiType.RustBuffer],
       ret: FfiType.RustBuffer,
       hasRustCallStatus: true,
     },
@@ -486,11 +489,6 @@ const DEFINITIONS = {
       hasRustCallStatus: true,
     },
     uniffi_ddk_ffi_fn_func_finalize_sign: {
-      args: [FfiType.RustBuffer, FfiType.RustBuffer, FfiType.RustBuffer, FfiType.RustBuffer],
-      ret: FfiType.RustBuffer,
-      hasRustCallStatus: true,
-    },
-    uniffi_ddk_ffi_fn_func_finalize_sign_spliced: {
       args: [
         FfiType.RustBuffer,
         FfiType.RustBuffer,
@@ -499,6 +497,11 @@ const DEFINITIONS = {
         FfiType.Handle,
         FfiType.RustBuffer,
       ],
+      ret: FfiType.RustBuffer,
+      hasRustCallStatus: true,
+    },
+    uniffi_ddk_ffi_fn_func_finalize_sign_with_signatures: {
+      args: [FfiType.RustBuffer, FfiType.RustBuffer, FfiType.RustBuffer, FfiType.RustBuffer, FfiType.RustBuffer],
       ret: FfiType.RustBuffer,
       hasRustCallStatus: true,
     },
@@ -534,15 +537,13 @@ const DEFINITIONS = {
       ret: FfiType.RustBuffer,
       hasRustCallStatus: true,
     },
-    uniffi_ddk_ffi_fn_func_sign_accept_spliced: {
-      args: [
-        FfiType.RustBuffer,
-        FfiType.RustBuffer,
-        FfiType.Handle,
-        FfiType.RustBuffer,
-        FfiType.RustBuffer,
-        FfiType.RustBuffer,
-      ],
+    uniffi_ddk_ffi_fn_func_sign_accept_request: {
+      args: [FfiType.RustBuffer, FfiType.RustBuffer],
+      ret: FfiType.RustBuffer,
+      hasRustCallStatus: true,
+    },
+    uniffi_ddk_ffi_fn_func_sign_accept_with_signatures: {
+      args: [FfiType.RustBuffer, FfiType.RustBuffer, FfiType.RustBuffer, FfiType.RustBuffer, FfiType.RustBuffer],
       ret: FfiType.RustBuffer,
       hasRustCallStatus: true,
     },
@@ -565,6 +566,11 @@ const DEFINITIONS = {
     },
     uniffi_ddk_ffi_fn_func_sign_funding_psbt_with_descriptor: {
       args: [FfiType.RustBuffer, FfiType.RustBuffer, FfiType.RustBuffer, FfiType.RustBuffer, FfiType.RustBuffer],
+      ret: FfiType.RustBuffer,
+      hasRustCallStatus: true,
+    },
+    uniffi_ddk_ffi_fn_func_spliced_contract_ids: {
+      args: [FfiType.RustBuffer],
       ret: FfiType.RustBuffer,
       hasRustCallStatus: true,
     },
@@ -726,6 +732,16 @@ const DEFINITIONS = {
       ret: FfiType.UInt16,
       hasRustCallStatus: false,
     },
+    uniffi_ddk_ffi_checksum_func_accept_offer_request: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
+    uniffi_ddk_ffi_checksum_func_accept_offer_with_signatures: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
     uniffi_ddk_ffi_checksum_func_chain_hash_from_network: {
       args: [],
       ret: FfiType.UInt16,
@@ -856,7 +872,7 @@ const DEFINITIONS = {
       ret: FfiType.UInt16,
       hasRustCallStatus: false,
     },
-    uniffi_ddk_ffi_checksum_func_finalize_sign_spliced: {
+    uniffi_ddk_ffi_checksum_func_finalize_sign_with_signatures: {
       args: [],
       ret: FfiType.UInt16,
       hasRustCallStatus: false,
@@ -886,7 +902,12 @@ const DEFINITIONS = {
       ret: FfiType.UInt16,
       hasRustCallStatus: false,
     },
-    uniffi_ddk_ffi_checksum_func_sign_accept_spliced: {
+    uniffi_ddk_ffi_checksum_func_sign_accept_request: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
+    uniffi_ddk_ffi_checksum_func_sign_accept_with_signatures: {
       args: [],
       ret: FfiType.UInt16,
       hasRustCallStatus: false,
@@ -902,6 +923,11 @@ const DEFINITIONS = {
       hasRustCallStatus: false,
     },
     uniffi_ddk_ffi_checksum_func_sign_funding_psbt_with_descriptor: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
+    uniffi_ddk_ffi_checksum_func_spliced_contract_ids: {
       args: [],
       ret: FfiType.UInt16,
       hasRustCallStatus: false,
@@ -1083,6 +1109,17 @@ interface NativeModuleInterface {
     newTemporaryContractId: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus,
   ): Uint8Array
+  uniffi_ddk_ffi_fn_func_accept_offer_request(
+    offer: Uint8Array,
+    params: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Uint8Array
+  uniffi_ddk_ffi_fn_func_accept_offer_with_signatures(
+    offer: Uint8Array,
+    params: Uint8Array,
+    signatures: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Uint8Array
   uniffi_ddk_ffi_fn_func_chain_hash_from_network(network: Uint8Array, uniffi_out_err: UniffiRustCallStatus): Uint8Array
   uniffi_ddk_ffi_fn_func_compute_contract_id(
     offer: Uint8Array,
@@ -1147,7 +1184,6 @@ interface NativeModuleInterface {
     prevSign: Uint8Array,
     localParty: Uint8Array,
     inputSerialId: Uint8Array,
-    maxWitnessLen: number,
     uniffi_out_err: UniffiRustCallStatus,
   ): Uint8Array
   uniffi_ddk_ffi_fn_func_create_dlc_transactions(
@@ -1260,15 +1296,16 @@ interface NativeModuleInterface {
     accept: Uint8Array,
     sign: Uint8Array,
     signedFundingPsbt: Uint8Array,
+    keys: bigint,
+    splicedContracts: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus,
   ): Uint8Array
-  uniffi_ddk_ffi_fn_func_finalize_sign_spliced(
+  uniffi_ddk_ffi_fn_func_finalize_sign_with_signatures(
     offer: Uint8Array,
     accept: Uint8Array,
     sign: Uint8Array,
     signedFundingPsbt: Uint8Array,
-    keys: bigint,
-    spliceKeys: Uint8Array,
+    dlcInputSignatures: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus,
   ): Uint8Array
   uniffi_ddk_ffi_fn_func_funding_input(
@@ -1295,17 +1332,21 @@ interface NativeModuleInterface {
     offer: Uint8Array,
     accept: Uint8Array,
     keys: bigint,
-    temporaryContractId: Uint8Array,
     signedFundingPsbt: Uint8Array,
+    splicedContracts: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus,
   ): Uint8Array
-  uniffi_ddk_ffi_fn_func_sign_accept_spliced(
+  uniffi_ddk_ffi_fn_func_sign_accept_request(
     offer: Uint8Array,
     accept: Uint8Array,
-    keys: bigint,
-    temporaryContractId: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Uint8Array
+  uniffi_ddk_ffi_fn_func_sign_accept_with_signatures(
+    offer: Uint8Array,
+    accept: Uint8Array,
+    signatures: Uint8Array,
     signedFundingPsbt: Uint8Array,
-    spliceKeys: Uint8Array,
+    dlcInputSignatures: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus,
   ): Uint8Array
   uniffi_ddk_ffi_fn_func_sign_contract_cet(
@@ -1333,6 +1374,7 @@ interface NativeModuleInterface {
     inputs: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus,
   ): Uint8Array
+  uniffi_ddk_ffi_fn_func_spliced_contract_ids(offer: Uint8Array, uniffi_out_err: UniffiRustCallStatus): Uint8Array
   uniffi_ddk_ffi_fn_func_validate_accept(
     offer: Uint8Array,
     accept: Uint8Array,
@@ -1476,6 +1518,8 @@ interface NativeModuleInterface {
   ): Uint8Array
   ffi_ddk_ffi_uniffi_contract_version(): number
   uniffi_ddk_ffi_checksum_func_accept_offer(): number
+  uniffi_ddk_ffi_checksum_func_accept_offer_request(): number
+  uniffi_ddk_ffi_checksum_func_accept_offer_with_signatures(): number
   uniffi_ddk_ffi_checksum_func_chain_hash_from_network(): number
   uniffi_ddk_ffi_checksum_func_compute_contract_id(): number
   uniffi_ddk_ffi_checksum_func_contract_info_payouts(): number
@@ -1502,16 +1546,18 @@ interface NativeModuleInterface {
   uniffi_ddk_ffi_checksum_func_dlc_transactions_from_signed_messages(): number
   uniffi_ddk_ffi_checksum_func_extract_ecdsa_signature_from_oracle_signatures(): number
   uniffi_ddk_ffi_checksum_func_finalize_sign(): number
-  uniffi_ddk_ffi_checksum_func_finalize_sign_spliced(): number
+  uniffi_ddk_ffi_checksum_func_finalize_sign_with_signatures(): number
   uniffi_ddk_ffi_checksum_func_funding_input(): number
   uniffi_ddk_ffi_checksum_func_get_pubkey_from_extkey(): number
   uniffi_ddk_ffi_checksum_func_get_total_input_vsize(): number
   uniffi_ddk_ffi_checksum_func_get_xpub_from_xpriv(): number
   uniffi_ddk_ffi_checksum_func_sign_accept(): number
-  uniffi_ddk_ffi_checksum_func_sign_accept_spliced(): number
+  uniffi_ddk_ffi_checksum_func_sign_accept_request(): number
+  uniffi_ddk_ffi_checksum_func_sign_accept_with_signatures(): number
   uniffi_ddk_ffi_checksum_func_sign_contract_cet(): number
   uniffi_ddk_ffi_checksum_func_sign_contract_refund(): number
   uniffi_ddk_ffi_checksum_func_sign_funding_psbt_with_descriptor(): number
+  uniffi_ddk_ffi_checksum_func_spliced_contract_ids(): number
   uniffi_ddk_ffi_checksum_func_validate_accept(): number
   uniffi_ddk_ffi_checksum_func_validate_offer(): number
   uniffi_ddk_ffi_checksum_func_validate_sign(): number

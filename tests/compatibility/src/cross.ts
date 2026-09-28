@@ -154,7 +154,7 @@ export async function enterDdkOfferBalAccept(
   ddk.validateAccept(offer, accept)
   const fundingPsbt = ddk.createFundingPsbt(offer, accept)
   const signedPsbt = ddkParty.signFundingPsbt(offer, accept, fundingPsbt, [ddkInput])
-  const signResult = ddk.signAccept(offer, accept, ddkParty.keys, ddkTempId, signedPsbt)
+  const signResult = ddk.signAccept(offer, accept, ddkParty.keys, signedPsbt, [])
   const sign = signResult.sign
 
   // --- BAL finalizes and the funding tx is broadcast ---
@@ -242,7 +242,7 @@ export async function enterBalOfferDdkAccept(
   // --- ddk finalizes and broadcasts ---
   ddk.validateSign(offer, accept, sign)
   const acceptorSignedPsbt = ddkParty.signFundingPsbt(offer, accept, acceptResult.fundingPsbt, [ddkInput])
-  const fundingTx = ddk.finalizeSign(offer, accept, sign, acceptorSignedPsbt)
+  const fundingTx = ddk.finalizeSign(offer, accept, sign, acceptorSignedPsbt, ddkParty.keys, [])
   const fundTxId = await rpc.broadcastAndConfirm(hex(fundingTx))
 
   const ddkTransactions = ddk.dlcTransactionsFromMessages(offer, accept)

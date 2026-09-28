@@ -83,6 +83,59 @@ export function acceptOffer(
 }
 
 /**
+ * What the accepting party signs to accept `offer` with `params`.
+ *
+ * `params.party` must fix `payout_serial_id` and `change_serial_id`: they
+ * place outputs in every transaction signed here, so this and
+ * [`accept_offer_with_signatures`] must be given the same values.
+ */
+export function acceptOfferRequest(offer: Uint8Array, params: AcceptOfferParams): SigningRequest /*throws*/ {
+  const __rb: Uint8Array = uniffiCaller.rustCallWithError(
+    /*liftError:*/ FfiConverterTypeContractError.lift.bind(FfiConverterTypeContractError),
+    /*caller:*/ (callStatus) => {
+      return nativeModule().uniffi_ddk_ffi_fn_func_accept_offer_request(
+        FfiConverterUint8Array.lower(offer, nativeModule().rustbuffer_alloc),
+        FfiConverterTypeAcceptOfferParams.lower(params, nativeModule().rustbuffer_alloc),
+        callStatus,
+      )
+    },
+    /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+  )
+  try {
+    return FfiConverterTypeSigningRequest.lift(__rb)
+  } finally {
+    nativeModule().rustbuffer_free(__rb)
+  }
+}
+
+/**
+ * Completes [`accept_offer_request`] into the same result as `accept_offer`.
+ */
+export function acceptOfferWithSignatures(
+  offer: Uint8Array,
+  params: AcceptOfferParams,
+  signatures: ContractSignatures,
+): AcceptResult /*throws*/ {
+  const __rb: Uint8Array = uniffiCaller.rustCallWithError(
+    /*liftError:*/ FfiConverterTypeContractError.lift.bind(FfiConverterTypeContractError),
+    /*caller:*/ (callStatus) => {
+      return nativeModule().uniffi_ddk_ffi_fn_func_accept_offer_with_signatures(
+        FfiConverterUint8Array.lower(offer, nativeModule().rustbuffer_alloc),
+        FfiConverterTypeAcceptOfferParams.lower(params, nativeModule().rustbuffer_alloc),
+        FfiConverterTypeContractSignatures.lower(signatures, nativeModule().rustbuffer_alloc),
+        callStatus,
+      )
+    },
+    /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+  )
+  try {
+    return FfiConverterTypeAcceptResult.lift(__rb)
+  } finally {
+    nativeModule().rustbuffer_free(__rb)
+  }
+}
+
+/**
  * The 32-byte chain hash for a network (`bitcoin` / `testnet` / `signet` /
  * `regtest`). Use it for [`CreateOfferParams::chain_hash`].
  */
@@ -332,9 +385,14 @@ export function createCets(
  * Rebuilds the splice `FundingInput` (wire-encoded) that spends a previous
  * contract's 2-of-2 funding output, from that contract's offer, accept and
  * sign messages. The sign message selects the fee rule, so a contract created
- * before ddk-dlc 2.0.0-rc.4 can be spliced too. Only the offering party contributes a splice input; place the
- * result in the offering party's `funding_inputs`. `max_witness_len` must be
- * greater than 108 — use [`dlc_input_max_witness_len`].
+ * before ddk-dlc 2.0.0-rc.4 can be spliced too.
+ *
+ * A splice is an ordinary offer whose funding inputs include this one: place
+ * it in the offering party's `funding_inputs` (only the offering party
+ * contributes splice inputs). `local_party` is the side the new offering party
+ * was on in the previous contract. The input carries the previous contract's
+ * id, which is how both parties find it again when signing
+ * ([`SplicedContract`]).
  */
 export function createDlcSpliceInput(
   prevOffer: Uint8Array,
@@ -342,7 +400,6 @@ export function createDlcSpliceInput(
   prevSign: Uint8Array,
   localParty: Party,
   inputSerialId: bigint | undefined,
-  maxWitnessLen: number,
 ): Uint8Array /*throws*/ {
   const __rb: Uint8Array = uniffiCaller.rustCallWithError(
     /*liftError:*/ FfiConverterTypeContractError.lift.bind(FfiConverterTypeContractError),
@@ -353,7 +410,6 @@ export function createDlcSpliceInput(
         FfiConverterUint8Array.lower(prevSign, nativeModule().rustbuffer_alloc),
         FfiConverterTypeParty.lower(localParty, nativeModule().rustbuffer_alloc),
         FfiConverterOptionalUInt64.lower(inputSerialId, nativeModule().rustbuffer_alloc),
-        FfiConverterUInt16.lower(maxWitnessLen, nativeModule().rustbuffer_alloc),
         callStatus,
       )
     },
@@ -710,7 +766,8 @@ export function createXprivFromParentPath(
 }
 
 /**
- * The required `max_witness_len` for a DLC (splice) funding input (220).
+ * The `max_witness_len` of a DLC (splice) funding input (220), for building a
+ * low-level `DlcInputInfo`. [`create_dlc_splice_input`] applies it itself.
  */
 export function dlcInputMaxWitnessLen(): number {
   return FfiConverterUInt16.lift(
@@ -803,12 +860,18 @@ export function extractEcdsaSignatureFromOracleSignatures(
 /**
  * The accepting party verifies the sign message and completes the funding
  * transaction. Returns the Bitcoin consensus-serialized signed transaction.
+ *
+ * `keys` and `spliced_contracts` are only used when the offer carries splice
+ * (DLC) funding inputs: this party's half of each previous contract's 2-of-2
+ * is derived from them, as in [`sign_accept`]. Pass an empty list otherwise.
  */
 export function finalizeSign(
   offer: Uint8Array,
   accept: Uint8Array,
   sign: Uint8Array,
   signedFundingPsbt: Uint8Array,
+  keys: ContractKeyProviderLike,
+  splicedContracts: Array<SplicedContract>,
 ): Uint8Array /*throws*/ {
   const __rb: Uint8Array = uniffiCaller.rustCallWithError(
     /*liftError:*/ FfiConverterTypeContractError.lift.bind(FfiConverterTypeContractError),
@@ -818,6 +881,8 @@ export function finalizeSign(
         FfiConverterUint8Array.lower(accept, nativeModule().rustbuffer_alloc),
         FfiConverterUint8Array.lower(sign, nativeModule().rustbuffer_alloc),
         FfiConverterUint8Array.lower(signedFundingPsbt, nativeModule().rustbuffer_alloc),
+        FfiConverterTypeContractKeyProvider.lower(keys, nativeModule().rustbuffer_alloc),
+        FfiConverterSequenceTypeSplicedContract.lower(splicedContracts, nativeModule().rustbuffer_alloc),
         callStatus,
       )
     },
@@ -831,28 +896,30 @@ export function finalizeSign(
 }
 
 /**
- * Like [`finalize_sign`], but additionally completes the 2-of-2 witness for any
- * splice (DLC) funding input using this (accepting) party's prior funding keys,
- * re-derived inside Rust from `keys`.
+ * Completes the funding transaction for an accepting party whose contract key
+ * is held externally: the same result as `finalize_sign`, with this party's
+ * half of each splice input taken from `dlc_input_signatures` (the
+ * accept step's request lists their indexes) rather than derived from keys.
+ *
+ * `signed_funding_psbt` carries finalized witnesses for the accepting party's
+ * wallet inputs; with none, the unsigned funding PSBT is enough.
  */
-export function finalizeSignSpliced(
+export function finalizeSignWithSignatures(
   offer: Uint8Array,
   accept: Uint8Array,
   sign: Uint8Array,
   signedFundingPsbt: Uint8Array,
-  keys: ContractKeyProviderLike,
-  spliceKeys: Array<SpliceKeyRef>,
+  dlcInputSignatures: Array<DlcInputSignature>,
 ): Uint8Array /*throws*/ {
   const __rb: Uint8Array = uniffiCaller.rustCallWithError(
     /*liftError:*/ FfiConverterTypeContractError.lift.bind(FfiConverterTypeContractError),
     /*caller:*/ (callStatus) => {
-      return nativeModule().uniffi_ddk_ffi_fn_func_finalize_sign_spliced(
+      return nativeModule().uniffi_ddk_ffi_fn_func_finalize_sign_with_signatures(
         FfiConverterUint8Array.lower(offer, nativeModule().rustbuffer_alloc),
         FfiConverterUint8Array.lower(accept, nativeModule().rustbuffer_alloc),
         FfiConverterUint8Array.lower(sign, nativeModule().rustbuffer_alloc),
         FfiConverterUint8Array.lower(signedFundingPsbt, nativeModule().rustbuffer_alloc),
-        FfiConverterTypeContractKeyProvider.lower(keys, nativeModule().rustbuffer_alloc),
-        FfiConverterSequenceTypeSpliceKeyRef.lower(spliceKeys, nativeModule().rustbuffer_alloc),
+        FfiConverterSequenceTypeDlcInputSignature.lower(dlcInputSignatures, nativeModule().rustbuffer_alloc),
         callStatus,
       )
     },
@@ -974,15 +1041,21 @@ export function getXpubFromXpriv(xpriv: Uint8Array, network: string): Uint8Array
 
 /**
  * The offering party verifies the accept message and produces its `SignDlc`.
- * The offer party's funding secret key is derived from `keys` +
- * `temporary_contract_id` (the new contract's id).
+ *
+ * The offering party's funding secret key is derived from `keys` and the
+ * offer's own temporary contract id, which is the id the offering party
+ * published its funding public key under.
+ *
+ * When the offer carries splice (DLC) funding inputs, this party also signs
+ * its half of each previous contract's 2-of-2; `spliced_contracts` names those
+ * contracts (see [`SplicedContract`]). Pass an empty list otherwise.
  */
 export function signAccept(
   offer: Uint8Array,
   accept: Uint8Array,
   keys: ContractKeyProviderLike,
-  temporaryContractId: Uint8Array,
   signedFundingPsbt: Uint8Array,
+  splicedContracts: Array<SplicedContract>,
 ): SignResult /*throws*/ {
   const __rb: Uint8Array = uniffiCaller.rustCallWithError(
     /*liftError:*/ FfiConverterTypeContractError.lift.bind(FfiConverterTypeContractError),
@@ -991,8 +1064,8 @@ export function signAccept(
         FfiConverterUint8Array.lower(offer, nativeModule().rustbuffer_alloc),
         FfiConverterUint8Array.lower(accept, nativeModule().rustbuffer_alloc),
         FfiConverterTypeContractKeyProvider.lower(keys, nativeModule().rustbuffer_alloc),
-        FfiConverterUint8Array.lower(temporaryContractId, nativeModule().rustbuffer_alloc),
         FfiConverterUint8Array.lower(signedFundingPsbt, nativeModule().rustbuffer_alloc),
+        FfiConverterSequenceTypeSplicedContract.lower(splicedContracts, nativeModule().rustbuffer_alloc),
         callStatus,
       )
     },
@@ -1006,28 +1079,51 @@ export function signAccept(
 }
 
 /**
- * Like [`sign_accept`], but additionally co-signs any splice (DLC) funding
- * inputs. For each splice input, `splice_keys` names the previous contract; the
- * prior funding secret key is re-derived inside Rust from `keys`.
+ * What the offering party signs to answer `accept`. The accept message's
+ * signatures are verified first, so nothing is signed for an invalid accept.
  */
-export function signAcceptSpliced(
+export function signAcceptRequest(offer: Uint8Array, accept: Uint8Array): SigningRequest /*throws*/ {
+  const __rb: Uint8Array = uniffiCaller.rustCallWithError(
+    /*liftError:*/ FfiConverterTypeContractError.lift.bind(FfiConverterTypeContractError),
+    /*caller:*/ (callStatus) => {
+      return nativeModule().uniffi_ddk_ffi_fn_func_sign_accept_request(
+        FfiConverterUint8Array.lower(offer, nativeModule().rustbuffer_alloc),
+        FfiConverterUint8Array.lower(accept, nativeModule().rustbuffer_alloc),
+        callStatus,
+      )
+    },
+    /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+  )
+  try {
+    return FfiConverterTypeSigningRequest.lift(__rb)
+  } finally {
+    nativeModule().rustbuffer_free(__rb)
+  }
+}
+
+/**
+ * Completes [`sign_accept_request`] into the same result as `sign_accept`.
+ *
+ * `signed_funding_psbt` carries finalized witnesses for the offering party's
+ * wallet inputs, as for `sign_accept`. `dlc_input_signatures` carries this
+ * party's half of each splice input; pass an empty list otherwise.
+ */
+export function signAcceptWithSignatures(
   offer: Uint8Array,
   accept: Uint8Array,
-  keys: ContractKeyProviderLike,
-  temporaryContractId: Uint8Array,
+  signatures: ContractSignatures,
   signedFundingPsbt: Uint8Array,
-  spliceKeys: Array<SpliceKeyRef>,
+  dlcInputSignatures: Array<DlcInputSignature>,
 ): SignResult /*throws*/ {
   const __rb: Uint8Array = uniffiCaller.rustCallWithError(
     /*liftError:*/ FfiConverterTypeContractError.lift.bind(FfiConverterTypeContractError),
     /*caller:*/ (callStatus) => {
-      return nativeModule().uniffi_ddk_ffi_fn_func_sign_accept_spliced(
+      return nativeModule().uniffi_ddk_ffi_fn_func_sign_accept_with_signatures(
         FfiConverterUint8Array.lower(offer, nativeModule().rustbuffer_alloc),
         FfiConverterUint8Array.lower(accept, nativeModule().rustbuffer_alloc),
-        FfiConverterTypeContractKeyProvider.lower(keys, nativeModule().rustbuffer_alloc),
-        FfiConverterUint8Array.lower(temporaryContractId, nativeModule().rustbuffer_alloc),
+        FfiConverterTypeContractSignatures.lower(signatures, nativeModule().rustbuffer_alloc),
         FfiConverterUint8Array.lower(signedFundingPsbt, nativeModule().rustbuffer_alloc),
-        FfiConverterSequenceTypeSpliceKeyRef.lower(spliceKeys, nativeModule().rustbuffer_alloc),
+        FfiConverterSequenceTypeDlcInputSignature.lower(dlcInputSignatures, nativeModule().rustbuffer_alloc),
         callStatus,
       )
     },
@@ -1160,6 +1256,32 @@ export function signFundingPsbtWithDescriptor(
   )
   try {
     return FfiConverterUint8Array.lift(__rb)
+  } finally {
+    nativeModule().rustbuffer_free(__rb)
+  }
+}
+
+/**
+ * The ids of the previous contracts an offer splices, one per splice (DLC)
+ * funding input, in funding-input order. Empty for an offer that splices
+ * nothing.
+ *
+ * This is how the accepting party finds its own records of those contracts,
+ * to supply them as [`SplicedContract`]s to [`finalize_sign`].
+ */
+export function splicedContractIds(offer: Uint8Array): Array<Uint8Array> /*throws*/ {
+  const __rb: Uint8Array = uniffiCaller.rustCallWithError(
+    /*liftError:*/ FfiConverterTypeContractError.lift.bind(FfiConverterTypeContractError),
+    /*caller:*/ (callStatus) => {
+      return nativeModule().uniffi_ddk_ffi_fn_func_spliced_contract_ids(
+        FfiConverterUint8Array.lower(offer, nativeModule().rustbuffer_alloc),
+        callStatus,
+      )
+    },
+    /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+  )
+  try {
+    return FfiConverterSequenceBytes.lift(__rb)
   } finally {
     nativeModule().rustbuffer_free(__rb)
   }
@@ -2111,6 +2233,59 @@ const FfiConverterTypeCetAdaptorSignatureDebugInfo = (() => {
   return new FFIConverter()
 })()
 
+/**
+ * One CET adaptor signature to produce.
+ */
+export type CetSigningRequest = {
+  /**
+   * The CET as a BIP-174 PSBT spending the 2-of-2 funding output, with its
+   * `witness_utxo` and `witness_script` set.
+   */
+  psbt: Uint8Array
+  /**
+   * The 33-byte point the signature is encrypted to: the oracle outcome
+   * this CET pays out on.
+   */
+  adaptorPoint: Uint8Array
+}
+
+/**
+ * Generated factory for {@link CetSigningRequest} record objects.
+ */
+export const CetSigningRequest = (() => {
+  const defaults = () => ({})
+  const create = (() => {
+    return uniffiCreateRecord<CetSigningRequest, ReturnType<typeof defaults>>(defaults)
+  })()
+  return Object.freeze({
+    create,
+    new: create,
+    defaults: () => Object.freeze(defaults()) as Partial<CetSigningRequest>,
+  })
+})()
+
+const FfiConverterTypeCetSigningRequest = (() => {
+  type TypeName = CetSigningRequest
+  class FFIConverter extends AbstractFfiConverterByteArray<TypeName> {
+    readFromCursor(c: Cursor): TypeName {
+      return {
+        psbt: FfiConverterUint8Array.readFromCursor(c),
+        adaptorPoint: FfiConverterUint8Array.readFromCursor(c),
+      }
+    }
+    writeIntoCursor(value: TypeName, c: Cursor): void {
+      FfiConverterUint8Array.writeIntoCursor(value.psbt, c)
+      FfiConverterUint8Array.writeIntoCursor(value.adaptorPoint, c)
+    }
+    allocationSize(value: TypeName): number {
+      return (
+        FfiConverterUint8Array.allocationSize(value.psbt) + FfiConverterUint8Array.allocationSize(value.adaptorPoint)
+      )
+    }
+  }
+  return new FFIConverter()
+})()
+
 export type ChangeOutputAndFees = {
   changeOutput: TxOutput
   fundFee: bigint
@@ -2288,6 +2463,58 @@ const FfiConverterTypeContractPayouts = (() => {
         FfiConverterUInt64.allocationSize(value.totalCollateralSats) +
         FfiConverterBool.allocationSize(value.isEnum) +
         FfiConverterSequenceTypePayoutRow.allocationSize(value.rows)
+      )
+    }
+  }
+  return new FFIConverter()
+})()
+
+/**
+ * A signer's answer to a [`SigningRequest`]'s refund and CETs.
+ */
+export type ContractSignatures = {
+  /**
+   * The 64-byte compact (R‖S) ECDSA signature of the refund, SIGHASH_ALL.
+   */
+  refundSignature: Uint8Array
+  /**
+   * The 162-byte ECDSA adaptor signatures, in the request's `cets` order.
+   */
+  cetAdaptorSignatures: Array<Uint8Array>
+}
+
+/**
+ * Generated factory for {@link ContractSignatures} record objects.
+ */
+export const ContractSignatures = (() => {
+  const defaults = () => ({})
+  const create = (() => {
+    return uniffiCreateRecord<ContractSignatures, ReturnType<typeof defaults>>(defaults)
+  })()
+  return Object.freeze({
+    create,
+    new: create,
+    defaults: () => Object.freeze(defaults()) as Partial<ContractSignatures>,
+  })
+})()
+
+const FfiConverterTypeContractSignatures = (() => {
+  type TypeName = ContractSignatures
+  class FFIConverter extends AbstractFfiConverterByteArray<TypeName> {
+    readFromCursor(c: Cursor): TypeName {
+      return {
+        refundSignature: FfiConverterUint8Array.readFromCursor(c),
+        cetAdaptorSignatures: FfiConverterSequenceBytes.readFromCursor(c),
+      }
+    }
+    writeIntoCursor(value: TypeName, c: Cursor): void {
+      FfiConverterUint8Array.writeIntoCursor(value.refundSignature, c)
+      FfiConverterSequenceBytes.writeIntoCursor(value.cetAdaptorSignatures, c)
+    }
+    allocationSize(value: TypeName): number {
+      return (
+        FfiConverterUint8Array.allocationSize(value.refundSignature) +
+        FfiConverterSequenceBytes.allocationSize(value.cetAdaptorSignatures)
       )
     }
   }
@@ -2517,6 +2744,58 @@ const FfiConverterTypeDlcInputInfo = (() => {
         FfiConverterUInt32.allocationSize(value.maxWitnessLen) +
         FfiConverterUInt64.allocationSize(value.inputSerialId) +
         FfiConverterUint8Array.allocationSize(value.contractId)
+      )
+    }
+  }
+  return new FFIConverter()
+})()
+
+/**
+ * A signer's half of one splice (DLC) input's 2-of-2.
+ */
+export type DlcInputSignature = {
+  /**
+   * The funding transaction input index, from the request's
+   * `dlc_input_indexes`.
+   */
+  inputIndex: number
+  /**
+   * The 64-byte compact (R‖S) ECDSA signature, SIGHASH_ALL.
+   */
+  signature: Uint8Array
+}
+
+/**
+ * Generated factory for {@link DlcInputSignature} record objects.
+ */
+export const DlcInputSignature = (() => {
+  const defaults = () => ({})
+  const create = (() => {
+    return uniffiCreateRecord<DlcInputSignature, ReturnType<typeof defaults>>(defaults)
+  })()
+  return Object.freeze({
+    create,
+    new: create,
+    defaults: () => Object.freeze(defaults()) as Partial<DlcInputSignature>,
+  })
+})()
+
+const FfiConverterTypeDlcInputSignature = (() => {
+  type TypeName = DlcInputSignature
+  class FFIConverter extends AbstractFfiConverterByteArray<TypeName> {
+    readFromCursor(c: Cursor): TypeName {
+      return {
+        inputIndex: FfiConverterUInt32.readFromCursor(c),
+        signature: FfiConverterUint8Array.readFromCursor(c),
+      }
+    }
+    writeIntoCursor(value: TypeName, c: Cursor): void {
+      FfiConverterUInt32.writeIntoCursor(value.inputIndex, c)
+      FfiConverterUint8Array.writeIntoCursor(value.signature, c)
+    }
+    allocationSize(value: TypeName): number {
+      return (
+        FfiConverterUInt32.allocationSize(value.inputIndex) + FfiConverterUint8Array.allocationSize(value.signature)
       )
     }
   }
@@ -2802,7 +3081,7 @@ const FfiConverterTypePayout = (() => {
 })()
 
 /**
- * The result of [`sign_accept`] / [`sign_accept_spliced`].
+ * The result of [`sign_accept`].
  */
 export type SignResult = {
   /**
@@ -2854,52 +3133,133 @@ const FfiConverterTypeSignResult = (() => {
 })()
 
 /**
- * References a splice (DLC) funding input and the previous contract whose
- * 2-of-2 output it spends, so the provider can re-derive the signing key.
+ * Everything one party signs with its contract key in one step.
  */
-export type SpliceKeyRef = {
+export type SigningRequest = {
   /**
-   * The serial id of the DLC (splice) funding input this key signs.
+   * The 33-byte funding public key every refund and CET signature must
+   * verify against: this party's, from the messages.
    */
-  inputSerialId: bigint
+  fundingPubkey: Uint8Array
   /**
-   * The 32-byte temporary id of the previous contract being spliced from.
+   * The refund transaction as a PSBT spending the 2-of-2 funding output,
+   * with its `witness_utxo` and `witness_script` set.
    */
-  priorTemporaryContractId: Uint8Array
+  refundPsbt: Uint8Array
+  /**
+   * One entry per adaptor signature, in the order they are returned.
+   */
+  cets: Array<CetSigningRequest>
+  /**
+   * The funding transaction as a PSBT. Splice (DLC) inputs carry their
+   * `witness_utxo` and 2-of-2 `witness_script` here, unlike in
+   * `create_funding_psbt`, so a signer can produce this party's half.
+   */
+  fundingPsbt: Uint8Array
+  /**
+   * The funding transaction input indexes of the splice (DLC) inputs this
+   * party signs a half of. Empty unless the offer splices a contract.
+   */
+  dlcInputIndexes: Array<number>
 }
 
 /**
- * Generated factory for {@link SpliceKeyRef} record objects.
+ * Generated factory for {@link SigningRequest} record objects.
  */
-export const SpliceKeyRef = (() => {
+export const SigningRequest = (() => {
   const defaults = () => ({})
   const create = (() => {
-    return uniffiCreateRecord<SpliceKeyRef, ReturnType<typeof defaults>>(defaults)
+    return uniffiCreateRecord<SigningRequest, ReturnType<typeof defaults>>(defaults)
   })()
   return Object.freeze({
     create,
     new: create,
-    defaults: () => Object.freeze(defaults()) as Partial<SpliceKeyRef>,
+    defaults: () => Object.freeze(defaults()) as Partial<SigningRequest>,
   })
 })()
 
-const FfiConverterTypeSpliceKeyRef = (() => {
-  type TypeName = SpliceKeyRef
+const FfiConverterTypeSigningRequest = (() => {
+  type TypeName = SigningRequest
   class FFIConverter extends AbstractFfiConverterByteArray<TypeName> {
     readFromCursor(c: Cursor): TypeName {
       return {
-        inputSerialId: FfiConverterUInt64.readFromCursor(c),
-        priorTemporaryContractId: FfiConverterUint8Array.readFromCursor(c),
+        fundingPubkey: FfiConverterUint8Array.readFromCursor(c),
+        refundPsbt: FfiConverterUint8Array.readFromCursor(c),
+        cets: FfiConverterSequenceTypeCetSigningRequest.readFromCursor(c),
+        fundingPsbt: FfiConverterUint8Array.readFromCursor(c),
+        dlcInputIndexes: FfiConverterSequenceUInt32.readFromCursor(c),
       }
     }
     writeIntoCursor(value: TypeName, c: Cursor): void {
-      FfiConverterUInt64.writeIntoCursor(value.inputSerialId, c)
-      FfiConverterUint8Array.writeIntoCursor(value.priorTemporaryContractId, c)
+      FfiConverterUint8Array.writeIntoCursor(value.fundingPubkey, c)
+      FfiConverterUint8Array.writeIntoCursor(value.refundPsbt, c)
+      FfiConverterSequenceTypeCetSigningRequest.writeIntoCursor(value.cets, c)
+      FfiConverterUint8Array.writeIntoCursor(value.fundingPsbt, c)
+      FfiConverterSequenceUInt32.writeIntoCursor(value.dlcInputIndexes, c)
     }
     allocationSize(value: TypeName): number {
       return (
-        FfiConverterUInt64.allocationSize(value.inputSerialId) +
-        FfiConverterUint8Array.allocationSize(value.priorTemporaryContractId)
+        FfiConverterUint8Array.allocationSize(value.fundingPubkey) +
+        FfiConverterUint8Array.allocationSize(value.refundPsbt) +
+        FfiConverterSequenceTypeCetSigningRequest.allocationSize(value.cets) +
+        FfiConverterUint8Array.allocationSize(value.fundingPsbt) +
+        FfiConverterSequenceUInt32.allocationSize(value.dlcInputIndexes)
+      )
+    }
+  }
+  return new FFIConverter()
+})()
+
+/**
+ * A previous contract that a splice (DLC) funding input in the offer spends.
+ *
+ * The input carries the contract id, not this party's temporary id for that
+ * contract — which is what the provider derives the contract's funding key
+ * from. Look the contract up by [`spliced_contract_ids`] and supply both.
+ */
+export type SplicedContract = {
+  /**
+   * The 32-byte contract id, as carried by the offer's DLC input.
+   */
+  contractId: Uint8Array
+  /**
+   * This party's own 32-byte temporary id for that contract.
+   */
+  temporaryContractId: Uint8Array
+}
+
+/**
+ * Generated factory for {@link SplicedContract} record objects.
+ */
+export const SplicedContract = (() => {
+  const defaults = () => ({})
+  const create = (() => {
+    return uniffiCreateRecord<SplicedContract, ReturnType<typeof defaults>>(defaults)
+  })()
+  return Object.freeze({
+    create,
+    new: create,
+    defaults: () => Object.freeze(defaults()) as Partial<SplicedContract>,
+  })
+})()
+
+const FfiConverterTypeSplicedContract = (() => {
+  type TypeName = SplicedContract
+  class FFIConverter extends AbstractFfiConverterByteArray<TypeName> {
+    readFromCursor(c: Cursor): TypeName {
+      return {
+        contractId: FfiConverterUint8Array.readFromCursor(c),
+        temporaryContractId: FfiConverterUint8Array.readFromCursor(c),
+      }
+    }
+    writeIntoCursor(value: TypeName, c: Cursor): void {
+      FfiConverterUint8Array.writeIntoCursor(value.contractId, c)
+      FfiConverterUint8Array.writeIntoCursor(value.temporaryContractId, c)
+    }
+    allocationSize(value: TypeName): number {
+      return (
+        FfiConverterUint8Array.allocationSize(value.contractId) +
+        FfiConverterUint8Array.allocationSize(value.temporaryContractId)
       )
     }
   }
@@ -2925,6 +3285,7 @@ export enum ContractError_Tags {
   Serialization = 'Serialization',
   InvalidNetwork = 'InvalidNetwork',
   InvalidLength = 'InvalidLength',
+  Unsupported = 'Unsupported',
 }
 /**
  * Errors returned by the stateless contract API.
@@ -3496,6 +3857,43 @@ export const ContractError = (() => {
     }
   }
 
+  type Unsupported__interface = {
+    tag: ContractError_Tags.Unsupported
+    inner: Readonly<{ message: string }>
+  }
+  /**
+   * The operation does not support this contract, e.g. external signing of
+   * a numeric-outcome contract.
+   */
+  class Unsupported_ extends UniffiError implements Unsupported__interface {
+    /**
+     * @private
+     * This field is private and should not be used, use `tag` instead.
+     */
+    readonly [uniffiTypeNameSymbol] = 'ContractError'
+    readonly tag = ContractError_Tags.Unsupported
+    readonly inner: Readonly<{ message: string }>
+    constructor(inner: { message: string }) {
+      super('ContractError', 'Unsupported')
+
+      this.inner = Object.freeze(inner)
+    }
+    static new(inner: { message: string }): Unsupported_ {
+      return new Unsupported_(inner)
+    }
+
+    static instanceOf(obj: any): obj is Unsupported_ {
+      return obj.tag === ContractError_Tags.Unsupported
+    }
+    static hasInner(obj: any): obj is Unsupported_ {
+      return Unsupported_.instanceOf(obj)
+    }
+
+    static getInner(obj: Unsupported_): Readonly<{ message: string }> {
+      return obj.inner
+    }
+  }
+
   function instanceOf(obj: any): obj is ContractError {
     return obj[uniffiTypeNameSymbol] === 'ContractError'
   }
@@ -3519,6 +3917,7 @@ export const ContractError = (() => {
     Serialization: Serialization_,
     InvalidNetwork: InvalidNetwork_,
     InvalidLength: InvalidLength_,
+    Unsupported: Unsupported_,
   })
 })()
 /**
@@ -3545,7 +3944,8 @@ export type ContractError = InstanceType<
     | 'Key'
     | 'Serialization'
     | 'InvalidNetwork'
-    | 'InvalidLength']
+    | 'InvalidLength'
+    | 'Unsupported']
 >
 
 // FfiConverter for enum ContractError
@@ -3592,6 +3992,8 @@ const FfiConverterTypeContractError = (() => {
             expected: FfiConverterUInt32.readFromCursor(c),
             actual: FfiConverterUInt32.readFromCursor(c),
           })
+        case 18:
+          return new ContractError.Unsupported({ message: FfiConverterString.readFromCursor(c) })
         default:
           throw new UniffiInternalError.UnexpectedEnumCase()
       }
@@ -3700,6 +4102,12 @@ const FfiConverterTypeContractError = (() => {
           FfiConverterUInt32.writeIntoCursor(inner.actual, c)
           return
         }
+        case ContractError_Tags.Unsupported: {
+          c.writeI32(18)
+          const inner = value.inner
+          FfiConverterString.writeIntoCursor(inner.message, c)
+          return
+        }
         default:
           // Throwing from here means that ContractError_Tags hasn't matched an ordinal.
           throw new UniffiInternalError.UnexpectedEnumCase()
@@ -3806,6 +4214,12 @@ const FfiConverterTypeContractError = (() => {
           size += FfiConverterString.allocationSize(inner.field)
           size += FfiConverterUInt32.allocationSize(inner.expected)
           size += FfiConverterUInt32.allocationSize(inner.actual)
+          return size
+        }
+        case ContractError_Tags.Unsupported: {
+          const inner = value.inner
+          let size = 4
+          size += FfiConverterString.allocationSize(inner.message)
           return size
         }
         default:
@@ -4663,6 +5077,12 @@ const FfiConverterSequenceTypeTxInputInfo = new FfiConverterArray(FfiConverterTy
 // FfiConverter for Array<DlcInputInfo>
 const FfiConverterSequenceTypeDlcInputInfo = new FfiConverterArray(FfiConverterTypeDlcInputInfo)
 
+// FfiConverter for Array<CetSigningRequest>
+const FfiConverterSequenceTypeCetSigningRequest = new FfiConverterArray(FfiConverterTypeCetSigningRequest)
+
+// FfiConverter for Array<number>
+const FfiConverterSequenceUInt32 = new FfiConverterArray(FfiConverterUInt32)
+
 // FfiConverter for Array<OracleInfo>
 const FfiConverterSequenceTypeOracleInfo = new FfiConverterArray(FfiConverterTypeOracleInfo)
 
@@ -4678,8 +5098,11 @@ const FfiConverterSequenceTypeAdaptorSignature = new FfiConverterArray(FfiConver
 // FfiConverter for Array<Payout>
 const FfiConverterSequenceTypePayout = new FfiConverterArray(FfiConverterTypePayout)
 
-// FfiConverter for Array<SpliceKeyRef>
-const FfiConverterSequenceTypeSpliceKeyRef = new FfiConverterArray(FfiConverterTypeSpliceKeyRef)
+// FfiConverter for Array<SplicedContract>
+const FfiConverterSequenceTypeSplicedContract = new FfiConverterArray(FfiConverterTypeSplicedContract)
+
+// FfiConverter for Array<DlcInputSignature>
+const FfiConverterSequenceTypeDlcInputSignature = new FfiConverterArray(FfiConverterTypeDlcInputSignature)
 
 // FfiConverter for Array<OracleAttestationRef>
 const FfiConverterSequenceTypeOracleAttestationRef = new FfiConverterArray(FfiConverterTypeOracleAttestationRef)
@@ -4707,6 +5130,12 @@ function uniffiEnsureInitialized() {
   }
   if (nativeModule().uniffi_ddk_ffi_checksum_func_accept_offer() !== 49334) {
     throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_accept_offer')
+  }
+  if (nativeModule().uniffi_ddk_ffi_checksum_func_accept_offer_request() !== 40940) {
+    throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_accept_offer_request')
+  }
+  if (nativeModule().uniffi_ddk_ffi_checksum_func_accept_offer_with_signatures() !== 35336) {
+    throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_accept_offer_with_signatures')
   }
   if (nativeModule().uniffi_ddk_ffi_checksum_func_chain_hash_from_network() !== 782) {
     throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_chain_hash_from_network')
@@ -4741,7 +5170,7 @@ function uniffiEnsureInitialized() {
   if (nativeModule().uniffi_ddk_ffi_checksum_func_create_cets() !== 22051) {
     throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_create_cets')
   }
-  if (nativeModule().uniffi_ddk_ffi_checksum_func_create_dlc_splice_input() !== 33258) {
+  if (nativeModule().uniffi_ddk_ffi_checksum_func_create_dlc_splice_input() !== 42507) {
     throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_create_dlc_splice_input')
   }
   if (nativeModule().uniffi_ddk_ffi_checksum_func_create_dlc_transactions() !== 28858) {
@@ -4781,7 +5210,7 @@ function uniffiEnsureInitialized() {
   if (nativeModule().uniffi_ddk_ffi_checksum_func_create_xpriv_from_parent_path() !== 7895) {
     throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_create_xpriv_from_parent_path')
   }
-  if (nativeModule().uniffi_ddk_ffi_checksum_func_dlc_input_max_witness_len() !== 49586) {
+  if (nativeModule().uniffi_ddk_ffi_checksum_func_dlc_input_max_witness_len() !== 51405) {
     throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_dlc_input_max_witness_len')
   }
   if (nativeModule().uniffi_ddk_ffi_checksum_func_dlc_transactions_from_messages() !== 56492) {
@@ -4797,11 +5226,11 @@ function uniffiEnsureInitialized() {
       'uniffi_ddk_ffi_checksum_func_extract_ecdsa_signature_from_oracle_signatures',
     )
   }
-  if (nativeModule().uniffi_ddk_ffi_checksum_func_finalize_sign() !== 20463) {
+  if (nativeModule().uniffi_ddk_ffi_checksum_func_finalize_sign() !== 42102) {
     throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_finalize_sign')
   }
-  if (nativeModule().uniffi_ddk_ffi_checksum_func_finalize_sign_spliced() !== 32005) {
-    throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_finalize_sign_spliced')
+  if (nativeModule().uniffi_ddk_ffi_checksum_func_finalize_sign_with_signatures() !== 6383) {
+    throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_finalize_sign_with_signatures')
   }
   if (nativeModule().uniffi_ddk_ffi_checksum_func_funding_input() !== 64911) {
     throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_funding_input')
@@ -4815,11 +5244,14 @@ function uniffiEnsureInitialized() {
   if (nativeModule().uniffi_ddk_ffi_checksum_func_get_xpub_from_xpriv() !== 8843) {
     throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_get_xpub_from_xpriv')
   }
-  if (nativeModule().uniffi_ddk_ffi_checksum_func_sign_accept() !== 37062) {
+  if (nativeModule().uniffi_ddk_ffi_checksum_func_sign_accept() !== 26774) {
     throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_sign_accept')
   }
-  if (nativeModule().uniffi_ddk_ffi_checksum_func_sign_accept_spliced() !== 32504) {
-    throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_sign_accept_spliced')
+  if (nativeModule().uniffi_ddk_ffi_checksum_func_sign_accept_request() !== 12935) {
+    throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_sign_accept_request')
+  }
+  if (nativeModule().uniffi_ddk_ffi_checksum_func_sign_accept_with_signatures() !== 17014) {
+    throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_sign_accept_with_signatures')
   }
   if (nativeModule().uniffi_ddk_ffi_checksum_func_sign_contract_cet() !== 36727) {
     throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_sign_contract_cet')
@@ -4829,6 +5261,9 @@ function uniffiEnsureInitialized() {
   }
   if (nativeModule().uniffi_ddk_ffi_checksum_func_sign_funding_psbt_with_descriptor() !== 25961) {
     throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_sign_funding_psbt_with_descriptor')
+  }
+  if (nativeModule().uniffi_ddk_ffi_checksum_func_spliced_contract_ids() !== 41910) {
+    throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_spliced_contract_ids')
   }
   if (nativeModule().uniffi_ddk_ffi_checksum_func_validate_accept() !== 9081) {
     throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_validate_accept')
@@ -4881,15 +5316,18 @@ export default Object.freeze({
     FfiConverterTypeAcceptResult,
     FfiConverterTypeAdaptorSignature,
     FfiConverterTypeCetAdaptorSignatureDebugInfo,
+    FfiConverterTypeCetSigningRequest,
     FfiConverterTypeChangeOutputAndFees,
     FfiConverterTypeContractError,
     FfiConverterTypeContractKeyProvider,
     FfiConverterTypeContractPartyParams,
     FfiConverterTypeContractPayouts,
+    FfiConverterTypeContractSignatures,
     FfiConverterTypeCreateOfferParams,
     FfiConverterTypeDLCError,
     FfiConverterTypeDescriptorInput,
     FfiConverterTypeDlcInputInfo,
+    FfiConverterTypeDlcInputSignature,
     FfiConverterTypeDlcTransactions,
     FfiConverterTypeExtendedKey,
     FfiConverterTypeFeeRule,
@@ -4900,7 +5338,8 @@ export default Object.freeze({
     FfiConverterTypePayout,
     FfiConverterTypePayoutRow,
     FfiConverterTypeSignResult,
-    FfiConverterTypeSpliceKeyRef,
+    FfiConverterTypeSigningRequest,
+    FfiConverterTypeSplicedContract,
     FfiConverterTypeTransaction,
     FfiConverterTypeTxInput,
     FfiConverterTypeTxInputInfo,

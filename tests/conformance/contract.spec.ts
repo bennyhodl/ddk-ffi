@@ -104,8 +104,8 @@ function runFullFlow() {
   const signedPsbt = ddk.signFundingPsbtWithDescriptor(offer, accept, fundingPsbt, OFFERER_DESCRIPTOR, [
     { inputSerialId: FUNDING_SERIAL, derivationIndex: 0 },
   ])
-  const signResult = ddk.signAccept(offer, accept, offererKeys, offerTempId, signedPsbt)
-  const fundingTx = ddk.finalizeSign(offer, accept, signResult.sign, fundingPsbt)
+  const signResult = ddk.signAccept(offer, accept, offererKeys, signedPsbt, [])
+  const fundingTx = ddk.finalizeSign(offer, accept, signResult.sign, fundingPsbt, acceptorKeys, [])
 
   return {
     offererKeys,
@@ -140,12 +140,16 @@ describe('binding surface', () => {
       'dlcTransactionsFromMessages',
       'signFundingPsbtWithDescriptor',
       'signAccept',
-      'signAcceptSpliced',
       'finalizeSign',
-      'finalizeSignSpliced',
       'signContractCet',
       'signContractRefund',
       'createDlcSpliceInput',
+      'splicedContractIds',
+      'acceptOfferRequest',
+      'acceptOfferWithSignatures',
+      'signAcceptRequest',
+      'signAcceptWithSignatures',
+      'finalizeSignWithSignatures',
     ]
     for (const name of fns) {
       expect(typeof (ddk as Record<string, unknown>)[name], name).toBe('function')
@@ -450,33 +454,21 @@ describe('splicing', () => {
   const flow = runFullFlow()
 
   test('createDlcSpliceInput builds a splice FundingInput from a contract', () => {
-    const spliceInput = ddk.createDlcSpliceInput(
-      flow.offer,
-      flow.accept,
-      flow.signResult.sign,
-      ddk.Party.Offer,
-      900n,
-      ddk.dlcInputMaxWitnessLen(),
-    )
+    const spliceInput = ddk.createDlcSpliceInput(flow.offer, flow.accept, flow.signResult.sign, ddk.Party.Offer, 900n)
     expect(spliceInput instanceof Uint8Array).toBe(true)
     expect(spliceInput.length).toBeGreaterThan(0)
   })
 
-  test('rejects a max witness length <= 108', () => {
-    expect(() =>
-      ddk.createDlcSpliceInput(flow.offer, flow.accept, flow.signResult.sign, ddk.Party.Offer, 900n, 108),
-    ).toThrow()
-  })
-
   // A splice-out rollover: contract B is funded entirely by spending contract
   // A's 2-of-2 output, taking 40 000 sats out on the way (100 000 -> 60 000).
-  // This is the only path that exercises signAcceptSpliced / finalizeSignSpliced,
-  // and the only one where each party must re-derive a PRIOR contract's funding
-  // key — note the two splice-key refs carry DIFFERENT prior temporary ids,
-  // because each party derives its own half of A's 2-of-2.
+  // This is the only path where each party must re-derive a PRIOR contract's
+  // funding key. Both find contract A by the contract id the offer's DLC input
+  // carries, but each supplies its OWN temporary id for A, because each
+  // derives its own half of A's 2-of-2.
   const SPLICE_SERIAL = 900n
   const offerTempIdB = tempId(0xbb)
   const acceptTempIdB = tempId(0xbc)
+  const contractIdA = ddk.computeContractId(flow.offer, flow.accept)
 
   function runSpliceOut() {
     const spliceInput = ddk.createDlcSpliceInput(
@@ -485,7 +477,6 @@ describe('splicing', () => {
       flow.signResult.sign,
       ddk.Party.Offer,
       SPLICE_SERIAL,
-      ddk.dlcInputMaxWitnessLen(),
     )
     const spk = buf(OFFERER_SPK_HEX)
 
@@ -533,20 +524,29 @@ describe('splicing', () => {
     // The offerer signs its half of A's 2-of-2 (there are no wallet inputs to
     // sign, so the PSBT goes across untouched)...
     const psbt = ddk.createFundingPsbt(offerB, acceptB)
-    const signB = ddk.signAcceptSpliced(offerB, acceptB, flow.offererKeys, offerTempIdB, psbt, [
-      { inputSerialId: SPLICE_SERIAL, priorTemporaryContractId: flow.offerTempId },
+    const signB = ddk.signAccept(offerB, acceptB, flow.offererKeys, psbt, [
+      { contractId: contractIdA, temporaryContractId: flow.offerTempId },
     ]).sign
 
-    // ...and the acceptor completes it.
-    const fundingTx = ddk.finalizeSignSpliced(offerB, acceptB, signB, psbt, flow.acceptorKeys, [
-      { inputSerialId: SPLICE_SERIAL, priorTemporaryContractId: flow.acceptTempId },
+    // ...and the acceptor, which learns which of its contracts is spliced from
+    // the offer alone, completes it.
+    const [splicedId] = ddk.splicedContractIds(offerB)
+    const fundingTx = ddk.finalizeSign(offerB, acceptB, signB, psbt, flow.acceptorKeys, [
+      { contractId: splicedId!, temporaryContractId: flow.acceptTempId },
     ])
     return { offerB, acceptB, signB, fundingTx }
   }
 
   const splice = runSpliceOut()
 
-  test('signAcceptSpliced -> finalizeSignSpliced completes a spliced contract', () => {
+  test('splicedContractIds names the spliced contract', () => {
+    const ids = ddk.splicedContractIds(splice.offerB)
+    expect(ids.length).toBe(1)
+    expect(bytes(ids[0]!).equals(contractIdA)).toBe(true)
+    expect(ddk.splicedContractIds(flow.offer).length).toBe(0)
+  })
+
+  test('signAccept -> finalizeSign completes a spliced contract', () => {
     expect(splice.fundingTx instanceof Uint8Array).toBe(true)
     expect(() => ddk.validateSign(splice.offerB, splice.acceptB, splice.signB)).not.toThrow()
     // Witnesses were added for the prior 2-of-2, so the signed transaction is
@@ -557,16 +557,26 @@ describe('splicing', () => {
     expect(unsigned.fund.inputs.length).toBe(1)
   })
 
-  // Proves the splice-key refs are load-bearing rather than incidental: the
-  // acceptor deriving from the OFFERER's prior temporary id produces the wrong
+  // Proves the spliced contracts are load-bearing rather than incidental: the
+  // acceptor deriving from the OFFERER's temporary id for A produces the wrong
   // half of contract A's 2-of-2, so the witness cannot be completed.
-  test('each party must use its own prior temporary contract id', () => {
+  test('each party must use its own temporary id for the spliced contract', () => {
     const psbt = ddk.createFundingPsbt(splice.offerB, splice.acceptB)
     expect(() =>
-      ddk.finalizeSignSpliced(splice.offerB, splice.acceptB, splice.signB, psbt, flow.acceptorKeys, [
-        { inputSerialId: SPLICE_SERIAL, priorTemporaryContractId: flow.offerTempId },
+      ddk.finalizeSign(splice.offerB, splice.acceptB, splice.signB, psbt, flow.acceptorKeys, [
+        { contractId: contractIdA, temporaryContractId: flow.offerTempId },
       ]),
     ).toThrow()
+  })
+
+  test('a splice cannot be signed without the spliced contract', () => {
+    const psbt = ddk.createFundingPsbt(splice.offerB, splice.acceptB)
+    try {
+      ddk.signAccept(splice.offerB, splice.acceptB, flow.offererKeys, psbt, [])
+      throw new Error('should have thrown')
+    } catch (e) {
+      expect((e as { tag?: string }).tag).toBe('InvalidFundingInput')
+    }
   })
 
   test('the spliced contract carries the reduced collateral', () => {
@@ -586,5 +596,53 @@ describe('splicing', () => {
     const refund = ddk.signContractRefund(splice.offerB, splice.acceptB, splice.signB, flow.acceptorKeys, acceptTempIdB)
     expect(refund.length).toBeGreaterThan(0)
     expect(bytes(refund).equals(cet)).toBe(false)
+  })
+})
+
+// External signing is proven end to end in Rust (external.rs), where a test
+// signer can hold raw keys. Here: that its records cross the binding intact.
+describe('external signing', () => {
+  const flow = runFullFlow()
+  const acceptParams = {
+    party: {
+      fundingPubkey: flow.acceptorKeys.fundingPubkey(flow.acceptTempId),
+      fundingInputs: [],
+      payoutSpk: buf(OFFERER_SPK_HEX),
+      payoutSerialId: 4n,
+      changeSpk: buf(OFFERER_SPK_HEX),
+      changeSerialId: 5n,
+    },
+    minTimeoutInterval: 100,
+    maxTimeoutInterval: 100_000,
+    nowUnix: NOW_UNIX,
+  }
+
+  test('acceptOfferRequest names the key, the refund and one PSBT per CET', () => {
+    const request = ddk.acceptOfferRequest(flow.offer, acceptParams)
+    expect(bytes(request.fundingPubkey).equals(acceptParams.party.fundingPubkey)).toBe(true)
+    expect(request.refundPsbt.length).toBeGreaterThan(0)
+    expect(request.cets.length).toBe(2)
+    for (const cet of request.cets) {
+      expect(cet.psbt.length).toBeGreaterThan(0)
+      expect(cet.adaptorPoint.length).toBe(33)
+    }
+    expect(request.dlcInputIndexes).toEqual([])
+  })
+
+  test('signAcceptRequest is for the offering party', () => {
+    const request = ddk.signAcceptRequest(flow.offer, flow.accept)
+    expect(bytes(request.fundingPubkey).equals(flow.offererKeys.fundingPubkey(flow.offerTempId))).toBe(true)
+  })
+
+  test('a malformed signature is rejected before anything is built', () => {
+    try {
+      ddk.acceptOfferWithSignatures(flow.offer, acceptParams, {
+        refundSignature: Buffer.alloc(10),
+        cetAdaptorSignatures: [],
+      })
+      throw new Error('should have thrown')
+    } catch (e) {
+      expect((e as { tag?: string }).tag).toBe('Serialization')
+    }
   })
 })
