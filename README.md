@@ -69,16 +69,11 @@ npm install @bennyblader/ddk-rn
 The contract API runs the whole DLC lifecycle — offer, accept, fund, sign, settle,
 and splice — without a contract store.
 
-**Nothing is persisted.** Every transaction is rebuilt from the `OfferDlc` /
-`AcceptDlc` / `SignDlc` wire messages at the moment it is needed, so there is no
-state to keep in sync: hold the three messages (and one 32-byte
-`temporaryContractId`) and you can reconstruct and sign anything the contract can
-produce.
-
-**Secret keys never cross the boundary.** `ContractKeyProvider` derives funding
-keys deterministically inside Rust from a mnemonic, seed, xprv, or private
-descriptor. Callers only ever see public keys; the provider re-derives whatever
-secret key an operation needs from the temporary contract id.
+The library rebuilds transactions from the offer/accept/sign messages. Consumers
+own persistent contract records and key metadata. Signing functions accept a
+`ContractSignerProvider`, implemented by the app or by the built-in
+`ContractKeyProvider`. The provider resolves a funding public key to a signer;
+DDK prepares the transactions and verifies the returned signatures.
 
 Messages cross as their lightning TLV encoding — the same bytes node-dlc and
 bitcoin-abstraction-layer produce. PSBTs are BIP-174; final transactions are
@@ -124,6 +119,7 @@ order, and both represent bytes as `Uint8Array`. In Node a `Buffer` is a
 ```typescript
 import {
   ContractKeyProvider,
+  Party,
   chainHashFromNetwork,
   fundingInput,
   createOffer,
@@ -185,8 +181,7 @@ const accepted = acceptOffer(
     maxTimeoutInterval: 4_294_967_295,
     nowUnix: BigInt(Math.floor(Date.now() / 1000)), // the acceptor's clock
   },
-  acceptorKeys,
-  acceptTempId
+  acceptorKeys
 );
 
 // 3. Fund — each party signs its own funding inputs on the shared PSBT
@@ -212,7 +207,7 @@ const cet = signContractCet(
   accepted.accept,
   signed.sign,
   offererKeys,
-  offerTempId, // the settling party's OWN temporary id — it also says which side is settling
+  Party.Offer, // which party is settling
   [{ oracleIndex: 0, attestation: ATTESTATION }]
 );
 
@@ -222,7 +217,7 @@ const refund = signContractRefund(
   accepted.accept,
   signed.sign,
   offererKeys,
-  offerTempId
+  Party.Offer
 );
 ```
 
@@ -231,86 +226,125 @@ Runnable versions of exactly this flow:
 - `examples/node/src/contract.ts` — `pnpm contract`
 - `examples/react-native/src/App.tsx` — the on-device demo the Maestro E2E drives
 
-### Key derivation
+### Contract signers
+
+The built-in provider derives keys inside Rust. All four constructors remain
+available: `fromMnemonic`, `fromSeed`, `fromXprv`, and `fromDescriptor`.
 
 ```typescript
-ContractKeyProvider.fromMnemonic(mnemonic, passphrase, network);
-ContractKeyProvider.fromSeed(seed, network);
-ContractKeyProvider.fromXprv(xprv); // 78-byte encoded master xprv
-ContractKeyProvider.fromDescriptor(descriptor); // must carry an xprv; watch-only is rejected
+const keys = ContractKeyProvider.fromMnemonic(mnemonic, passphrase, network);
+const fundingPubkey = keys.fundingPubkey(localTemporaryContractId);
+// The key is now registered on this provider for lifecycle signing.
 
-provider.fundingPubkey(temporaryContractId); // 33-byte compressed pubkey
+// After restart, restore each contract using its stored local temporary ID
+// and the public key published in its offer or accept message.
+keys.signerForContract(stored.localTemporaryContractId, stored.fundingPubkey);
 ```
 
-The only thing to persist per contract is your own 32-byte `temporaryContractId`.
-The provider re-derives the funding secret key from it whenever one is needed, so
-the same provider serves every contract. The offering party's is the offer's own,
-so `signAccept` reads it from the offer; the accepting party's appears in no
-message, which is why `acceptOffer` and settlement take it.
+The in-memory registry holds public-key-to-temporary-ID mappings. Persist those
+values in the app; the provider does not write to a database. `signerForContract`
+returns a signer and registers the mapping. It checks the expected public key,
+including DDK's older derivation scheme. `fromDescriptor` uses the descriptor's
+extended private key, not its BIP84 path.
+
+Consumers can implement both signing interfaces:
+
+```typescript
+interface ContractSignerProvider {
+  getSigner(key: ContractKeyRequest): ContractSigner;
+}
+interface ContractKeyRequest {
+  fundingPubkey: Uint8Array;
+  contractId?: Uint8Array;
+}
+interface ContractSigner {
+  signEcdsa(sighash: Uint8Array): Uint8Array; // 64-byte compact signature
+  signAdaptor(sighash: Uint8Array, adaptorPoint: Uint8Array): Uint8Array; // 162 bytes
+}
+
+const signers: ContractSignerProvider = {
+  getSigner(key) {
+    const stored = contracts.findByKey(key.fundingPubkey, key.contractId);
+    if (stored.legacy) return legacyWallet.signerForPath(stored.path);
+    return keys.signerForContract(stored.localTemporaryContractId, key.fundingPubkey);
+  },
+};
+```
+
+`PrivateKeySigner.fromSecretKey` is available when the consumer derives a local
+legacy key and wants Rust to perform ECDSA/adaptor signing. It imports a 32-byte
+secret and exposes `publicKey`, `signEcdsa`, and `signAdaptor`. A consumer may
+instead implement those methods without importing a private key into Rust.
+
+Callbacks are synchronous. Preload the metadata needed for lookup; use the
+external signing API for signers that need network access or user approval.
+`acceptOffer`, `signAccept`, `finalizeSign`, `signContractCet`, and
+`signContractRefund` accept either provider implementation. Settlement takes
+`Party.Offer` or `Party.Accept` to identify the local side.
 
 ### Splicing
 
-A contract can be rolled into a new one that spends its funding output directly,
-with no on-chain settlement in between. A splice is an ordinary offer whose
-funding inputs include a DLC input: only the offering party contributes one, and
-it carries the previous contract's id and both of its funding pubkeys.
+A splice is an ordinary offer containing a DLC funding input. Add wallet inputs
+to contribute collateral, or reduce the successor's collateral to withdraw it.
 
 ```typescript
 const spliceInput = createDlcSpliceInput(
-  prevOffer,
-  prevAccept,
-  prevSign, // selects the fee rule, so contracts from before ddk-dlc 2.0.0-rc.4 splice too
-  Party.Offer, // the side the new offerer was on in the previous contract
-  200n // serial id; random when omitted
+  prevOffer, prevAccept, prevSign,
+  Party.Offer, // the new offerer's side in the previous contract
+  200n,
 );
-// …place it in the offering party's `fundingInputs` and create the offer as usual.
-
-// Signing needs each party's own temporary id for the previous contract.
-// The acceptor finds which contract that is from the offer alone:
-const [prevContractId] = splicedContractIds(offer);
-signAccept(offer, accept, keys, psbt, [
-  { contractId: prevContractId, temporaryContractId: myPrevTempId },
-]);
-finalizeSign(offer, accept, sign, psbt, keys, [
-  { contractId: prevContractId, temporaryContractId: myPrevTempId },
-]);
+// Put spliceInput and any additional wallet inputs in offerParams.party.fundingInputs.
+const offer = createOffer(offerParams);
+const accepted = acceptOffer(offer, acceptParams, acceptorSigners);
+const signed = signAccept(offer, accepted.accept, offererSigners, offererSignedPsbt);
+const fundingTx = finalizeSign(offer, accepted.accept, signed.sign, acceptorSignedPsbt, acceptorSigners);
 ```
 
-The previous contract's funding key is re-derived inside Rust from the provider
-and that temporary id — like everything else, it never leaves.
+Signing reads each DLC input's previous contract ID and required funding public
+key from the offer and calls the provider. No previous-contract list or previous
+temporary ID is passed to lifecycle functions. `splicedContractIds(offer)` remains
+available for inspection. The previous sign message lets `createDlcSpliceInput`
+rebuild contracts created under the old fee rule.
 
 ### External signing
 
-For a contract key held by a signer that cannot answer inside the call — a
-custody vault that needs a person to approve — each step that signs with the
-contract key is a pair: a request, and the same step completed with the
-signatures. Requests are PSBTs; the messages are the only state between the two
-calls, and every returned signature is verified before anything is built from it.
+Prepare transactions, ask the consumer's external signer for signatures, then
+complete the message. Enum contracts are supported; preparing a numeric contract
+returns `ContractError.Unsupported` in both the provider and external flows.
 
 ```typescript
-// Accepting party
-const request = acceptOfferRequest(offer, params); // params must fix both serial ids
-// → { fundingPubkey, refundPsbt, cets: [{ psbt, adaptorPoint }], fundingPsbt, dlcInputIndexes }
-const accepted = acceptOfferWithSignatures(offer, params, {
-  refundSignature, // 64-byte compact ECDSA
-  cetAdaptorSignatures, // 162-byte adaptor signatures, in `cets` order
+// Acceptor: omitted output serial IDs are chosen once during preparation.
+const preparedAccept = prepareAcceptOffer(offer, acceptParams);
+// Persist preparedAccept.context while approval is pending. It contains
+// offer/accept bytes, including the chosen serial IDs, and no private keys.
+const acceptResponse = await custody.sign(preparedAccept.request);
+const accepted = completeAcceptOffer(preparedAccept.context, acceptResponse.contract);
+
+// Offerer
+const preparedSign = prepareSignAccept(offer, accepted.accept);
+const signResponse = await custody.sign(preparedSign.request);
+const signed = completeSignAccept(preparedSign.context, {
+  contract: signResponse.contract,
+  signedFundingPsbt: offererSignedPsbt,
+  dlcInputSignatures: signResponse.dlcInputSignatures,
 });
 
-// Offering party
-const request = signAcceptRequest(offer, accept);
-const signed = signAcceptWithSignatures(offer, accept, signatures, signedFundingPsbt, dlcInputSignatures);
-
-// Accepting party, completing the funding transaction
-const fundingTx = finalizeSignWithSignatures(offer, accept, sign, signedFundingPsbt, dlcInputSignatures);
+// Acceptor: retain its splice halves from the accept request until finalize.
+const fundingTx = finalizeSignWithSignatures(
+  offer, accepted.accept, signed.sign, acceptorSignedPsbt,
+  acceptResponse.dlcInputSignatures,
+);
 ```
 
-When the offer splices a contract, the request's `fundingPsbt` carries each DLC
-input's `witness_utxo` and 2-of-2 `witness_script`, and `dlcInputIndexes` lists
-them; the signer's half of each comes back as a `DlcInputSignature`. Wallet
-inputs are signed through the funding PSBT, as in the key-based flow.
+A request includes refund/CET PSBTs, each CET's adaptor point, and the funding
+PSBT. Its `dlcInputs` entries contain `{ inputIndex, key }`, with the required
+funding public key and previous contract ID. DDK derives this information from
+the messages; the custody adapter maps keys to its own signer identities.
 
-Enum-outcome contracts only for now; a numeric-outcome contract throws
-`ContractError.Unsupported`.
+Contract and splice signatures are verified before completion. Wallet inputs
+must carry finalized witnesses in the funding PSBT. Refund and splice signatures
+are 64-byte compact ECDSA with SIGHASH_ALL; adaptor signatures are 162 bytes in
+request order. The consumer adapter handles the custody service's encodings.
 
 ### Validation and inspection
 
@@ -441,17 +475,12 @@ interface SignResult {
   transactions: DlcTransactions;
 }
 
-interface SplicedContract {
-  contractId: Bytes; // as carried by the offer's DLC input
-  temporaryContractId: Bytes; // your own temporary id for that contract
-}
-
 interface SigningRequest {
   fundingPubkey: Bytes; // the key every refund and CET signature verifies against
   refundPsbt: Bytes;
   cets: CetSigningRequest[]; // one per adaptor signature, in return order
   fundingPsbt: Bytes; // DLC inputs carry witness_utxo + witness_script
-  dlcInputIndexes: number[]; // splice inputs this party signs a half of
+  dlcInputs: { inputIndex: number; key: ContractKeyRequest }[];
 }
 
 interface CetSigningRequest {

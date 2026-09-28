@@ -34,6 +34,8 @@ uniffi::setup_scaffolding!();
 /// surface; uniffi/React-Native generation is unaffected by the visibility.
 pub mod contract;
 pub mod external;
+pub mod settlement;
+pub mod signer;
 
 static SECP_CONTEXT: OnceLock<Secp256k1<All>> = OnceLock::new();
 
@@ -1852,7 +1854,7 @@ mod tests {
     fn xpriv_to_xpub_test() {
         let mnemonic = Mnemonic::generate(24).unwrap();
         let rust_xpriv =
-            Xpriv::new_master(Network::Bitcoin, &mnemonic.to_seed_normalized("").to_vec()).unwrap();
+            Xpriv::new_master(Network::Bitcoin, &mnemonic.to_seed_normalized("")).unwrap();
         let ffi_xpriv = create_extkey_from_seed(
             mnemonic.to_seed_normalized("").to_vec(),
             "bitcoin".to_string(),
@@ -1875,7 +1877,7 @@ mod tests {
             Xpriv::new_master(Network::Bitcoin, &mnemonic.to_seed_normalized("")).unwrap();
         let rust_path =
             DerivationPath::from_str(&format!("{}/{}", base_derivation_path, app_path)).unwrap();
-        let rust_xpriv = rust_xpriv.derive_priv(&secp, &rust_path).unwrap();
+        let rust_xpriv = rust_xpriv.derive_priv(secp, &rust_path).unwrap();
 
         let ffi_xpriv_bytes = convert_mnemonic_to_seed(mnemonic.to_string(), None).unwrap();
         let ffi_xpub = create_xpriv_from_parent_path(
@@ -1993,12 +1995,12 @@ mod tests {
 
         // Verify funding transaction has correct structure
         assert_eq!(dlc_txs.fund.inputs.len(), 2); // Two parties contributing
-        assert!(dlc_txs.fund.outputs.len() >= 1); // At least funding output
+        assert!(!dlc_txs.fund.outputs.is_empty()); // At least funding output
 
         // Verify CETs have correct structure
         for cet in &dlc_txs.cets {
             assert_eq!(cet.inputs.len(), 1); // Single funding input
-            assert!(cet.outputs.len() >= 1); // At least one output (dust may be filtered)
+            assert!(!cet.outputs.is_empty()); // At least one output (dust may be filtered)
         }
 
         // Verify refund transaction

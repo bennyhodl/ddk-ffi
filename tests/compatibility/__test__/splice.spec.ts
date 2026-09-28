@@ -102,9 +102,7 @@ describe('splice: ddk offers the successor contract, BAL accepts', () => {
     // ddk signs: no wallet inputs, so the PSBT goes in unsigned; the DLC
     // input signature comes from re-deriving the base contract's key.
     const psbt2 = ddk.createFundingPsbt(offer2, accept2)
-    const signResult2 = ddk.signAccept(offer2, accept2, ddkParty.keys, psbt2, [
-      { contractId: ddk.computeContractId(base.offer, base.accept), temporaryContractId: base.ddkTempId },
-    ])
+    const signResult2 = ddk.signAccept(offer2, accept2, ddkParty.keys, psbt2)
     // BAL needs [signature, pubkey] witness elements for DLC inputs; ddk
     // emits [signature]. See shimSpliceSignForBal for the full story.
     const sign2 = shimSpliceSignForBal(signResult2.sign, balOffer2)
@@ -214,7 +212,6 @@ describe('splice: BAL offers the successor contract, ddk accepts', () => {
         nowUnix: NOW_UNIX,
       },
       ddkParty.keys,
-      tempId2,
     )
     const accept2 = acceptResult2.accept
 
@@ -226,10 +223,7 @@ describe('splice: BAL offers the successor contract, ddk accepts', () => {
 
     // ddk finalizes: adds its half of the base 2-of-2, found by the contract
     // id BAL's offer carries, and broadcasts the successor funding transaction.
-    const [splicedId] = ddk.splicedContractIds(offer2)
-    const fundingTx2 = ddk.finalizeSign(offer2, accept2, sign2, acceptResult2.fundingPsbt, ddkParty.keys, [
-      { contractId: splicedId, temporaryContractId: base.ddkTempId },
-    ])
+    const fundingTx2 = ddk.finalizeSign(offer2, accept2, sign2, acceptResult2.fundingPsbt, ddkParty.keys)
     const fundTxId2 = await rpc.broadcastAndConfirm(hex(fundingTx2))
     await assertSpends(fundTxId2, base.fundTxId)
     expect(fundTxId2).toBe(txidOf(acceptResult2.transactions.fund.rawBytes))

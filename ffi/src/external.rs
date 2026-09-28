@@ -1,12 +1,12 @@
 //! External signing: for a contract key held by a signer that cannot answer
 //! inside the call, such as a custody vault that needs a person to approve.
 //!
-//! Each step that signs with the contract key is a pair. `*_request` returns
+//! Each step that signs with the contract key is a pair. `prepare_*` returns
 //! what this party must sign — PSBTs, because that is what such signers take
-//! and what shows the approver what they are signing. `*_with_signatures`
+//! and what shows the approver what they are signing. `complete_*`
 //! takes the signatures back, verifies every one against the messages, and
-//! produces the same result as the key-based function. The messages are the
-//! only state between the two calls.
+//! produces the same result as the provider-based function. The prepared
+//! context preserves the messages and generated serial ids between calls.
 //!
 //! The contract key signs the refund, one adaptor signature per CET and oracle
 //! combination, and — when the offer splices a previous contract — this
@@ -17,7 +17,9 @@
 //! come from its digit trie, which is not exposed yet
 //! ([`ContractError::Unsupported`]).
 
+use crate::signer::{ContractKeyRequest, ContractSignerProvider};
 use bitcoin::psbt::Psbt;
+use bitcoin::secp256k1::rand::random;
 use bitcoin::sighash::EcdsaSighashType;
 use bitcoin::{Transaction, Witness};
 use ddk::contract as ddk_contract;
@@ -37,7 +39,7 @@ use crate::contract::{
 };
 
 /// One CET adaptor signature to produce.
-#[derive(uniffi::Record)]
+#[derive(Clone, uniffi::Record)]
 pub struct CetSigningRequest {
     /// The CET as a BIP-174 PSBT spending the 2-of-2 funding output, with its
     /// `witness_utxo` and `witness_script` set.
@@ -48,7 +50,7 @@ pub struct CetSigningRequest {
 }
 
 /// Everything one party signs with its contract key in one step.
-#[derive(uniffi::Record)]
+#[derive(Clone, uniffi::Record)]
 pub struct SigningRequest {
     /// The 33-byte funding public key every refund and CET signature must
     /// verify against: this party's, from the messages.
@@ -64,11 +66,11 @@ pub struct SigningRequest {
     pub funding_psbt: Vec<u8>,
     /// The funding transaction input indexes of the splice (DLC) inputs this
     /// party signs a half of. Empty unless the offer splices a contract.
-    pub dlc_input_indexes: Vec<u32>,
+    pub dlc_inputs: Vec<DlcInputSigningRequest>,
 }
 
 /// A signer's answer to a [`SigningRequest`]'s refund and CETs.
-#[derive(uniffi::Record)]
+#[derive(Clone, uniffi::Record)]
 pub struct ContractSignatures {
     /// The 64-byte compact (R‖S) ECDSA signature of the refund, SIGHASH_ALL.
     pub refund_signature: Vec<u8>,
@@ -77,39 +79,73 @@ pub struct ContractSignatures {
 }
 
 /// A signer's half of one splice (DLC) input's 2-of-2.
-#[derive(uniffi::Record)]
+#[derive(Clone, uniffi::Record)]
 pub struct DlcInputSignature {
     /// The funding transaction input index, from the request's
-    /// `dlc_input_indexes`.
+    /// `dlc_inputs`.
     pub input_index: u32,
     /// The 64-byte compact (R‖S) ECDSA signature, SIGHASH_ALL.
     pub signature: Vec<u8>,
 }
 
-/// What the accepting party signs to accept `offer` with `params`.
-///
-/// `params.party` must fix `payout_serial_id` and `change_serial_id`: they
-/// place outputs in every transaction signed here, so this and
-/// [`accept_offer_with_signatures`] must be given the same values.
-#[uniffi::export]
-pub fn accept_offer_request(
-    offer: Vec<u8>,
-    params: AcceptOfferParams,
-) -> Result<SigningRequest, ContractError> {
-    let offer: OfferDlc = decode_msg(&offer, "offer")?;
-    let accept = unsigned_accept(&offer, params)?;
-    signing_request(&offer, &accept, Party::Accept)
+/// A splice input's signing identity, read from the offer. No previous
+/// contract data needs to be supplied by the caller.
+#[derive(Clone, uniffi::Record)]
+pub struct DlcInputSigningRequest {
+    pub input_index: u32,
+    pub key: ContractKeyRequest,
 }
 
-/// Completes [`accept_offer_request`] into the same result as `accept_offer`.
+/// Serializable preparation state. Preserve both messages exactly; signatures
+/// are verified against the transactions reconstructed from them on completion.
+#[derive(Clone, uniffi::Record)]
+pub struct SigningContext {
+    pub offer: Vec<u8>,
+    pub accept: Vec<u8>,
+}
+
+#[derive(Clone, uniffi::Record)]
+pub struct PreparedContract {
+    pub context: SigningContext,
+    pub request: SigningRequest,
+}
+
+/// Contract signatures plus wallet funding witnesses and splice input halves.
+#[derive(Clone, uniffi::Record)]
+pub struct SigningResponse {
+    pub contract: ContractSignatures,
+    pub signed_funding_psbt: Vec<u8>,
+    #[uniffi(default = [])]
+    pub dlc_input_signatures: Vec<DlcInputSignature>,
+}
+
+/// Prepare an accept, choosing omitted serial ids once. Persist `context`
+/// while waiting for external approval; no key material is retained in it.
 #[uniffi::export]
-pub fn accept_offer_with_signatures(
+pub fn prepare_accept_offer(
     offer: Vec<u8>,
     params: AcceptOfferParams,
+) -> Result<PreparedContract, ContractError> {
+    let offer_msg: OfferDlc = decode_msg(&offer, "offer")?;
+    let accept = unsigned_accept(&offer_msg, params)?;
+    let request = signing_request(&offer_msg, &accept, Party::Accept)?;
+    Ok(PreparedContract {
+        context: SigningContext {
+            offer,
+            accept: crate::contract::encode_msg(&accept),
+        },
+        request,
+    })
+}
+
+/// Verify externally produced signatures and finish the prepared accept.
+#[uniffi::export]
+pub fn complete_accept_offer(
+    context: SigningContext,
     signatures: ContractSignatures,
 ) -> Result<AcceptResult, ContractError> {
-    let offer: OfferDlc = decode_msg(&offer, "offer")?;
-    let mut accept = unsigned_accept(&offer, params)?;
+    let offer: OfferDlc = decode_msg(&context.offer, "offer")?;
+    let mut accept: AcceptDlc = decode_msg(&context.accept, "prepared accept")?;
     let (refund_signature, cet_adaptor_signatures) = decode_contract_signatures(signatures)?;
     accept.refund_signature = refund_signature;
     accept.cet_adaptor_signatures = cet_adaptor_signatures;
@@ -122,35 +158,37 @@ pub fn accept_offer_with_signatures(
     }))
 }
 
-/// What the offering party signs to answer `accept`. The accept message's
-/// signatures are verified first, so nothing is signed for an invalid accept.
+/// Validate the accept before requesting any offering-party signatures.
 #[uniffi::export]
-pub fn sign_accept_request(
+pub fn prepare_sign_accept(
     offer: Vec<u8>,
     accept: Vec<u8>,
-) -> Result<SigningRequest, ContractError> {
-    let offer: OfferDlc = decode_msg(&offer, "offer")?;
-    let accept: AcceptDlc = decode_msg(&accept, "accept")?;
-    verify_party_signatures(&offer, &accept, Party::Accept)?;
-    signing_request(&offer, &accept, Party::Offer)
+) -> Result<PreparedContract, ContractError> {
+    let offer_msg: OfferDlc = decode_msg(&offer, "offer")?;
+    let accept_msg: AcceptDlc = decode_msg(&accept, "accept")?;
+    verify_party_signatures(&offer_msg, &accept_msg, Party::Accept)?;
+    let request = signing_request(&offer_msg, &accept_msg, Party::Offer)?;
+    Ok(PreparedContract {
+        context: SigningContext { offer, accept },
+        request,
+    })
 }
 
-/// Completes [`sign_accept_request`] into the same result as `sign_accept`.
-///
-/// `signed_funding_psbt` carries finalized witnesses for the offering party's
-/// wallet inputs, as for `sign_accept`. `dlc_input_signatures` carries this
-/// party's half of each splice input; omit it otherwise.
-#[uniffi::export(default(dlc_input_signatures))]
-pub fn sign_accept_with_signatures(
-    offer: Vec<u8>,
-    accept: Vec<u8>,
-    signatures: ContractSignatures,
-    signed_funding_psbt: Vec<u8>,
-    dlc_input_signatures: Vec<DlcInputSignature>,
+/// Complete SignDlc from the prepared context and signatures. Wallet inputs
+/// must have finalized witnesses; splice halves are verified and assembled here.
+#[uniffi::export]
+pub fn complete_sign_accept(
+    context: SigningContext,
+    signatures: SigningResponse,
 ) -> Result<SignResult, ContractError> {
-    let offer: OfferDlc = decode_msg(&offer, "offer")?;
-    let accept: AcceptDlc = decode_msg(&accept, "accept")?;
+    let offer: OfferDlc = decode_msg(&context.offer, "offer")?;
+    let accept: AcceptDlc = decode_msg(&context.accept, "accept")?;
     verify_party_signatures(&offer, &accept, Party::Accept)?;
+    let SigningResponse {
+        contract: signatures,
+        signed_funding_psbt,
+        dlc_input_signatures,
+    } = signatures;
 
     let (refund_signature, cet_adaptor_signatures) = decode_contract_signatures(signatures)?;
     advanced::verify_cet_adaptor_signatures(
@@ -221,20 +259,72 @@ pub fn finalize_sign_with_signatures(
     let accept: AcceptDlc = decode_msg(&accept, "accept")?;
     let sign: SignDlc = decode_msg(&sign, "sign")?;
 
+    let transactions = verified_sign_transactions(&offer, &accept, &sign)?;
+    let offer_signatures = &sign.funding_signatures.funding_signatures;
+    let psbt = decode_psbt(&signed_funding_psbt)?;
+    ensure_psbt_spends(&psbt, &transactions.fund)?;
+    let mut dlc_signatures = DlcInputSignatures::decode(dlc_input_signatures)?;
+
+    // Splice halves sign the unsigned transaction: a SegWit sighash does not
+    // commit to the other inputs' witnesses.
+    let unsigned = &transactions.fund;
+    let mut funding_transaction = transactions.fund.clone();
+    for (input, offer_signature) in offer.funding_inputs.iter().zip(offer_signatures) {
+        let input_index = funding_input_index(&offer, &accept, input.input_serial_id)?;
+        let elements = offer_signature
+            .witness_elements
+            .iter()
+            .map(|element| element.witness.clone())
+            .collect::<Vec<_>>();
+        funding_transaction.input[input_index].witness = match &input.dlc_input {
+            Some(dlc_input) => {
+                let dlc_input_info: DlcInputInfo = input.into();
+                let offer_half = elements[0].clone();
+                let accept_half = dlc_signatures.take_verified(
+                    input_index,
+                    unsigned,
+                    &dlc_input_info,
+                    &dlc_input.remote_fund_pubkey,
+                )?;
+                ddk_dlc::dlc_input::combine_dlc_input_signatures(
+                    &dlc_input_info,
+                    &accept_half,
+                    &offer_half,
+                    &dlc_input.remote_fund_pubkey,
+                    &dlc_input.local_fund_pubkey,
+                )
+            }
+            None => Witness::from_slice(&elements),
+        };
+    }
+    for input in &accept.funding_inputs {
+        let input_index = funding_input_index(&offer, &accept, input.input_serial_id)?;
+        funding_transaction.input[input_index].witness = finalized_witness(&psbt, input_index)?;
+    }
+    dlc_signatures.ensure_all_used()?;
+
+    Ok(bitcoin::consensus::serialize(&funding_transaction))
+}
+
+fn verified_sign_transactions(
+    offer: &OfferDlc,
+    accept: &AcceptDlc,
+    sign: &SignDlc,
+) -> Result<ddk_dlc::DlcTransactions, ContractError> {
     if sign.protocol_version != offer.protocol_version {
         return Err(ContractError::InvalidSign {
             message: "offer and sign protocol versions differ".to_string(),
         });
     }
-    if sign.contract_id != advanced::compute_contract_id(&offer, &accept)? {
+    if sign.contract_id != advanced::compute_contract_id(offer, accept)? {
         return Err(ContractError::InvalidSign {
             message: "sign message contract id does not match the rebuilt funding transaction"
                 .to_string(),
         });
     }
     advanced::verify_cet_adaptor_signatures(
-        &offer,
-        &accept,
+        offer,
+        accept,
         Party::Offer,
         &sign.refund_signature,
         &sign.cet_adaptor_signatures,
@@ -250,73 +340,32 @@ pub fn finalize_sign_with_signatures(
         });
     }
 
-    let transactions = ddk_contract::create_dlc_transactions(&offer, &accept)?;
-    let psbt = decode_psbt(&signed_funding_psbt)?;
-    ensure_psbt_spends(&psbt, &transactions.fund)?;
-    let mut dlc_signatures = DlcInputSignatures::decode(dlc_input_signatures)?;
-
-    // Splice halves sign the unsigned transaction: a SegWit sighash does not
-    // commit to the other inputs' witnesses.
-    let unsigned = &transactions.fund;
-    let mut funding_transaction = transactions.fund.clone();
+    let transactions = ddk_contract::create_dlc_transactions(offer, accept)?;
     let secp = Secp256k1::verification_only();
-    for (input, offer_signature) in offer.funding_inputs.iter().zip(offer_signatures) {
-        let input_index = funding_input_index(&offer, &accept, input.input_serial_id)?;
-        let elements = offer_signature
-            .witness_elements
-            .iter()
-            .map(|element| element.witness.clone())
-            .collect::<Vec<_>>();
-        funding_transaction.input[input_index].witness = match &input.dlc_input {
-            Some(dlc_input) => {
-                let dlc_input_info: DlcInputInfo = input.into();
-                let offer_half =
-                    elements
-                        .first()
-                        .cloned()
-                        .ok_or_else(|| ContractError::InvalidSign {
-                            message: format!("DLC input {input_index} funding signature is empty"),
-                        })?;
-                ddk_dlc::dlc_input::verify_dlc_funding_input_signature(
-                    &secp,
-                    unsigned,
-                    input_index,
-                    &dlc_input_info,
-                    offer_half.clone(),
-                    &dlc_input.local_fund_pubkey,
-                )
-                .map_err(|e| ContractError::InvalidSign {
-                    message: format!("invalid signature for DLC input {input_index}: {e}"),
+    for (input, signature) in offer.funding_inputs.iter().zip(offer_signatures) {
+        let index = funding_input_index(offer, accept, input.input_serial_id)?;
+        let first =
+            signature
+                .witness_elements
+                .first()
+                .ok_or_else(|| ContractError::InvalidSign {
+                    message: format!("funding signature for input {index} is empty"),
                 })?;
-                let accept_half = dlc_signatures.take_verified(
-                    input_index,
-                    unsigned,
-                    &dlc_input_info,
-                    &dlc_input.remote_fund_pubkey,
-                )?;
-                ddk_dlc::dlc_input::combine_dlc_input_signatures(
-                    &dlc_input_info,
-                    &accept_half,
-                    &offer_half,
-                    &dlc_input.remote_fund_pubkey,
-                    &dlc_input.local_fund_pubkey,
-                )
-            }
-            None if elements.is_empty() => {
-                return Err(ContractError::InvalidSign {
-                    message: format!("funding signature for input {input_index} is empty"),
-                })
-            }
-            None => Witness::from_slice(&elements),
-        };
+        if let Some(dlc_input) = &input.dlc_input {
+            ddk_dlc::dlc_input::verify_dlc_funding_input_signature(
+                &secp,
+                &transactions.fund,
+                index,
+                &input.into(),
+                first.witness.clone(),
+                &dlc_input.local_fund_pubkey,
+            )
+            .map_err(|e| ContractError::InvalidSign {
+                message: format!("invalid signature for DLC input {index}: {e}"),
+            })?;
+        }
     }
-    for input in &accept.funding_inputs {
-        let input_index = funding_input_index(&offer, &accept, input.input_serial_id)?;
-        funding_transaction.input[input_index].witness = finalized_witness(&psbt, input_index)?;
-    }
-    dlc_signatures.ensure_all_used()?;
-
-    Ok(bitcoin::consensus::serialize(&funding_transaction))
+    Ok(transactions)
 }
 
 /// The accept message `params` produce, without its signatures: enough to
@@ -334,15 +383,8 @@ fn unsigned_accept(
     } = params.into_rust()?;
     ddk_contract::validate_offer(offer, min_timeout_interval, max_timeout_interval, now_unix)?;
 
-    let (Some(payout_serial_id), Some(change_serial_id)) =
-        (party.payout_serial_id, party.change_serial_id)
-    else {
-        return Err(ContractError::InvalidAccept {
-            message: "external signing needs payout_serial_id and change_serial_id set, so the \
-                      request and the signed accept build the same transactions"
-                .to_string(),
-        });
-    };
+    let payout_serial_id = party.payout_serial_id.unwrap_or_else(random);
+    let change_serial_id = party.change_serial_id.unwrap_or_else(random);
     let accept_collateral = offer
         .get_total_collateral()
         .checked_sub(offer.offer_collateral)
@@ -361,8 +403,8 @@ fn unsigned_accept(
         change_spk: party.change_spk,
         change_serial_id,
         cet_adaptor_signatures: CetAdaptorSignatures::from(&[][..]),
-        // Replaced before the message is encoded or verified; the rebuilt
-        // transactions do not depend on it.
+        // A placeholder in the prepared context, replaced before completion
+        // verifies the message. Rebuilt transactions do not depend on it.
         refund_signature: Signature::from_compact(&[1; 64]).expect("a valid compact signature"),
         negotiation_fields: None,
         tlvs: Default::default(),
@@ -408,7 +450,7 @@ fn signing_request(
     // Both parties sign a half of every splice input, so both get the same
     // indexes.
     let mut funding_psbt = ddk_contract::create_funding_psbt(offer, accept)?;
-    let mut dlc_input_indexes = Vec::new();
+    let mut dlc_inputs = Vec::new();
     for input in &offer.funding_inputs {
         let Some(dlc_input) = &input.dlc_input else {
             continue;
@@ -427,7 +469,17 @@ fn signing_request(
             &dlc_input.local_fund_pubkey,
             &dlc_input.remote_fund_pubkey,
         ));
-        dlc_input_indexes.push(input_index as u32);
+        let pubkey = match party {
+            Party::Offer => dlc_input.local_fund_pubkey,
+            Party::Accept => dlc_input.remote_fund_pubkey,
+        };
+        dlc_inputs.push(DlcInputSigningRequest {
+            input_index: input_index as u32,
+            key: ContractKeyRequest {
+                funding_pubkey: pubkey.serialize().to_vec(),
+                contract_id: Some(dlc_input.contract_id.to_vec()),
+            },
+        });
     }
 
     Ok(SigningRequest {
@@ -435,8 +487,81 @@ fn signing_request(
         refund_psbt: spend_psbt(&transactions.refund)?,
         cets,
         funding_psbt: funding_psbt.serialize(),
-        dlc_input_indexes,
+        dlc_inputs,
     })
+}
+
+/// The same request preparation serves native providers and external signers.
+pub(crate) fn sign_contract_request(
+    request: &SigningRequest,
+    provider: &dyn ContractSignerProvider,
+) -> Result<ContractSignatures, ContractError> {
+    let signer = provider.get_signer(ContractKeyRequest {
+        funding_pubkey: request.funding_pubkey.clone(),
+        contract_id: None,
+    })?;
+    let refund_signature = signer.sign_ecdsa(psbt_sighash(&request.refund_psbt, 0)?)?;
+    let cet_adaptor_signatures = request
+        .cets
+        .iter()
+        .map(|cet| signer.sign_adaptor(psbt_sighash(&cet.psbt, 0)?, cet.adaptor_point.clone()))
+        .collect::<Result<_, _>>()?;
+    Ok(ContractSignatures {
+        refund_signature,
+        cet_adaptor_signatures,
+    })
+}
+
+pub(crate) fn sign_dlc_inputs(
+    request: &SigningRequest,
+    provider: &dyn ContractSignerProvider,
+) -> Result<Vec<DlcInputSignature>, ContractError> {
+    request
+        .dlc_inputs
+        .iter()
+        .map(|input| {
+            let signer = provider.get_signer(input.key.clone())?;
+            Ok(DlcInputSignature {
+                input_index: input.input_index,
+                signature: signer.sign_ecdsa(psbt_sighash(
+                    &request.funding_psbt,
+                    input.input_index as usize,
+                )?)?,
+            })
+        })
+        .collect()
+}
+
+fn psbt_sighash(bytes: &[u8], index: usize) -> Result<Vec<u8>, ContractError> {
+    let psbt = decode_psbt(bytes)?;
+    let input = psbt
+        .inputs
+        .get(index)
+        .ok_or_else(|| ContractError::PsbtMismatch {
+            message: "signing input not found".into(),
+        })?;
+    let (Some(script), Some(utxo)) = (&input.witness_script, &input.witness_utxo) else {
+        return Err(ContractError::PsbtMismatch {
+            message: "signing input needs witness_script and witness_utxo".into(),
+        });
+    };
+    ddk_dlc::util::get_sig_hash_msg(&psbt.unsigned_tx, index, script, utxo.value)
+        .map(|msg| msg.as_ref().to_vec())
+        .map_err(|e| ContractError::Dlc {
+            message: e.to_string(),
+        })
+}
+
+/// Validate the peer before asking the accepting provider to sign splice inputs.
+pub(crate) fn finalize_request(
+    offer: &[u8],
+    accept: &[u8],
+    sign: &[u8],
+) -> Result<SigningRequest, ContractError> {
+    let offer = decode_msg(offer, "offer")?;
+    let accept = decode_msg(accept, "accept")?;
+    verified_sign_transactions(&offer, &accept, &decode_msg(sign, "sign")?)?;
+    signing_request(&offer, &accept, Party::Accept)
 }
 
 /// The adaptor point of every adaptor signature the contract needs, paired
@@ -646,7 +771,8 @@ mod tests {
     /// Signs a request the way an external signer does: from its PSBTs,
     /// adaptor points and input indexes alone, never the messages. ECDSA here is
     /// RFC 6979 low-R, as in ddk, so its funding-transaction signatures are the
-    /// same bytes the key-based path produces.
+    /// same bytes the key-based path produces. Adaptor signatures also use
+    /// deterministic nonces so complete messages can be compared byte-for-byte.
     struct RequestSigner {
         contract_key: SecretKey,
         /// The previous contract's key, for a splice.
@@ -674,29 +800,25 @@ mod tests {
                 .iter()
                 .map(|cet| {
                     let psbt = Psbt::deserialize(&cet.psbt).unwrap();
-                    let input = &psbt.inputs[0];
-                    ddk_dlc::create_cet_adaptor_sig_from_point(
+                    EcdsaAdaptorSignature::encrypt_no_aux_rand(
                         &secp,
-                        &psbt.unsigned_tx,
-                        &PublicKey::from_slice(&cet.adaptor_point).unwrap(),
+                        &sighash(&psbt, 0),
                         &self.contract_key,
-                        input.witness_script.as_ref().unwrap(),
-                        input.witness_utxo.as_ref().unwrap().value,
+                        &PublicKey::from_slice(&cet.adaptor_point).unwrap(),
                     )
-                    .unwrap()
                     .as_ref()
                     .to_vec()
                 })
                 .collect();
             let funding = Psbt::deserialize(&request.funding_psbt).unwrap();
             let dlc_input_signatures = request
-                .dlc_input_indexes
+                .dlc_inputs
                 .iter()
-                .map(|&input_index| DlcInputSignature {
-                    input_index,
+                .map(|input| DlcInputSignature {
+                    input_index: input.input_index,
                     signature: secp
                         .sign_ecdsa_low_r(
-                            &sighash(&funding, input_index as usize),
+                            &sighash(&funding, input.input_index as usize),
                             self.dlc_input_key.as_ref().unwrap(),
                         )
                         .serialize_compact()
@@ -739,29 +861,42 @@ mod tests {
         let acceptor = RequestSigner::for_contract(&fixture.acceptor_keys, &fixture.accept_temp_id);
         let offerer = RequestSigner::for_contract(&fixture.offerer_keys, &fixture.offer_temp_id);
 
-        let request = accept_offer_request(offer.clone(), fixture.accept_params.clone()).unwrap();
+        let request = prepare_accept_offer(offer.clone(), fixture.accept_params.clone())
+            .unwrap()
+            .request;
         assert_eq!(
             request.funding_pubkey,
             fixture.accept_params.party.funding_pubkey
         );
         assert_eq!(request.cets.len(), 2, "one per outcome of the one oracle");
-        assert!(request.dlc_input_indexes.is_empty());
+        assert!(request.dlc_inputs.is_empty());
         let (signatures, _) = acceptor.sign(&request);
-        let accept =
-            accept_offer_with_signatures(offer.clone(), fixture.accept_params.clone(), signatures)
+        let accept = complete_accept_offer(
+            prepare_accept_offer(offer.clone(), fixture.accept_params.clone())
                 .unwrap()
-                .accept;
+                .context,
+            signatures,
+        )
+        .unwrap()
+        .accept;
         validate_accept(offer.clone(), accept.clone()).unwrap();
 
         let signed_psbt = offerer_signed_funding_psbt(&offer, &accept, &fixture.offerer_descriptor);
-        let (signatures, _) =
-            offerer.sign(&sign_accept_request(offer.clone(), accept.clone()).unwrap());
-        let sign = sign_accept_with_signatures(
-            offer.clone(),
-            accept.clone(),
-            signatures,
-            signed_psbt.clone(),
-            vec![],
+        let (signatures, _) = offerer.sign(
+            &prepare_sign_accept(offer.clone(), accept.clone())
+                .unwrap()
+                .request,
+        );
+        let sign = complete_sign_accept(
+            SigningContext {
+                offer: offer.clone(),
+                accept: accept.clone(),
+            },
+            SigningResponse {
+                contract: signatures,
+                signed_funding_psbt: signed_psbt.clone(),
+                dlc_input_signatures: vec![],
+            },
         )
         .unwrap()
         .sign;
@@ -782,7 +917,6 @@ mod tests {
             accept.clone(),
             fixture.offerer_keys.clone(),
             signed_psbt,
-            vec![],
         )
         .unwrap()
         .sign;
@@ -792,7 +926,6 @@ mod tests {
             key_sign.clone(),
             unsigned_psbt,
             fixture.acceptor_keys.clone(),
-            vec![],
         )
         .unwrap();
         assert_eq!(funding_transaction, key_funding_transaction);
@@ -807,16 +940,16 @@ mod tests {
 
         // Each settles with the counterparty's adaptor signature, which was
         // made externally.
-        for (keys, temp_id) in [
-            (fixture.offerer_keys, fixture.offer_temp_id),
-            (fixture.acceptor_keys, fixture.accept_temp_id),
+        for (keys, party) in [
+            (fixture.offerer_keys, crate::contract::Party::Offer),
+            (fixture.acceptor_keys, crate::contract::Party::Accept),
         ] {
             sign_contract_cet(
                 offer.clone(),
                 accept.clone(),
                 sign.clone(),
                 keys,
-                temp_id,
+                party,
                 vec![attestation_ref("up")],
             )
             .unwrap();
@@ -832,7 +965,7 @@ mod tests {
         let offer: OfferDlc = decode_msg(&splice.offer_b, "offer").unwrap();
         let input = &offer.funding_inputs[0];
         let dlc_input = input.dlc_input.as_ref().unwrap();
-        let prior_temp_id = to_array_32(&splice.spliced_a.temporary_contract_id, "id").unwrap();
+        let prior_temp_id = to_array_32(&splice.prior_temp_id, "id").unwrap();
         let prior_key = |keys: &ContractKeyProvider, pubkey| {
             keys.inner
                 .dlc_input_signing_key(prior_temp_id, pubkey, input.input_serial_id)
@@ -856,28 +989,44 @@ mod tests {
 
         // The acceptor signs its half at the accept step, as a vault does,
         // and keeps it for finalize.
-        let accept_request =
-            accept_offer_request(splice.offer_b.clone(), splice.accept_params_b.clone()).unwrap();
-        assert_eq!(accept_request.dlc_input_indexes, vec![0]);
-        let (_, acceptor_halves) = acceptor.sign(&accept_request);
+        let prepared_accept =
+            prepare_accept_offer(splice.offer_b.clone(), splice.accept_params_b.clone()).unwrap();
+        let accept_request = &prepared_accept.request;
+        assert_eq!(
+            accept_request
+                .dlc_inputs
+                .iter()
+                .map(|input| input.input_index)
+                .collect::<Vec<_>>(),
+            vec![0]
+        );
+        let (accept_signatures, acceptor_halves) = acceptor.sign(accept_request);
+        let accept = complete_accept_offer(prepared_accept.context, accept_signatures)
+            .unwrap()
+            .accept;
+        assert_eq!(accept, splice.accept_b);
 
-        let unsigned_psbt =
-            create_funding_psbt(splice.offer_b.clone(), splice.accept_b.clone()).unwrap();
-        let sign_request =
-            sign_accept_request(splice.offer_b.clone(), splice.accept_b.clone()).unwrap();
+        let unsigned_psbt = create_funding_psbt(splice.offer_b.clone(), accept.clone()).unwrap();
+        let sign_request = prepare_sign_accept(splice.offer_b.clone(), accept.clone())
+            .unwrap()
+            .request;
         let (signatures, offerer_halves) = offerer.sign(&sign_request);
-        let sign = sign_accept_with_signatures(
-            splice.offer_b.clone(),
-            splice.accept_b.clone(),
-            signatures,
-            unsigned_psbt.clone(),
-            offerer_halves,
+        let sign = complete_sign_accept(
+            SigningContext {
+                offer: splice.offer_b.clone(),
+                accept: accept.clone(),
+            },
+            SigningResponse {
+                contract: signatures,
+                signed_funding_psbt: unsigned_psbt.clone(),
+                dlc_input_signatures: offerer_halves,
+            },
         )
         .unwrap()
         .sign;
         let funding_transaction = finalize_sign_with_signatures(
             splice.offer_b.clone(),
-            splice.accept_b.clone(),
+            accept,
             sign,
             unsigned_psbt.clone(),
             acceptor_halves,
@@ -889,7 +1038,6 @@ mod tests {
             splice.accept_b.clone(),
             splice.offerer_keys.clone(),
             unsigned_psbt.clone(),
-            vec![splice.spliced_a.clone()],
         )
         .unwrap()
         .sign;
@@ -899,7 +1047,6 @@ mod tests {
             key_sign,
             unsigned_psbt,
             splice.acceptor_keys,
-            vec![splice.spliced_a],
         )
         .unwrap();
         assert_eq!(funding_transaction, key_funding_transaction);
@@ -910,10 +1057,16 @@ mod tests {
     fn signatures_from_the_wrong_key_are_rejected() {
         let fixture = single_funded_offer();
         let stranger = RequestSigner::for_contract(&fixture.offerer_keys, &fixture.accept_temp_id);
-        let request =
-            accept_offer_request(fixture.offer.clone(), fixture.accept_params.clone()).unwrap();
+        let request = prepare_accept_offer(fixture.offer.clone(), fixture.accept_params.clone())
+            .unwrap()
+            .request;
         let (signatures, _) = stranger.sign(&request);
-        let result = accept_offer_with_signatures(fixture.offer, fixture.accept_params, signatures);
+        let result = complete_accept_offer(
+            prepare_accept_offer(fixture.offer, fixture.accept_params)
+                .unwrap()
+                .context,
+            signatures,
+        );
         assert!(matches!(result, Err(ContractError::InvalidAccept { .. })));
 
         // A splice half from a key that is not the input's.
@@ -925,14 +1078,21 @@ mod tests {
             dlc_input_key: Some(SecretKey::from_slice(&[7; 32]).unwrap()),
             ..RequestSigner::for_contract(&splice.offerer_keys, &offer.temporary_contract_id)
         };
-        let (signatures, halves) = offerer
-            .sign(&sign_accept_request(splice.offer_b.clone(), splice.accept_b.clone()).unwrap());
-        let result = sign_accept_with_signatures(
-            splice.offer_b,
-            splice.accept_b,
-            signatures,
-            unsigned_psbt,
-            halves,
+        let (signatures, halves) = offerer.sign(
+            &prepare_sign_accept(splice.offer_b.clone(), splice.accept_b.clone())
+                .unwrap()
+                .request,
+        );
+        let result = complete_sign_accept(
+            SigningContext {
+                offer: splice.offer_b,
+                accept: splice.accept_b,
+            },
+            SigningResponse {
+                contract: signatures,
+                signed_funding_psbt: unsigned_psbt,
+                dlc_input_signatures: halves,
+            },
         );
         assert!(matches!(
             result,
@@ -940,14 +1100,60 @@ mod tests {
         ));
     }
 
-    /// The request and the signed accept are two calls; without fixed serial
-    /// ids they would describe different transactions.
     #[test]
-    fn accepting_externally_needs_fixed_serial_ids() {
+    fn invalid_peer_sign_never_reaches_the_accepting_signer() {
+        struct MustNotSign;
+        impl ContractSignerProvider for MustNotSign {
+            fn get_signer(
+                &self,
+                _: ContractKeyRequest,
+            ) -> Result<std::sync::Arc<dyn crate::signer::ContractSigner>, ContractError>
+            {
+                panic!("an invalid peer message must be rejected before key lookup")
+            }
+        }
+        let splice = splice_fixture();
+        let psbt = create_funding_psbt(splice.offer_b.clone(), splice.accept_b.clone()).unwrap();
+        let signed = sign_accept(
+            splice.offer_b.clone(),
+            splice.accept_b.clone(),
+            splice.offerer_keys,
+            psbt.clone(),
+        )
+        .unwrap();
+        let valid: SignDlc = decode_msg(&signed.sign, "sign").unwrap();
+        let mut wrong_id = valid.clone();
+        wrong_id.contract_id[0] ^= 1;
+        let mut wrong_half = valid;
+        wrong_half.funding_signatures.funding_signatures[0].witness_elements[0].witness = vec![0];
+        for invalid in [wrong_id, wrong_half] {
+            let result = finalize_sign(
+                splice.offer_b.clone(),
+                splice.accept_b.clone(),
+                crate::contract::encode_msg(&invalid),
+                psbt.clone(),
+                std::sync::Arc::new(MustNotSign),
+            );
+            assert!(matches!(result, Err(ContractError::InvalidSign { .. })));
+        }
+    }
+
+    /// Omitted serial ids are generated once and survive persisted preparation.
+    #[test]
+    fn prepared_accept_retains_generated_serial_ids() {
         let fixture = single_funded_offer();
         let mut params = fixture.accept_params;
         params.party.change_serial_id = None;
-        let result = accept_offer_request(fixture.offer, params);
-        assert!(matches!(result, Err(ContractError::InvalidAccept { .. })));
+        params.party.payout_serial_id = None;
+        let prepared = prepare_accept_offer(fixture.offer.clone(), params).unwrap();
+        let signer = RequestSigner::for_contract(&fixture.acceptor_keys, &fixture.accept_temp_id);
+        let unsigned: AcceptDlc = decode_msg(&prepared.context.accept, "prepared accept").unwrap();
+        let (signatures, _) = signer.sign(&prepared.request);
+        let accepted = complete_accept_offer(prepared.context, signatures).unwrap();
+        let completed: AcceptDlc = decode_msg(&accepted.accept, "accept").unwrap();
+        assert_eq!(unsigned.payout_serial_id, completed.payout_serial_id);
+        assert_eq!(unsigned.change_serial_id, completed.change_serial_id);
+        assert_eq!(prepared.request.funding_psbt, accepted.funding_psbt);
+        validate_accept(fixture.offer, accepted.accept).unwrap();
     }
 }

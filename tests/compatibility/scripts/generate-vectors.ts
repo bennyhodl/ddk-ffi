@@ -15,10 +15,21 @@ import { resolve } from 'node:path'
 import * as ddk from '@bennyblader/ddk'
 
 import { nodeDlc } from '../src/bal.js'
-import { BAL_MNEMONIC, CET_LOCKTIME, DDK_MNEMONIC, FEE_RATE_PER_VB, MAX_TIMEOUT_INTERVAL, MIN_TIMEOUT_INTERVAL, NOW_UNIX, REFUND_LOCKTIME, REPO_ROOT } from '../src/config.js'
+import {
+  BAL_MNEMONIC,
+  CET_LOCKTIME,
+  DDK_MNEMONIC,
+  FEE_RATE_PER_VB,
+  MAX_TIMEOUT_INTERVAL,
+  MIN_TIMEOUT_INTERVAL,
+  NOW_UNIX,
+  REFUND_LOCKTIME,
+  REPO_ROOT,
+} from '../src/config.js'
 import { DdkParty } from '../src/ddk.js'
 import { fundVout, syntheticFundedInput, txidOf } from '../src/flow.js'
 import {
+  fromHexString,
   buildAccept,
   buildOffer,
   buildSpliceAccept,
@@ -101,6 +112,8 @@ const vectors: CompatVectors = {
   const offer = buildOffer(ddk, vectors)
   const { accept, fundingPsbt } = buildAccept(ddk, vectors, offer)
   const offererKeys = ddk.ContractKeyProvider.fromDescriptor(offerer.descriptor)
+  offererKeys.fundingPubkey(fromHexString(vectors.contract.offerTempIdHex))
+  offererKeys.fundingPubkey(fromHexString(vectors.splice.offerTempIdHex))
   const signedPsbt = ddk.signFundingPsbtWithDescriptor(offer, accept, fundingPsbt, offerer.descriptor, [
     { inputSerialId: 100n, derivationIndex: 0 },
   ])
@@ -108,9 +121,7 @@ const vectors: CompatVectors = {
 
   const { offer2 } = buildSpliceOffer(ddk, vectors, offer, accept, sign)
   const { accept2, fundingPsbt2 } = buildSpliceAccept(ddk, vectors, offer2)
-  const sign2 = ddk.signAccept(offer2, accept2, offererKeys, fundingPsbt2, [
-    { contractId: ddk.computeContractId(offer, accept), temporaryContractId: tempId(0x5c) },
-  ]).sign
+  const sign2 = ddk.signAccept(offer2, accept2, offererKeys, fundingPsbt2).sign
 
   vectors.transcript = {
     offerHex: toHexString(offer),
@@ -153,7 +164,11 @@ for (const [message, cls, validate] of [
 }
 assertEqual('replayed offer vs transcript', vectors.expected.offerHex!, vectors.transcript.offerHex)
 assertEqual('replayed offer2 vs transcript', vectors.expected.offer2Hex!, vectors.transcript.offer2Hex)
-assertEqual('replayed psbt vs fresh accept psbt', vectors.expected.fundingPsbtHex!, vectors.expected.freshAcceptPsbtHex!)
+assertEqual(
+  'replayed psbt vs fresh accept psbt',
+  vectors.expected.fundingPsbtHex!,
+  vectors.expected.freshAcceptPsbtHex!,
+)
 
 const announcement1 = (scenario1.contractInfo as any).oracleInfo.announcement
 attestation1.validate(announcement1)
@@ -162,7 +177,10 @@ attestation2.validate(announcement2)
 
 {
   // Contract id agrees with the reference XOR derivation.
-  const transactions = ddk.dlcTransactionsFromMessages(buf(vectors.transcript.offerHex), buf(vectors.transcript.acceptHex))
+  const transactions = ddk.dlcTransactionsFromMessages(
+    buf(vectors.transcript.offerHex),
+    buf(vectors.transcript.acceptHex),
+  )
   const reference = referenceContractId(
     buf(txidOf(transactions.fund.rawBytes)),
     fundVout(transactions.fund.rawBytes, transactions.fundingWitnessScript),

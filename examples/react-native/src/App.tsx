@@ -28,6 +28,7 @@ import {
 import * as ddk from '@bennyblader/ddk-rn';
 import {
   ContractKeyProvider,
+  Party,
   chainHashFromNetwork,
   fundingInput,
   createOffer,
@@ -225,8 +226,7 @@ export default function App() {
           // The fixture announcement matures at 750; the clock must be before it.
           nowUnix: 100n,
         },
-        acceptorKeys,
-        acceptTempId
+        acceptorKeys
       );
       const accept = acceptResult.accept;
       validateAccept(offer, accept);
@@ -271,7 +271,7 @@ export default function App() {
         accept,
         signResult.sign,
         offererKeys,
-        offerTempId,
+        Party.Offer,
         [{ oracleIndex: 0, attestation: hexToBytes(ATTESTATION_UP_HEX) }]
       );
       const refund = signContractRefund(
@@ -279,7 +279,7 @@ export default function App() {
         accept,
         signResult.sign,
         acceptorKeys,
-        acceptTempId
+        Party.Accept
       );
 
       setResult({

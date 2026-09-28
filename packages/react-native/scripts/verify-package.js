@@ -20,11 +20,12 @@
  */
 
 const { execSync } = require('child_process');
+const path = require('path');
 
 // --ignore-scripts so the pack does not re-run `prepare` (bob build); we only
 // need the file list, and `prepublishOnly` has already been preceded by it.
 const output = execSync('npm pack --dry-run --ignore-scripts 2>&1', {
-  cwd: __dirname + '/..',
+  cwd: path.join(__dirname, '..'),
   encoding: 'utf8',
 });
 

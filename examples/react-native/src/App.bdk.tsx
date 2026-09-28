@@ -287,8 +287,7 @@ export default function App() {
           // The fixture announcement matures at 750; the clock must be before it.
           nowUnix: 100n,
         },
-        acceptorKeys,
-        acceptTempId
+        acceptorKeys
       );
       const accept = acceptResult.accept;
 

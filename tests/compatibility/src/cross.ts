@@ -227,7 +227,6 @@ export async function enterBalOfferDdkAccept(
       nowUnix: NOW_UNIX,
     },
     ddkParty.keys,
-    ddkTempId,
   )
   const accept = acceptResult.accept
 
@@ -294,7 +293,7 @@ export async function ddkSettleCet(
     contract.accept,
     contract.sign,
     contract.ddkParty.keys,
-    contract.ddkTempId,
+    contract.ddkIsOfferer ? ddk.Party.Offer : ddk.Party.Accept,
     [{ oracleIndex: 0, attestation: attestationBody }],
   )
   return rpc.broadcastAndConfirm(hex(cet))
@@ -318,7 +317,7 @@ export async function ddkRefund(rpc: BitcoindRpc, contract: CrossContract): Prom
     contract.accept,
     contract.sign,
     contract.ddkParty.keys,
-    contract.ddkTempId,
+    contract.ddkIsOfferer ? ddk.Party.Offer : ddk.Party.Accept,
   )
   return rpc.broadcastAndConfirm(hex(refund))
 }
