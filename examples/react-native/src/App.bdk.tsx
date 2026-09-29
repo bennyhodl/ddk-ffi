@@ -22,9 +22,9 @@
  *   1. Two parties each build a bdk-rn wallet (the on-chain side).
  *   2. The offerer single-funds the contract; ddk-rn `createOffer` produces the
  *      OfferDlc (funding key from the seed, payout/change scripts from bdk).
- *   3. `acceptOffer` produces the AcceptDlc + the funding PSBT.
- *   4. The offerer signs its funding input on the PSBT with its bdk descriptor
- *      (`signFundingPsbtWithDescriptor`), then `signAccept` → SignDlc.
+ *   3. `acceptOffer` produces the AcceptDlc.
+ *   4. `signAccept` → SignDlc: the offerer's `Signers` carry its contract keys
+ *      and a wallet over its bdk descriptor, which signs its funding input.
  *   5. The acceptor (no inputs) runs `finalizeSign` → a fully-signed funding
  *      transaction, ready to broadcast.
  *
@@ -44,14 +44,14 @@ import {
 } from 'react-native';
 import {
   ContractKeyProvider,
+  DescriptorWallet,
+  Signers,
   chainHashFromNetwork,
   fundingInput,
   createOffer,
   contractInfoPayouts,
   acceptOffer,
   validateAccept,
-  createFundingPsbt,
-  signFundingPsbtWithDescriptor,
   signAccept,
   validateSign,
   finalizeSign,
@@ -270,6 +270,14 @@ export default function App() {
         contractFlags: 0,
       });
 
+      // Each party's signers, built once per wallet. The offerer's wallet is
+      // its bdk descriptor (bdk-rn's own `sign` is async, so it cannot be the
+      // synchronous FundingWallet callback); the acceptor funds nothing.
+      const offererSigners = new Signers(offererKeys).withWallet(
+        new DescriptorWallet(offerer.privateDescriptor)
+      );
+      const acceptorSigners = new Signers(acceptorKeys);
+
       // 2) Accept — the acceptor contributes no inputs and no collateral.
       const acceptResult = acceptOffer(
         offer,
@@ -289,7 +297,7 @@ export default function App() {
           // The fixture announcement matures at 750; the clock must be before it.
           nowUnix: 100n,
         },
-        acceptorKeys
+        acceptorSigners
       );
       const accept = acceptResult.accept;
 
@@ -298,18 +306,9 @@ export default function App() {
       // can be verified on its own.
       validateAccept(offer, accept);
 
-      // 3) Funding PSBT, and 4) the offerer signs its input with its descriptor.
-      const fundingPsbt = createFundingPsbt(offer, accept);
-      const signedPsbt = signFundingPsbtWithDescriptor(
-        offer,
-        accept,
-        fundingPsbt,
-        offerer.privateDescriptor,
-        [{ inputSerialId: FUNDING_INPUT_SERIAL_ID, derivationIndex: 0 }]
-      );
-
-      // 5) Offerer produces the sign message.
-      const signResult = signAccept(offer, accept, offererKeys, signedPsbt);
+      // 3) The offerer produces the sign message: its wallet signs its funding
+      //    input and its contract key signs the refund and CETs.
+      const signResult = await signAccept(offer, accept, offererSigners);
 
       // The acceptor independently validates the sign before finalizing.
       validateSign(offer, accept, signResult.sign);
@@ -327,13 +326,12 @@ export default function App() {
         accept: `${row.acceptPayoutSats.toString()} sats`,
       }));
 
-      // 6) Acceptor (no inputs of its own) finalizes → signed funding tx.
-      const fundingTx = finalizeSign(
+      // 4) Acceptor (no inputs of its own) finalizes → signed funding tx.
+      const fundingTx = await finalizeSign(
         offer,
         accept,
         signResult.sign,
-        fundingPsbt,
-        acceptorKeys
+        acceptorSigners
       );
 
       setResult({

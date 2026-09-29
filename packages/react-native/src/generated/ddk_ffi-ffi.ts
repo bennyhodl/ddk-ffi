@@ -188,6 +188,22 @@ interface NativeModuleInterface {
     ptr: bigint,
     uniffi_out_err: UniffiRustCallStatus
   ): void;
+  ubrn_uniffi_ddk_ffi_fn_clone_descriptorwallet(
+    ptr: bigint,
+    uniffi_out_err: UniffiRustCallStatus
+  ): bigint;
+  ubrn_uniffi_ddk_ffi_fn_free_descriptorwallet(
+    ptr: bigint,
+    uniffi_out_err: UniffiRustCallStatus
+  ): void;
+  ubrn_uniffi_ddk_ffi_fn_clone_fundingwallet(
+    ptr: bigint,
+    uniffi_out_err: UniffiRustCallStatus
+  ): bigint;
+  ubrn_uniffi_ddk_ffi_fn_free_fundingwallet(
+    ptr: bigint,
+    uniffi_out_err: UniffiRustCallStatus
+  ): void;
   ubrn_uniffi_ddk_ffi_fn_clone_privatekeysigner(
     ptr: bigint,
     uniffi_out_err: UniffiRustCallStatus
@@ -196,11 +212,22 @@ interface NativeModuleInterface {
     ptr: bigint,
     uniffi_out_err: UniffiRustCallStatus
   ): void;
+  ubrn_uniffi_ddk_ffi_fn_clone_signers(
+    ptr: bigint,
+    uniffi_out_err: UniffiRustCallStatus
+  ): bigint;
+  ubrn_uniffi_ddk_ffi_fn_free_signers(
+    ptr: bigint,
+    uniffi_out_err: UniffiRustCallStatus
+  ): void;
   ubrn_uniffi_ddk_ffi_fn_init_callback_vtable_contractsigner(
     vtable: UniffiVTableCallbackInterfaceDdkFfiContractSigner
   ): void;
   ubrn_uniffi_ddk_ffi_fn_init_callback_vtable_contractsignerprovider(
     vtable: UniffiVTableCallbackInterfaceDdkFfiContractSignerProvider
+  ): void;
+  ubrn_uniffi_ddk_ffi_fn_init_callback_vtable_fundingwallet(
+    vtable: UniffiVTableCallbackInterfaceDdkFfiFundingWallet
   ): void;
   ubrn_uniffi_ddk_ffi_fn_func_accept_offer(
     offer: Uint8Array,
@@ -414,10 +441,8 @@ interface NativeModuleInterface {
     offer: Uint8Array,
     accept: Uint8Array,
     sign: Uint8Array,
-    signedFundingPsbt: Uint8Array,
-    signers: bigint,
-    uniffi_out_err: UniffiRustCallStatus
-  ): Uint8Array;
+    signers: bigint
+  ): bigint;
   ubrn_uniffi_ddk_ffi_fn_func_finalize_sign_with_signatures(
     offer: Uint8Array,
     accept: Uint8Array,
@@ -472,18 +497,8 @@ interface NativeModuleInterface {
   ubrn_uniffi_ddk_ffi_fn_func_sign_accept(
     offer: Uint8Array,
     accept: Uint8Array,
-    signers: bigint,
-    signedFundingPsbt: Uint8Array,
-    uniffi_out_err: UniffiRustCallStatus
-  ): Uint8Array;
-  ubrn_uniffi_ddk_ffi_fn_func_sign_funding_psbt_with_descriptor(
-    offer: Uint8Array,
-    accept: Uint8Array,
-    fundingPsbt: Uint8Array,
-    descriptor: Uint8Array,
-    inputs: Uint8Array,
-    uniffi_out_err: UniffiRustCallStatus
-  ): Uint8Array;
+    signers: bigint
+  ): bigint;
   ubrn_uniffi_ddk_ffi_fn_func_spliced_contract_ids(
     offer: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus
@@ -655,6 +670,19 @@ interface NativeModuleInterface {
     key: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus
   ): bigint;
+  ubrn_uniffi_ddk_ffi_fn_constructor_descriptorwallet_new(
+    descriptor: Uint8Array,
+    lookahead: number,
+    uniffi_out_err: UniffiRustCallStatus
+  ): bigint;
+  ubrn_uniffi_ddk_ffi_fn_method_descriptorwallet_sign_funding_psbt(
+    uniffiSelf: bigint,
+    psbt: Uint8Array
+  ): bigint;
+  ubrn_uniffi_ddk_ffi_fn_method_fundingwallet_sign_funding_psbt(
+    uniffiSelf: bigint,
+    psbt: Uint8Array
+  ): bigint;
   ubrn_uniffi_ddk_ffi_fn_constructor_privatekeysigner_from_secret_key(
     secretKey: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus
@@ -674,6 +702,15 @@ interface NativeModuleInterface {
     sighash: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus
   ): Uint8Array;
+  ubrn_uniffi_ddk_ffi_fn_constructor_signers_new(
+    contractKeys: bigint,
+    uniffi_out_err: UniffiRustCallStatus
+  ): bigint;
+  ubrn_uniffi_ddk_ffi_fn_method_signers_with_wallet(
+    uniffiSelf: bigint,
+    wallet: bigint,
+    uniffi_out_err: UniffiRustCallStatus
+  ): bigint;
   ubrn_ffi_ddk_ffi_uniffi_contract_version(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_accept_offer(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_chain_hash_from_network(): number;
@@ -716,7 +753,6 @@ interface NativeModuleInterface {
   ubrn_uniffi_ddk_ffi_checksum_func_prepare_finalize_sign(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_prepare_sign_accept(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_sign_accept(): number;
-  ubrn_uniffi_ddk_ffi_checksum_func_sign_funding_psbt_with_descriptor(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_spliced_contract_ids(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_validate_accept(): number;
   ubrn_uniffi_ddk_ffi_checksum_func_validate_offer(): number;
@@ -732,10 +768,15 @@ interface NativeModuleInterface {
   ubrn_uniffi_ddk_ffi_checksum_method_contractsigner_sign_ecdsa(): number;
   ubrn_uniffi_ddk_ffi_checksum_method_contractsigner_sign_adaptor(): number;
   ubrn_uniffi_ddk_ffi_checksum_method_contractsignerprovider_get_signer(): number;
+  ubrn_uniffi_ddk_ffi_checksum_constructor_descriptorwallet_new(): number;
+  ubrn_uniffi_ddk_ffi_checksum_method_descriptorwallet_sign_funding_psbt(): number;
+  ubrn_uniffi_ddk_ffi_checksum_method_fundingwallet_sign_funding_psbt(): number;
   ubrn_uniffi_ddk_ffi_checksum_constructor_privatekeysigner_from_secret_key(): number;
   ubrn_uniffi_ddk_ffi_checksum_method_privatekeysigner_public_key(): number;
   ubrn_uniffi_ddk_ffi_checksum_method_privatekeysigner_sign_adaptor(): number;
   ubrn_uniffi_ddk_ffi_checksum_method_privatekeysigner_sign_ecdsa(): number;
+  ubrn_uniffi_ddk_ffi_checksum_constructor_signers_new(): number;
+  ubrn_uniffi_ddk_ffi_checksum_method_signers_with_wallet(): number;
   ubrn_uniffi_internal_fn_method_contractsigner_ffi__bless_pointer(
     pointer: bigint,
     uniffi_out_err: UniffiRustCallStatus
@@ -748,7 +789,19 @@ interface NativeModuleInterface {
     pointer: bigint,
     uniffi_out_err: UniffiRustCallStatus
   ): UniffiGcObject;
+  ubrn_uniffi_internal_fn_method_descriptorwallet_ffi__bless_pointer(
+    pointer: bigint,
+    uniffi_out_err: UniffiRustCallStatus
+  ): UniffiGcObject;
+  ubrn_uniffi_internal_fn_method_fundingwallet_ffi__bless_pointer(
+    pointer: bigint,
+    uniffi_out_err: UniffiRustCallStatus
+  ): UniffiGcObject;
   ubrn_uniffi_internal_fn_method_privatekeysigner_ffi__bless_pointer(
+    pointer: bigint,
+    uniffi_out_err: UniffiRustCallStatus
+  ): UniffiGcObject;
+  ubrn_uniffi_internal_fn_method_signers_ffi__bless_pointer(
     pointer: bigint,
     uniffi_out_err: UniffiRustCallStatus
   ): UniffiGcObject;
@@ -807,6 +860,29 @@ export type UniffiVTableCallbackInterfaceDdkFfiContractSignerProvider = {
   uniffi_free: UniffiCallbackInterfaceFreeDdkFfiContractSignerProvider;
   uniffi_clone: UniffiCallbackInterfaceCloneDdkFfiContractSignerProvider;
   get_signer: UniffiCallbackInterfaceDdkFfiContractSignerProviderMethod0;
+};
+export type UniffiForeignFutureResultRustBuffer = {
+  return_value: Uint8Array;
+  call_status: UniffiRustCallStatus;
+};
+export type UniffiForeignFutureCompleterustBuffer = (
+  callbackData: bigint,
+  result: UniffiForeignFutureResultRustBuffer
+) => void;
+type UniffiCallbackInterfaceDdkFfiFundingWalletMethod0 = (
+  uniffiHandle: bigint,
+  psbt: Uint8Array,
+  uniffiFutureCallback: UniffiForeignFutureCompleterustBuffer,
+  uniffiCallbackData: bigint
+) => UniffiForeignFutureDroppedCallbackStruct;
+type UniffiCallbackInterfaceCloneDdkFfiFundingWallet = (
+  handle: bigint
+) => UniffiResult<void>;
+type UniffiCallbackInterfaceFreeDdkFfiFundingWallet = (handle: bigint) => void;
+export type UniffiVTableCallbackInterfaceDdkFfiFundingWallet = {
+  uniffi_free: UniffiCallbackInterfaceFreeDdkFfiFundingWallet;
+  uniffi_clone: UniffiCallbackInterfaceCloneDdkFfiFundingWallet;
+  sign_funding_psbt: UniffiCallbackInterfaceDdkFfiFundingWalletMethod0;
 };
 
 // UniffiRustFutureContinuationCallback is generated as part of the component interface's

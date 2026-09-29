@@ -1,4 +1,4 @@
-import { describe, test, expect } from 'vitest'
+import { beforeAll, describe, test, expect } from 'vitest'
 import * as ddk from '@bennyblader/ddk'
 
 // ---------------------------------------------------------------------------
@@ -49,9 +49,10 @@ const tempId = (marker: number) => Buffer.alloc(32, marker)
 const FUNDING_SERIAL = 100n
 
 // Builds and signs a complete single-funded contract, returning every artifact.
-function runFullFlow(options?: {
+async function runFullFlow(options?: {
   fundingPubkey?: Uint8Array
   signers?: ddk.ContractSignerProvider
+  wallet?: ddk.FundingWallet
   offerTempId?: Uint8Array
 }) {
   const offererKeys = ddk.ContractKeyProvider.fromDescriptor(OFFERER_DESCRIPTOR)
@@ -99,16 +100,17 @@ function runFullFlow(options?: {
       maxTimeoutInterval: 100_000,
       nowUnix: NOW_UNIX,
     },
-    acceptorKeys,
+    new ddk.Signers(acceptorKeys),
   )
   const accept = acceptResult.accept
 
-  const fundingPsbt = ddk.createFundingPsbt(offer, accept)
-  const signedPsbt = ddk.signFundingPsbtWithDescriptor(offer, accept, fundingPsbt, OFFERER_DESCRIPTOR, [
-    { inputSerialId: FUNDING_SERIAL, derivationIndex: 0 },
-  ])
-  const signResult = ddk.signAccept(offer, accept, options?.signers ?? offererKeys, signedPsbt)
-  const fundingTx = ddk.finalizeSign(offer, accept, signResult.sign, fundingPsbt, acceptorKeys)
+  // The offerer's signers: its contract keys and the wallet over its
+  // descriptor, which signs its one funding input inside signAccept.
+  const offererSigners = new ddk.Signers(options?.signers ?? offererKeys).withWallet(
+    options?.wallet ?? new ddk.DescriptorWallet(OFFERER_DESCRIPTOR),
+  )
+  const signResult = await ddk.signAccept(offer, accept, offererSigners)
+  const fundingTx = await ddk.finalizeSign(offer, accept, signResult.sign, new ddk.Signers(acceptorKeys))
 
   return {
     offererKeys,
@@ -117,7 +119,6 @@ function runFullFlow(options?: {
     offer,
     acceptResult,
     accept,
-    fundingPsbt,
     signResult,
     fundingTx,
   }
@@ -126,7 +127,7 @@ function runFullFlow(options?: {
 // ---------------------------------------------------------------------------
 
 describe('binding surface', () => {
-  test('exports the whole stateless contract API', () => {
+  test('exports the whole stateless contract API', async () => {
     const fns = [
       'chainHashFromNetwork',
       'fundingInput',
@@ -141,7 +142,6 @@ describe('binding surface', () => {
       'acceptOffer',
       'createFundingPsbt',
       'dlcTransactionsFromMessages',
-      'signFundingPsbtWithDescriptor',
       'signAccept',
       'finalizeSign',
       'contractCetTransaction',
@@ -159,13 +159,15 @@ describe('binding surface', () => {
       expect(typeof (ddk as Record<string, unknown>)[name], name).toBe('function')
     }
     expect(typeof ddk.ContractKeyProvider).toBe('function') // the class constructor
+    expect(typeof ddk.DescriptorWallet).toBe('function')
+    expect(typeof ddk.Signers).toBe('function')
     expect(ddk.Party.Offer).toBeDefined()
     expect(ddk.Party.Accept).toBeDefined()
   })
 })
 
 describe('ContractKeyProvider', () => {
-  test('all constructors agree and funding keys are deterministic', () => {
+  test('all constructors agree and funding keys are deterministic', async () => {
     const seed = ddk.convertMnemonicToSeed(MNEMONIC, undefined)
     const fromMnemonic = ddk.ContractKeyProvider.fromMnemonic(MNEMONIC, undefined, 'bitcoin')
     const fromSeed = ddk.ContractKeyProvider.fromSeed(seed, 'bitcoin')
@@ -183,12 +185,12 @@ describe('ContractKeyProvider', () => {
     expect(bytes(fromMnemonic.fundingPubkey(tempId(0x22))).equals(expected)).toBe(false)
   })
 
-  test('fromDescriptor derives from the descriptor xprv', () => {
+  test('fromDescriptor derives from the descriptor xprv', async () => {
     const provider = ddk.ContractKeyProvider.fromDescriptor(OFFERER_DESCRIPTOR)
     expect(provider.fundingPubkey(tempId(0x01)).length).toBe(33)
   })
 
-  test('rejects a wrong-length temporary id', () => {
+  test('rejects a wrong-length temporary id', async () => {
     const provider = ddk.ContractKeyProvider.fromMnemonic(MNEMONIC, undefined, 'regtest')
     try {
       provider.fundingPubkey(Buffer.alloc(31))
@@ -198,7 +200,7 @@ describe('ContractKeyProvider', () => {
     }
   })
 
-  test('rejects an unknown network', () => {
+  test('rejects an unknown network', async () => {
     try {
       ddk.ContractKeyProvider.fromSeed(Buffer.alloc(64), 'mainnet-typo')
       throw new Error('should have thrown')
@@ -209,17 +211,17 @@ describe('ContractKeyProvider', () => {
 })
 
 describe('offer-building helpers', () => {
-  test('chainHashFromNetwork returns 32 bytes', () => {
+  test('chainHashFromNetwork returns 32 bytes', async () => {
     for (const network of ['bitcoin', 'testnet', 'signet', 'regtest']) {
       expect(ddk.chainHashFromNetwork(network).length).toBe(32)
     }
   })
 
-  test('dlcInputMaxWitnessLen is 220', () => {
+  test('dlcInputMaxWitnessLen is 220', async () => {
     expect(ddk.dlcInputMaxWitnessLen()).toBe(220)
   })
 
-  test('fundingInput encodes a FundingInput', () => {
+  test('fundingInput encodes a FundingInput', async () => {
     const input = ddk.fundingInput(buf(PREV_TX_HEX), 0, FUNDING_SERIAL, 0xffffffff, 108, Buffer.alloc(0))
     expect(input instanceof Uint8Array).toBe(true)
     expect(input.length).toBeGreaterThan(0)
@@ -227,26 +229,29 @@ describe('offer-building helpers', () => {
 })
 
 describe('full single-funded lifecycle', () => {
-  const flow = runFullFlow()
+  let flow: Awaited<ReturnType<typeof runFullFlow>>
+  beforeAll(async () => {
+    flow = await runFullFlow()
+  })
 
-  test('createOffer -> validateOffer', () => {
+  test('createOffer -> validateOffer', async () => {
     expect(flow.offer.length).toBeGreaterThan(0)
     expect(() => ddk.validateOffer(flow.offer, 100, 100_000, NOW_UNIX)).not.toThrow()
   })
 
-  test('acceptOffer -> AcceptResult with transactions + psbt', () => {
+  test('acceptOffer -> AcceptResult with transactions + psbt', async () => {
     expect(flow.accept.length).toBeGreaterThan(0)
     expect(flow.acceptResult.fundingPsbt.length).toBeGreaterThan(0)
     expect(flow.acceptResult.transactions.cets.length).toBe(2) // two enum outcomes
     expect(() => ddk.validateAccept(flow.offer, flow.accept)).not.toThrow()
   })
 
-  test('signAccept -> validateSign', () => {
+  test('signAccept -> validateSign', async () => {
     expect(flow.signResult.sign.length).toBeGreaterThan(0)
     expect(() => ddk.validateSign(flow.offer, flow.accept, flow.signResult.sign)).not.toThrow()
   })
 
-  test('finalizeSign -> a signed funding transaction', () => {
+  test('finalizeSign -> a signed funding transaction', async () => {
     expect(flow.fundingTx instanceof Uint8Array).toBe(true)
     expect(flow.fundingTx.length).toBeGreaterThan(0)
     // Signing added witnesses, so the final transaction is larger than the
@@ -256,11 +261,11 @@ describe('full single-funded lifecycle', () => {
 
   // The whole point of the stateless API: nothing is stored, so every artifact
   // has to come back byte-identical from the messages alone.
-  test('createFundingPsbt rebuilds the PSBT acceptOffer returned', () => {
+  test('createFundingPsbt rebuilds the PSBT acceptOffer returned', async () => {
     expect(bytes(ddk.createFundingPsbt(flow.offer, flow.accept)).equals(flow.acceptResult.fundingPsbt)).toBe(true)
   })
 
-  test('dlcTransactionsFromMessages rebuilds what acceptOffer returned', () => {
+  test('dlcTransactionsFromMessages rebuilds what acceptOffer returned', async () => {
     const rebuilt = ddk.dlcTransactionsFromMessages(flow.offer, flow.accept)
     expect(bytes(rebuilt.fund.rawBytes).equals(flow.acceptResult.transactions.fund.rawBytes)).toBe(true)
     expect(bytes(rebuilt.refund.rawBytes).equals(flow.acceptResult.transactions.refund.rawBytes)).toBe(true)
@@ -272,9 +277,12 @@ describe('full single-funded lifecycle', () => {
 })
 
 describe('validation rejects tampered / mismatched messages', () => {
-  const flow = runFullFlow()
+  let flow: Awaited<ReturnType<typeof runFullFlow>>
+  beforeAll(async () => {
+    flow = await runFullFlow()
+  })
 
-  test('validateOffer throws on malformed bytes with a code', () => {
+  test('validateOffer throws on malformed bytes with a code', async () => {
     try {
       ddk.validateOffer(buf('deadbeef'), 100, 100_000, NOW_UNIX)
       throw new Error('should have thrown')
@@ -283,11 +291,11 @@ describe('validation rejects tampered / mismatched messages', () => {
     }
   })
 
-  test('validateSign rejects a non-sign message', () => {
+  test('validateSign rejects a non-sign message', async () => {
     expect(() => ddk.validateSign(flow.offer, flow.accept, flow.accept)).toThrow()
   })
 
-  test('validateAccept rejects bytes that are not an accept for this offer', () => {
+  test('validateAccept rejects bytes that are not an accept for this offer', async () => {
     expect(() => ddk.validateAccept(flow.offer, buf('deadbeef'))).toThrow()
     expect(() => ddk.validateAccept(flow.offer, flow.offer)).toThrow()
   })
@@ -300,8 +308,8 @@ describe('validation rejects tampered / mismatched messages', () => {
   // byte while describing the same contract. An AcceptDlc is therefore not a
   // content hash of the contract — but everything rebuilt from a given pair of
   // messages is, which is what makes storing only the messages sufficient.
-  test('the offer is deterministic, and rebuilt artifacts are stable across accepts', () => {
-    const again = runFullFlow()
+  test('the offer is deterministic, and rebuilt artifacts are stable across accepts', async () => {
+    const again = await runFullFlow()
     expect(bytes(again.offer).equals(flow.offer)).toBe(true)
 
     expect(
@@ -312,19 +320,19 @@ describe('validation rejects tampered / mismatched messages', () => {
     expect(bytes(fromOther.refund.rawBytes).equals(flow.acceptResult.transactions.refund.rawBytes)).toBe(true)
   })
 
-  test('validateOffer rejects an oracle timeout outside the accepted window', () => {
+  test('validateOffer rejects an oracle timeout outside the accepted window', async () => {
     // The fixture event matures at 750 against a refund locktime of 1000, a gap
     // of 250 — outside a 1..100 window.
     expect(() => ddk.validateOffer(flow.offer, 1, 100, NOW_UNIX)).toThrow()
   })
 
-  test('validateOffer rejects an offer whose oracle event has already matured', () => {
+  test('validateOffer rejects an offer whose oracle event has already matured', async () => {
     // The fixture event matures at 750; a clock at or past it is refused.
     expect(() => ddk.validateOffer(flow.offer, 100, 100_000, 750n)).toThrow()
     expect(() => ddk.validateOffer(flow.offer, 100, 100_000, 749n)).not.toThrow()
   })
 
-  test('undecodable message bytes surface as Serialization', () => {
+  test('undecodable message bytes surface as Serialization', async () => {
     try {
       ddk.computeContractId(buf('deadbeef'), flow.accept)
       throw new Error('should have thrown')
@@ -335,21 +343,24 @@ describe('validation rejects tampered / mismatched messages', () => {
 })
 
 describe('inspection', () => {
-  const flow = runFullFlow()
+  let flow: Awaited<ReturnType<typeof runFullFlow>>
+  beforeAll(async () => {
+    flow = await runFullFlow()
+  })
 
-  test('computeContractId is 32 bytes and stable', () => {
+  test('computeContractId is 32 bytes and stable', async () => {
     const id = ddk.computeContractId(flow.offer, flow.accept)
     expect(id.length).toBe(32)
     expect(bytes(id).equals(ddk.computeContractId(flow.offer, flow.accept))).toBe(true)
   })
 
-  test('dlcTransactionsFromMessages rebuilds the transactions', () => {
+  test('dlcTransactionsFromMessages rebuilds the transactions', async () => {
     const txs = ddk.dlcTransactionsFromMessages(flow.offer, flow.accept)
     expect(txs.cets.length).toBe(2)
     expect(txs.fund.rawBytes instanceof Uint8Array).toBe(true)
   })
 
-  test('contractInfoPayouts derives the enum payout table', () => {
+  test('contractInfoPayouts derives the enum payout table', async () => {
     const payouts = ddk.contractInfoPayouts(buf(CONTRACT_INFO_HEX))
     expect(payouts.isEnum).toBe(true)
     expect(payouts.totalCollateralSats).toBe(100_000n)
@@ -364,10 +375,13 @@ describe('inspection', () => {
 })
 
 describe('settlement', () => {
-  const flow = runFullFlow()
+  let flow: Awaited<ReturnType<typeof runFullFlow>>
+  beforeAll(async () => {
+    flow = await runFullFlow()
+  })
   const up = [{ oracleIndex: 0, attestation: buf(ATTESTATION_UP_HEX) }]
 
-  test('contractCetTransaction builds the CET for the attested outcome from the messages alone', () => {
+  test('contractCetTransaction builds the CET for the attested outcome from the messages alone', async () => {
     const cet = ddk.contractCetTransaction(flow.offer, flow.accept, flow.signResult.sign, up)
     expect(cet instanceof Uint8Array).toBe(true)
     // Both halves of the 2-of-2 are present: the signed CET is larger than the
@@ -381,7 +395,7 @@ describe('settlement', () => {
     expect(bytes(down).equals(cet)).toBe(false)
   })
 
-  test('an outcome the contract does not have throws NoMatchingOutcome', () => {
+  test('an outcome the contract does not have throws NoMatchingOutcome', async () => {
     try {
       ddk.contractCetTransaction(flow.offer, flow.accept, flow.signResult.sign, [
         { oracleIndex: 0, attestation: buf(ATTESTATION_SIDEWAYS_HEX) },
@@ -392,7 +406,7 @@ describe('settlement', () => {
     }
   })
 
-  test('an out-of-range oracle index throws InvalidAttestation', () => {
+  test('an out-of-range oracle index throws InvalidAttestation', async () => {
     try {
       ddk.contractCetTransaction(flow.offer, flow.accept, flow.signResult.sign, [
         { oracleIndex: 5, attestation: buf(ATTESTATION_UP_HEX) },
@@ -403,16 +417,16 @@ describe('settlement', () => {
     }
   })
 
-  test('contractRefundTransaction builds the refund from the two refund signatures', () => {
+  test('contractRefundTransaction builds the refund from the two refund signatures', async () => {
     const refund = ddk.contractRefundTransaction(flow.offer, flow.accept, flow.signResult.sign)
     const unsigned = ddk.dlcTransactionsFromSignedMessages(flow.offer, flow.accept, flow.signResult.sign)
     expect(refund.length).toBeGreaterThan(unsigned.refund.rawBytes.length)
   })
 
-  test('a message whose signatures belong to another contract is rejected', () => {
+  test('a message whose signatures belong to another contract is rejected', async () => {
     // The same flow under another temporary id: a different contract, with
     // different keys on both sides, whose messages are individually well formed.
-    const other = runFullFlow({ offerTempId: tempId(0x77) })
+    const other = await runFullFlow({ offerTempId: tempId(0x77) })
     expect(bytes(other.signResult.sign).equals(flow.signResult.sign)).toBe(false)
     expect(() => ddk.contractRefundTransaction(flow.offer, flow.accept, other.signResult.sign)).toThrow()
     expect(() => ddk.contractCetTransaction(flow.offer, other.accept, flow.signResult.sign, up)).toThrow()
@@ -420,9 +434,14 @@ describe('settlement', () => {
 })
 
 describe('splicing', () => {
-  const flow = runFullFlow()
+  let flow: Awaited<ReturnType<typeof runFullFlow>>
+  let contractIdA: Uint8Array
+  beforeAll(async () => {
+    flow = await runFullFlow()
+    contractIdA = ddk.computeContractId(flow.offer, flow.accept)
+  })
 
-  test('createDlcSpliceInput builds a splice FundingInput from a contract', () => {
+  test('createDlcSpliceInput builds a splice FundingInput from a contract', async () => {
     const spliceInput = ddk.createDlcSpliceInput(flow.offer, flow.accept, flow.signResult.sign, ddk.Party.Offer, 900n)
     expect(spliceInput instanceof Uint8Array).toBe(true)
     expect(spliceInput.length).toBeGreaterThan(0)
@@ -435,9 +454,8 @@ describe('splicing', () => {
   // transaction, from which A's temporary id, and so each party's key, derive.
   const SPLICE_SERIAL = 900n
   const offerTempIdB = tempId(0xbb)
-  const contractIdA = ddk.computeContractId(flow.offer, flow.accept)
 
-  function runSpliceOut() {
+  async function runSpliceOut() {
     const spliceInput = ddk.createDlcSpliceInput(
       flow.offer,
       flow.accept,
@@ -484,23 +502,25 @@ describe('splicing', () => {
         maxTimeoutInterval: 100_000,
         nowUnix: NOW_UNIX,
       },
-      flow.acceptorKeys,
+      new ddk.Signers(flow.acceptorKeys),
     ).accept
 
-    // The offerer signs its half of A's 2-of-2 (there are no wallet inputs to
-    // sign, so the PSBT goes across untouched)...
-    const psbt = ddk.createFundingPsbt(offerB, acceptB)
-    const signB = ddk.signAccept(offerB, acceptB, flow.offererKeys, psbt).sign
+    // The offerer signs its half of A's 2-of-2 (there are no wallet inputs,
+    // so neither party needs a wallet)...
+    const signB = (await ddk.signAccept(offerB, acceptB, new ddk.Signers(flow.offererKeys))).sign
 
     // ...and the acceptor, which learns which of its contracts is spliced from
     // the offer alone, completes it.
-    const fundingTx = ddk.finalizeSign(offerB, acceptB, signB, psbt, flow.acceptorKeys)
+    const fundingTx = await ddk.finalizeSign(offerB, acceptB, signB, new ddk.Signers(flow.acceptorKeys))
     return { offerB, acceptB, signB, fundingTx }
   }
 
-  const splice = runSpliceOut()
+  let splice: Awaited<ReturnType<typeof runSpliceOut>>
+  beforeAll(async () => {
+    splice = await runSpliceOut()
+  })
 
-  test('prepareFinalizeSign lists the acceptor half of the spliced contract once the sign verifies', () => {
+  test('prepareFinalizeSign lists the acceptor half of the spliced contract once the sign verifies', async () => {
     const request = ddk.prepareFinalizeSign(splice.offerB, splice.acceptB, splice.signB)
     expect(request.dlcInputs.length).toBe(1)
     expect(bytes(request.dlcInputs[0]!.key.contractId)).toEqual(bytes(ddk.computeContractId(flow.offer, flow.accept)))
@@ -516,14 +536,14 @@ describe('splicing', () => {
     expect(() => ddk.prepareFinalizeSign(splice.offerB, splice.acceptB, flow.signResult.sign)).toThrow()
   })
 
-  test('splicedContractIds names the spliced contract', () => {
+  test('splicedContractIds names the spliced contract', async () => {
     const ids = ddk.splicedContractIds(splice.offerB)
     expect(ids.length).toBe(1)
     expect(bytes(ids[0]!).equals(contractIdA)).toBe(true)
     expect(ddk.splicedContractIds(flow.offer).length).toBe(0)
   })
 
-  test('signAccept -> finalizeSign completes a spliced contract', () => {
+  test('signAccept -> finalizeSign completes a spliced contract', async () => {
     expect(splice.fundingTx instanceof Uint8Array).toBe(true)
     expect(() => ddk.validateSign(splice.offerB, splice.acceptB, splice.signB)).not.toThrow()
     // Witnesses were added for the prior 2-of-2, so the signed transaction is
@@ -534,30 +554,28 @@ describe('splicing', () => {
     expect(unsigned.fund.inputs.length).toBe(1)
   })
 
-  test('providers built from the seeds sign the splice with nothing registered', () => {
+  test('providers built from the seeds sign the splice with nothing registered', async () => {
     // Fresh instances, as after a restart: no fundingPubkey call, no restore.
-    const psbt = ddk.createFundingPsbt(splice.offerB, splice.acceptB)
-    const freshOfferer = ddk.ContractKeyProvider.fromDescriptor(OFFERER_DESCRIPTOR)
-    const signed = ddk.signAccept(splice.offerB, splice.acceptB, freshOfferer, psbt)
+    const freshOfferer = new ddk.Signers(ddk.ContractKeyProvider.fromDescriptor(OFFERER_DESCRIPTOR))
+    const signed = await ddk.signAccept(splice.offerB, splice.acceptB, freshOfferer)
     expect(() => ddk.validateSign(splice.offerB, splice.acceptB, signed.sign)).not.toThrow()
-    const freshAcceptor = ddk.ContractKeyProvider.fromMnemonic(ACCEPTOR_MNEMONIC, undefined, 'regtest')
-    expect(bytes(ddk.finalizeSign(splice.offerB, splice.acceptB, splice.signB, psbt, freshAcceptor))).toEqual(
+    const freshAcceptor = new ddk.Signers(ddk.ContractKeyProvider.fromMnemonic(ACCEPTOR_MNEMONIC, undefined, 'regtest'))
+    expect(bytes(await ddk.finalizeSign(splice.offerB, splice.acceptB, splice.signB, freshAcceptor))).toEqual(
       bytes(splice.fundingTx),
     )
   })
 
-  test('a provider from another seed cannot sign the splice', () => {
-    const stranger = ddk.ContractKeyProvider.fromMnemonic(MNEMONIC, undefined, 'regtest')
-    const psbt = ddk.createFundingPsbt(splice.offerB, splice.acceptB)
+  test('a provider from another seed cannot sign the splice', async () => {
+    const stranger = new ddk.Signers(ddk.ContractKeyProvider.fromMnemonic(MNEMONIC, undefined, 'regtest'))
     try {
-      ddk.finalizeSign(splice.offerB, splice.acceptB, splice.signB, psbt, stranger)
+      await ddk.finalizeSign(splice.offerB, splice.acceptB, splice.signB, stranger)
       throw new Error('should have thrown')
     } catch (e) {
       expect((e as { tag?: string }).tag).toBe('Key')
     }
   })
 
-  test('the spliced contract carries the reduced collateral', () => {
+  test('the spliced contract carries the reduced collateral', async () => {
     const payouts = ddk.contractInfoPayouts(buf(CONTRACT_INFO_60K_HEX))
     expect(payouts.totalCollateralSats).toBe(60_000n)
     // 40 000 of the prior contract's 100 000 was spliced out.
@@ -566,7 +584,7 @@ describe('splicing', () => {
     )
   })
 
-  test('the spliced contract settles like any other', () => {
+  test('the spliced contract settles like any other', async () => {
     const cet = ddk.contractCetTransaction(splice.offerB, splice.acceptB, splice.signB, [
       { oracleIndex: 0, attestation: buf(ATTESTATION_UP_HEX) },
     ])
@@ -580,22 +598,26 @@ describe('splicing', () => {
 // External signing is proven end to end in Rust (external.rs), where a test
 // signer can hold raw keys. Here: that its records cross the binding intact.
 describe('external signing', () => {
-  const flow = runFullFlow()
-  const acceptParams = {
-    party: {
-      fundingPubkey: flow.acceptorKeys.fundingPubkey(flow.offerTempId),
-      fundingInputs: [],
-      payoutSpk: buf(OFFERER_SPK_HEX),
-      payoutSerialId: 4n,
-      changeSpk: buf(OFFERER_SPK_HEX),
-      changeSerialId: 5n,
-    },
-    minTimeoutInterval: 100,
-    maxTimeoutInterval: 100_000,
-    nowUnix: NOW_UNIX,
-  }
+  let flow: Awaited<ReturnType<typeof runFullFlow>>
+  let acceptParams: ddk.AcceptOfferParams
+  beforeAll(async () => {
+    flow = await runFullFlow()
+    acceptParams = {
+      party: {
+        fundingPubkey: flow.acceptorKeys.fundingPubkey(flow.offerTempId),
+        fundingInputs: [],
+        payoutSpk: buf(OFFERER_SPK_HEX),
+        payoutSerialId: 4n,
+        changeSpk: buf(OFFERER_SPK_HEX),
+        changeSerialId: 5n,
+      },
+      minTimeoutInterval: 100,
+      maxTimeoutInterval: 100_000,
+      nowUnix: NOW_UNIX,
+    }
+  })
 
-  test('prepareAcceptOffer names the key, the refund and one PSBT per CET', () => {
+  test('prepareAcceptOffer names the key, the refund and one PSBT per CET', async () => {
     const request = ddk.prepareAcceptOffer(flow.offer, acceptParams).request
     expect(bytes(request.key.fundingPubkey).equals(acceptParams.party.fundingPubkey)).toBe(true)
     expect(bytes(request.key.temporaryContractId)).toEqual(flow.offerTempId)
@@ -609,12 +631,12 @@ describe('external signing', () => {
     expect(request.splice.dlcInputs).toEqual([])
   })
 
-  test('prepareSignAccept is for the offering party', () => {
+  test('prepareSignAccept is for the offering party', async () => {
     const request = ddk.prepareSignAccept(flow.offer, flow.accept).request
     expect(bytes(request.key.fundingPubkey).equals(flow.offererKeys.fundingPubkey(flow.offerTempId))).toBe(true)
   })
 
-  test('a malformed signature is rejected before anything is built', () => {
+  test('a malformed signature is rejected before anything is built', async () => {
     try {
       ddk.completeAcceptOffer(ddk.prepareAcceptOffer(flow.offer, acceptParams).context, {
         refundSignature: Buffer.alloc(10),
@@ -628,7 +650,7 @@ describe('external signing', () => {
 })
 
 describe('consumer contract signer provider', () => {
-  test('a legacy BIP84 contract rolls into a DDK contract with added collateral', () => {
+  test('a legacy BIP84 contract rolls into a DDK contract with added collateral', async () => {
     const master = ddk.createExtkeyFromSeed(ddk.convertMnemonicToSeed(MNEMONIC, undefined), 'regtest')
     const child = ddk.createExtkeyFromParentPath(master, "m/84'/1'/0'/0/7")
     const legacy = ddk.PrivateKeySigner.fromSecretKey(child.slice(46))
@@ -655,7 +677,7 @@ describe('consumer contract signer provider', () => {
         }
       },
     }
-    const previous = runFullFlow({ fundingPubkey: legacyPubkey, signers: provider })
+    const previous = await runFullFlow({ fundingPubkey: legacyPubkey, signers: provider })
     const previousId = ddk.computeContractId(previous.offer, previous.accept)
     const spliceInput = ddk.createDlcSpliceInput(
       previous.offer,
@@ -709,24 +731,19 @@ describe('consumer contract signer provider', () => {
         maxTimeoutInterval: 100_000,
         nowUnix: NOW_UNIX,
       },
-      previous.acceptorKeys,
+      new ddk.Signers(previous.acceptorKeys),
     )
-    const psbt = ddk.signFundingPsbtWithDescriptor(offer, accepted.accept, accepted.fundingPsbt, OFFERER_DESCRIPTOR, [
-      { inputSerialId: 50n, derivationIndex: 0 },
-    ])
     const prepared = ddk.prepareSignAccept(offer, accepted.accept)
     expect(prepared.request.splice.dlcInputs.length).toBe(1)
     expect(prepared.request.splice.dlcInputs[0]!.inputIndex).toBe(1)
     expect(bytes(prepared.request.splice.dlcInputs[0]!.key.fundingPubkey)).toEqual(bytes(legacyPubkey))
     expect(bytes(prepared.request.splice.dlcInputs[0]!.key.contractId)).toEqual(bytes(previousId))
-    const signed = ddk.signAccept(offer, accepted.accept, provider, psbt)
-    const transaction = ddk.finalizeSign(
+    const signed = await ddk.signAccept(
       offer,
       accepted.accept,
-      signed.sign,
-      accepted.fundingPsbt,
-      previous.acceptorKeys,
+      new ddk.Signers(provider).withWallet(new ddk.DescriptorWallet(OFFERER_DESCRIPTOR)),
     )
+    const transaction = await ddk.finalizeSign(offer, accepted.accept, signed.sign, new ddk.Signers(previous.acceptorKeys))
     expect(signed.transactions.fund.inputs.length).toBe(2)
     expect(transaction.length).toBeGreaterThan(signed.transactions.fund.rawBytes.length)
     expect(
@@ -749,35 +766,102 @@ describe('consumer contract signer provider', () => {
     expect(bytes(oldCet)).not.toEqual(bytes(newCet))
   })
 
-  test('callback exceptions and wrong-key signatures reject the operation', () => {
-    const flow = runFullFlow()
-    const psbt = ddk.signFundingPsbtWithDescriptor(flow.offer, flow.accept, flow.fundingPsbt, OFFERER_DESCRIPTOR, [
-      { inputSerialId: FUNDING_SERIAL, derivationIndex: 0 },
-    ])
-    expect(() =>
+  test('callback exceptions and wrong-key signatures reject the operation', async () => {
+    const flow = await runFullFlow()
+    const wallet = new ddk.DescriptorWallet(OFFERER_DESCRIPTOR)
+    await expect(
       ddk.signAccept(
         flow.offer,
         flow.accept,
-        {
+        new ddk.Signers({
           getSigner() {
             throw new Error('wallet locked')
           },
-        },
-        psbt,
+        }).withWallet(wallet),
       ),
-    ).toThrow()
+    ).rejects.toThrow()
     const wrong = ddk.PrivateKeySigner.fromSecretKey(new Uint8Array(32).fill(7))
-    expect(() =>
+    await expect(
       ddk.signAccept(
         flow.offer,
         flow.accept,
-        {
+        new ddk.Signers({
           getSigner() {
             return wrong
           },
-        },
-        psbt,
+        }).withWallet(wallet),
       ),
-    ).toThrow()
+    ).rejects.toThrow()
+  })
+})
+
+describe('Signers', () => {
+  test('a wallet implemented in JavaScript signs the funding inputs', async () => {
+    const descriptorWallet = new ddk.DescriptorWallet(OFFERER_DESCRIPTOR)
+    let calls = 0
+    // The callback receives the funding PSBT once, at signAccept, and what it
+    // returns is verified the same way as the built-in wallet's output.
+    const wallet: ddk.FundingWallet = {
+      signFundingPsbt(psbt) {
+        calls++
+        return descriptorWallet.signFundingPsbt(psbt)
+      },
+    }
+    const flow = await runFullFlow({ wallet })
+    expect(calls).toBe(1)
+    // Wallet signatures are deterministic (RFC 6979) and the acceptor funds
+    // nothing, so the funding transaction is byte-identical either way.
+    expect(bytes(flow.fundingTx)).toEqual(bytes((await runFullFlow()).fundingTx))
+  })
+
+  test('a wallet that leaves an input unsigned is rejected', async () => {
+    const flow = await runFullFlow()
+    try {
+      await ddk.signAccept(
+        flow.offer,
+        flow.accept,
+        new ddk.Signers(flow.offererKeys).withWallet({ signFundingPsbt: (psbt) => psbt }),
+      )
+      throw new Error('should have thrown')
+    } catch (e) {
+      expect((e as { tag?: string }).tag).toBe('MissingFinalizedInput')
+    }
+  })
+
+  test('a party with funding inputs needs a wallet; one without does not', async () => {
+    const flow = await runFullFlow()
+    try {
+      await ddk.signAccept(flow.offer, flow.accept, new ddk.Signers(flow.offererKeys))
+      throw new Error('should have thrown')
+    } catch (e) {
+      expect((e as { tag?: string }).tag).toBe('Wallet')
+    }
+    // The acceptor contributes no inputs: finalizeSign never asks for a wallet.
+    let calls = 0
+    const neverAsked: ddk.FundingWallet = {
+      signFundingPsbt(psbt) {
+        calls++
+        return psbt
+      },
+    }
+    await ddk.finalizeSign(
+      flow.offer,
+      flow.accept,
+      flow.signResult.sign,
+      new ddk.Signers(flow.acceptorKeys).withWallet(neverAsked),
+    )
+    expect(calls).toBe(0)
+  })
+
+  test('DescriptorWallet rejects watch-only and non-wpkh descriptors', async () => {
+    const pubkey = bytes(ddk.ContractKeyProvider.fromDescriptor(OFFERER_DESCRIPTOR).fundingPubkey(tempId(1))).toString('hex')
+    for (const descriptor of [`wpkh(${pubkey})`, OFFERER_DESCRIPTOR.replace('wpkh(', 'tr(')]) {
+      try {
+        new ddk.DescriptorWallet(descriptor)
+        throw new Error('should have thrown')
+      } catch (e) {
+        expect((e as { tag?: string }).tag, descriptor).toBe('Descriptor')
+      }
+    }
   })
 })

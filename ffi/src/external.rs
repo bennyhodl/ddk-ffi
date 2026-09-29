@@ -17,7 +17,7 @@
 //! come from its digit trie, which is not exposed yet
 //! ([`ContractError::Unsupported`]).
 
-use crate::signer::{ContractKeyRequest, ContractSignerProvider};
+use crate::signer::{ContractKeyRequest, ContractSignerProvider, FundingWallet};
 use bitcoin::hashes::Hash;
 use bitcoin::psbt::Psbt;
 use bitcoin::secp256k1::rand::random;
@@ -274,7 +274,8 @@ pub fn finalize_sign_with_signatures(
     let transactions = verified_sign_transactions(&offer, &accept, &sign)?;
     let offer_signatures = &sign.funding_signatures.funding_signatures;
     let psbt = decode_psbt(&signed_funding_psbt)?;
-    ensure_psbt_spends(&psbt, &transactions.fund)?;
+    let accept_signatures =
+        advanced::funding_signatures_from_psbt(&offer, &accept, Party::Accept, &psbt)?;
     let mut dlc_signatures = DlcInputSignatures::decode(dlc_input_signatures)?;
 
     // Splice halves sign the unsigned transaction: a SegWit sighash does not
@@ -309,9 +310,19 @@ pub fn finalize_sign_with_signatures(
             None => Witness::from_slice(&elements),
         };
     }
-    for input in &accept.funding_inputs {
+    for (input, signature) in accept
+        .funding_inputs
+        .iter()
+        .zip(&accept_signatures.funding_signatures)
+    {
         let input_index = funding_input_index(&offer, &accept, input.input_serial_id)?;
-        funding_transaction.input[input_index].witness = finalized_witness(&psbt, input_index)?;
+        funding_transaction.input[input_index].witness = Witness::from_slice(
+            &signature
+                .witness_elements
+                .iter()
+                .map(|element| &element.witness)
+                .collect::<Vec<_>>(),
+        );
     }
     dlc_signatures.ensure_all_used()?;
 
@@ -568,6 +579,34 @@ pub(crate) fn sign_dlc_inputs(
         .collect()
 }
 
+/// The funding PSBT with this party's wallet inputs signed by `wallet`, or as
+/// given when this party contributes none. Splice (DLC) inputs are not wallet
+/// inputs: the contract key signs those.
+pub(crate) async fn sign_wallet_inputs(
+    context: &SigningContext,
+    party: Party,
+    funding_psbt: Vec<u8>,
+    wallet: Option<&dyn FundingWallet>,
+) -> Result<Vec<u8>, ContractError> {
+    let has_wallet_inputs = match party {
+        Party::Offer => decode_msg::<OfferDlc>(&context.offer, "offer")?
+            .funding_inputs
+            .iter()
+            .any(|input| input.dlc_input.is_none()),
+        Party::Accept => decode_msg::<AcceptDlc>(&context.accept, "accept")?
+            .funding_inputs
+            .iter()
+            .any(|input| input.dlc_input.is_none()),
+    };
+    if !has_wallet_inputs {
+        return Ok(funding_psbt);
+    }
+    let wallet = wallet.ok_or_else(|| ContractError::Wallet {
+        message: "this party has wallet funding inputs but no wallet to sign them".to_string(),
+    })?;
+    wallet.sign_funding_psbt(funding_psbt).await
+}
+
 pub(crate) fn psbt_sighash(bytes: &[u8], index: usize) -> Result<Vec<u8>, ContractError> {
     let psbt = decode_psbt(bytes)?;
     let input = psbt
@@ -814,11 +853,12 @@ fn funding_input_index(
 mod tests {
     use super::*;
     use crate::contract::tests::{
-        attestation_ref, offerer_signed_funding_psbt, single_funded_offer, splice_fixture,
+        attestation_ref, finalize_sign, offerer_signed_funding_psbt, sign_accept, signers,
+        single_funded_offer, splice_fixture,
     };
     use crate::contract::{
-        compute_contract_id, contract_cet_transaction, create_funding_psbt, finalize_sign,
-        sign_accept, to_array_32, validate_accept, validate_sign, ContractKeyProvider,
+        compute_contract_id, contract_cet_transaction, create_funding_psbt, to_array_32,
+        validate_accept, validate_sign, ContractKeyProvider,
     };
     use secp256k1_zkp::{Message, SecretKey};
 
@@ -978,8 +1018,10 @@ mod tests {
         let key_sign = sign_accept(
             offer.clone(),
             accept.clone(),
-            fixture.offerer_keys.clone(),
-            signed_psbt,
+            signers(
+                fixture.offerer_keys.clone(),
+                Some(&fixture.offerer_descriptor),
+            ),
         )
         .unwrap()
         .sign;
@@ -987,8 +1029,7 @@ mod tests {
             offer.clone(),
             accept.clone(),
             key_sign.clone(),
-            unsigned_psbt,
-            fixture.acceptor_keys.clone(),
+            signers(fixture.acceptor_keys.clone(), None),
         )
         .unwrap();
         assert_eq!(funding_transaction, key_funding_transaction);
@@ -1003,6 +1044,115 @@ mod tests {
 
         // The contract settles from the externally made adaptor signatures.
         contract_cet_transaction(offer, accept, sign, vec![attestation_ref("up")]).unwrap();
+    }
+
+    /// DDK's peer signs a contract funded by both wallets. Finalization must
+    /// accept its PSBT encoding, including the empty scriptSig of a wrapped
+    /// SegWit input, and attach the accepting wallet's witness at its serial id.
+    #[test]
+    fn finalization_accepts_ddk_wallet_psbts_and_rejects_invalid_ones() {
+        use crate::contract::encode_msg;
+        use crate::signer::DescriptorWallet;
+        use bitcoin::bip32::{DerivationPath, Xpriv};
+        use bitcoin::{Amount, Network, ScriptBuf};
+        use std::str::FromStr;
+
+        for wrapped in [false, true] {
+            let fixture = single_funded_offer();
+            let mut offer: OfferDlc = decode_msg(&fixture.offer, "offer").unwrap();
+            offer.offer_collateral = Amount::from_sat(50_000);
+            let wallet = Xpriv::new_master(Network::Regtest, &[8; 64]).unwrap();
+            let wallet_key = wallet
+                .derive_priv(&Secp256k1::new(), &DerivationPath::from_str("0/0").unwrap())
+                .unwrap()
+                .to_priv()
+                .public_key(&Secp256k1::new());
+            let program = ScriptBuf::new_p2wpkh(&wallet_key.wpubkey_hash().unwrap());
+            let mut previous: Transaction =
+                bitcoin::consensus::deserialize(&offer.funding_inputs[0].prev_tx).unwrap();
+            previous.output[0].script_pubkey = if wrapped {
+                program.to_p2sh()
+            } else {
+                program.clone()
+            };
+            let input = ddk_contract::funding_input(
+                &previous,
+                0,
+                Some(50),
+                u32::MAX,
+                108,
+                if wrapped { program } else { ScriptBuf::new() },
+            )
+            .unwrap();
+            let mut params = fixture.accept_params;
+            params.party.funding_inputs = vec![encode_msg(&input)];
+            let offer_bytes = encode_msg(&offer);
+            let accepted = crate::contract::accept_offer(
+                offer_bytes.clone(),
+                params,
+                signers(fixture.acceptor_keys, None),
+            )
+            .unwrap();
+            let accept: AcceptDlc = decode_msg(&accepted.accept, "accept").unwrap();
+            let offer_psbt = offerer_signed_funding_psbt(
+                &offer_bytes,
+                &accepted.accept,
+                &fixture.offerer_descriptor,
+            );
+            // Produce the peer's message through DDK, independently of FFI's
+            // offer-side completion, whose PSBT handling is a separate path.
+            let peer_sign = ddk_contract::sign_accept(
+                &offer,
+                &accept,
+                &fixture
+                    .offerer_keys
+                    .inner
+                    .funding_secret_key(offer.temporary_contract_id)
+                    .unwrap(),
+                &Psbt::deserialize(&offer_psbt).unwrap(),
+            )
+            .unwrap()
+            .sign;
+            let descriptor = if wrapped {
+                format!("sh(wpkh({wallet}/0/*))")
+            } else {
+                format!("wpkh({wallet}/0/*)")
+            };
+            let signed = futures::executor::block_on(
+                DescriptorWallet::new(descriptor, 1000)
+                    .unwrap()
+                    .sign_funding_psbt(accepted.funding_psbt),
+            )
+            .unwrap();
+            let psbt = Psbt::deserialize(&signed).unwrap();
+            let finalize = |psbt: &Psbt| {
+                finalize_sign_with_signatures(
+                    offer_bytes.clone(),
+                    accepted.accept.clone(),
+                    encode_msg(&peer_sign),
+                    psbt.serialize(),
+                    vec![],
+                )
+            };
+            let expected = ddk_contract::finalize_sign(&offer, &accept, &peer_sign, &psbt).unwrap();
+            assert_eq!(
+                finalize(&psbt).unwrap(),
+                bitcoin::consensus::serialize(&expected),
+                "wrapped SegWit: {wrapped}"
+            );
+            let mut mutated = psbt.clone();
+            mutated.unsigned_tx.output[0].value += Amount::from_sat(1);
+            assert!(matches!(
+                finalize(&mutated),
+                Err(ContractError::PsbtMismatch { .. })
+            ));
+            let mut missing = psbt;
+            missing.inputs[0].final_script_witness = None;
+            assert!(matches!(
+                finalize(&missing),
+                Err(ContractError::MissingFinalizedInput { input_index: 0 })
+            ));
+        }
     }
 
     /// A splice signed externally by both parties — each signer's half of the
@@ -1102,8 +1252,7 @@ mod tests {
         let key_sign = sign_accept(
             splice.offer_b.clone(),
             splice.accept_b.clone(),
-            splice.offerer_keys.clone(),
-            unsigned_psbt.clone(),
+            signers(splice.offerer_keys.clone(), None),
         )
         .unwrap()
         .sign;
@@ -1111,8 +1260,7 @@ mod tests {
             splice.offer_b,
             splice.accept_b,
             key_sign,
-            unsigned_psbt,
-            splice.acceptor_keys,
+            signers(splice.acceptor_keys, None),
         )
         .unwrap();
         assert_eq!(funding_transaction, key_funding_transaction);
@@ -1179,12 +1327,10 @@ mod tests {
             }
         }
         let splice = splice_fixture();
-        let psbt = create_funding_psbt(splice.offer_b.clone(), splice.accept_b.clone()).unwrap();
         let signed = sign_accept(
             splice.offer_b.clone(),
             splice.accept_b.clone(),
-            splice.offerer_keys,
-            psbt.clone(),
+            signers(splice.offerer_keys, None),
         )
         .unwrap();
         let valid: SignDlc = decode_msg(&signed.sign, "sign").unwrap();
@@ -1203,8 +1349,7 @@ mod tests {
                 splice.offer_b.clone(),
                 splice.accept_b.clone(),
                 crate::contract::encode_msg(&invalid),
-                psbt.clone(),
-                std::sync::Arc::new(MustNotSign),
+                signers(std::sync::Arc::new(MustNotSign), None),
             );
             assert!(matches!(result, Err(ContractError::InvalidSign { .. })));
         }

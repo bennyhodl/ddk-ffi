@@ -38,7 +38,7 @@ version()
   and it throws on a platform without one rather than silently using wasm
 - Browsers: `ddk_ffi.wasm` (4.8MB, 2.9MB gzipped), no COOP/COEP headers needed;
   also available anywhere as `@bennyblader/ddk/wasm`
-- Full TypeScript support, synchronous calls after `init()`
+- Full TypeScript support, the same API as Node after `await init()`
 - ESM-only
 
 It replaces `@bennyblader/ddk-ts`.
@@ -70,10 +70,12 @@ The contract API runs the whole DLC lifecycle — offer, accept, fund, sign, set
 and splice — without a contract store.
 
 The library rebuilds transactions from the offer/accept/sign messages. Consumers
-own persistent contract records and key metadata. Signing functions accept a
-`ContractSignerProvider`, implemented by the app or by the built-in
-`ContractKeyProvider`. The provider resolves a funding public key to a signer;
-DDK prepares the transactions and verifies the returned signatures.
+own persistent contract records and key metadata. Signing functions take a
+`Signers` record, built once per wallet: the `ContractSignerProvider` that
+answers for the contract key, implemented by the app or by the built-in
+`ContractKeyProvider`, and the wallet that signs the party's funding inputs.
+DDK prepares the transactions, asks each for what it signs, and verifies the
+returned signatures.
 
 Messages cross as their lightning TLV encoding — the same bytes node-dlc and
 bitcoin-abstraction-layer produce. PSBTs are BIP-174; final transactions are
@@ -103,9 +105,10 @@ Bitcoin consensus serialization.
     the attested outcome)                    each party its collateral)
 ```
 
-Each party signs its own funding inputs on the shared PSBT before passing it
-along — `signFundingPsbtWithDescriptor` does that from a private output
-descriptor, or sign it with any wallet that speaks BIP-174.
+Each party's wallet signs its own funding inputs on the shared PSBT inside
+`signAccept` (the offerer) and `finalizeSign` (the acceptor). The wallet is
+anything that speaks BIP-174, or the built-in `DescriptorWallet` over a private
+output descriptor.
 
 Settlement needs no key. Both halves of the 2-of-2 are in the messages: the
 refund signatures in the clear, and the CET signatures as adaptor signatures
@@ -121,6 +124,8 @@ order, and both represent bytes as `Uint8Array`. In Node a `Buffer` is a
 ```typescript
 import {
   ContractKeyProvider,
+  DescriptorWallet,
+  Signers,
   Party,
   chainHashFromNetwork,
   fundingInput,
@@ -128,7 +133,6 @@ import {
   validateOffer,
   acceptOffer,
   validateAccept,
-  signFundingPsbtWithDescriptor,
   signAccept,
   validateSign,
   finalizeSign,
@@ -145,6 +149,13 @@ const acceptorKeys = ContractKeyProvider.fromMnemonic(
   undefined,
   'regtest'
 );
+// What each party signs with, built once per wallet: its contract keys and
+// the wallet that signs its funding inputs.
+const offererSigners = new Signers(offererKeys).withWallet(
+  new DescriptorWallet(OFFERER_DESCRIPTOR)
+);
+// acceptorWallet is any FundingWallet; a party that funds nothing skips withWallet.
+const acceptorSigners = new Signers(acceptorKeys).withWallet(acceptorWallet);
 
 const offerTempId = Buffer.alloc(32, 1); // 32 bytes, chosen by the offerer
 
@@ -184,23 +195,18 @@ const accepted = acceptOffer(
     maxTimeoutInterval: 4_294_967_295,
     nowUnix: BigInt(Math.floor(Date.now() / 1000)), // the acceptor's clock
   },
-  acceptorKeys
+  acceptorSigners
 );
 
-// 3. Fund — each party signs its own funding inputs on the shared PSBT
+// 3. Sign — the offerer's wallet signs its funding inputs and its contract key
+//    signs the refund and CETs; the sign message carries its half
 validateAccept(offer, accepted.accept);
-const psbt = signFundingPsbtWithDescriptor(
-  offer,
-  accepted.accept,
-  accepted.fundingPsbt,
-  OFFERER_DESCRIPTOR,
-  [{ inputSerialId: 100n, derivationIndex: 0 }]
-);
+const signed = await signAccept(offer, accepted.accept, offererSigners);
 
-// 4. Sign
-const signed = signAccept(offer, accepted.accept, offererKeys, psbt);
+// 4. Finalize — the acceptor's wallet signs its funding inputs; out comes the
+//    fully signed funding transaction
 validateSign(offer, accepted.accept, signed.sign);
-const fundingTx = finalizeSign(offer, accepted.accept, signed.sign, psbt, acceptorKeys);
+const fundingTx = await finalizeSign(offer, accepted.accept, signed.sign, acceptorSigners);
 
 const contractId = computeContractId(offer, accepted.accept); // the funded contract's id
 
@@ -218,11 +224,53 @@ Runnable versions of exactly this flow:
 - `examples/node/src/contract.ts` — `pnpm contract`
 - `examples/react-native/src/App.tsx` — the on-device demo the Maestro E2E drives
 
-### Contract signers
+### Signers
 
-Every function that signs with a contract key takes a `ContractSignerProvider`.
-It is asked for a key by a `ContractKeyRequest`, whose every field the library
-reads from the messages:
+`acceptOffer`, `signAccept` and `finalizeSign` take one `Signers` object. It
+holds nothing about any contract, so build it once per wallet:
+
+```typescript
+class Signers {
+  constructor(contractKeys: ContractSignerProvider); // the contract funding key
+  withWallet(wallet: FundingWallet): Signers;        // the party's funding inputs; skip it if it funds nothing
+}
+interface FundingWallet {
+  // Sign and finalize the inputs you own in this BIP-174 PSBT; leave the rest.
+  signFundingPsbt(psbt: Uint8Array): Promise<Uint8Array>;
+}
+```
+
+Every key is found from the messages: the refund and CETs use the party's
+funding key, a splice input uses the previous contract's, and the wallet
+recognises its inputs by script. The library builds the funding PSBT, hands it
+to the wallet at the step that needs it (`signAccept` for the offerer,
+`finalizeSign` for the acceptor) and verifies what comes back. `FundingWallet`
+is one async method, so the wallet that holds the coins signs them: a bdk
+wallet's `sign`, a node's `walletprocesspsbt`. Those two lifecycle calls are
+therefore async; `acceptOffer` never asks the wallet and stays synchronous.
+
+```typescript
+const signers = new Signers(contractKeys).withWallet({
+  async signFundingPsbt(bytes) {
+    const psbt = new PartiallySignedTransaction(toBase64(bytes));
+    await bdkWallet.sign(psbt);
+    return fromBase64(await psbt.serialize());
+  },
+});
+```
+
+The built-in `DescriptorWallet` signs from a private `wpkh()` or `sh(wpkh())`
+descriptor, trying wildcard indexes up to a lookahead (1000 by default) to find
+its inputs. It is for tests and scripts that have a descriptor and no wallet.
+`createFundingPsbt` remains for a wallet that signs outside these calls.
+
+A contract-key signer that answers later, in another process, goes through the
+external signing API below.
+
+#### Contract keys
+
+`contractKeys` is asked for a key by a `ContractKeyRequest`, whose every field
+the library reads from the messages:
 
 ```typescript
 interface ContractSignerProvider {
@@ -256,7 +304,7 @@ const offerPubkey = keys.fundingPubkey(temporaryContractId);
 // Acceptor: publish the key for the id the offer carries.
 const acceptPubkey = keys.fundingPubkey(offerTemporaryContractId(offer));
 // Signing, in this process or any later one, needs nothing else:
-const signed = signAccept(offer, accept, keys, signedFundingPsbt);
+const signed = await signAccept(offer, accept, new Signers(keys).withWallet(wallet));
 ```
 
 A consumer provider resolves the same request its own way, and can delegate
@@ -277,10 +325,9 @@ legacy key and wants Rust to perform ECDSA/adaptor signing. It imports a 32-byte
 secret and exposes `publicKey`, `signEcdsa`, and `signAdaptor`. A consumer may
 instead implement those methods without importing a private key into Rust.
 
-Callbacks are synchronous. Preload the metadata needed for lookup; use the
-external signing API for signers that need network access or user approval.
-`acceptOffer`, `signAccept`, and `finalizeSign` accept either provider
-implementation. Settlement takes no signer.
+Contract-key callbacks are synchronous. Preload the metadata needed for
+lookup; use the external signing API for signers that need network access or
+user approval. Settlement takes no signer.
 
 ### Splicing
 
@@ -296,13 +343,14 @@ const spliceInput = createDlcSpliceInput(
 // Put spliceInput and any additional wallet inputs in offerParams.party.fundingInputs.
 const offer = createOffer(offerParams);
 const accepted = acceptOffer(offer, acceptParams, acceptorSigners);
-const signed = signAccept(offer, accepted.accept, offererSigners, offererSignedPsbt);
-const fundingTx = finalizeSign(offer, accepted.accept, signed.sign, acceptorSignedPsbt, acceptorSigners);
+const signed = await signAccept(offer, accepted.accept, offererSigners);
+const fundingTx = await finalizeSign(offer, accepted.accept, signed.sign, acceptorSigners);
 ```
 
 Signing reads each DLC input's previous contract ID and required funding public
-key from the offer and calls the provider. No previous-contract list or previous
-temporary ID is passed to lifecycle functions. `splicedContractIds(offer)` remains
+key from the offer and calls `contractKeys`; the wallet is only asked about the
+wallet inputs. No previous-contract list or previous temporary ID is passed to
+lifecycle functions. `splicedContractIds(offer)` remains
 available for inspection. The previous sign message lets `createDlcSpliceInput`
 rebuild contracts created under the old fee rule.
 
@@ -513,9 +561,13 @@ interface OracleAttestationRef {
   attestation: Bytes; // wire-encoded OracleAttestation
 }
 
-interface DescriptorInput {
-  inputSerialId: bigint;
-  derivationIndex: number; // descriptor wildcard index
+class Signers {
+  constructor(contractKeys: ContractSignerProvider);
+  withWallet(wallet: FundingWallet): Signers;
+}
+
+interface FundingWallet {
+  signFundingPsbt(psbt: Bytes): Promise<Bytes>; // BIP-174 in, BIP-174 with this wallet's inputs finalized out
 }
 
 interface ContractPayouts {

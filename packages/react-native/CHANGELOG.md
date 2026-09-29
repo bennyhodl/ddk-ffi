@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### One `Signers` argument per party
+
+`acceptOffer`, `signAccept` and `finalizeSign` take a `Signers` object — `new Signers(contractKeys).withWallet(wallet)` — built once per wallet. `contractKeys` is the `ContractSignerProvider` they already took; `wallet` is a `FundingWallet`, one async method, `signFundingPsbt(psbt)`, which signs the inputs it owns and leaves the rest, so the bdk-rn wallet that holds the coins signs them itself. The library builds the funding PSBT, hands it to the wallet at the step that needs it, and verifies what comes back, so the PSBT no longer travels through app code. Because the wallet is awaited, `signAccept` and `finalizeSign` now return Promises; `acceptOffer` stays synchronous. A party that contributes no funding inputs skips `withWallet`.
+
+Implement `FundingWallet` over any wallet that signs PSBTs, or use the built-in `DescriptorWallet`, which signs from a private `wpkh()` / `sh(wpkh())` descriptor and finds its inputs by script. It replaces `signFundingPsbtWithDescriptor` and the `DescriptorInput` list of serial ids and derivation indexes, both removed. `createFundingPsbt` remains for wallets that sign outside these calls, and the prepare/complete API is unchanged.
+
 ### The stateless contract API
 
 The whole DLC lifecycle now runs on device: build an offer, accept it, fund it, sign it, and settle it — either the CET an oracle attestation selects or the refund once its locktime passes. Contracts can also be spliced, rolling one into another that spends its funding output.
@@ -30,7 +36,7 @@ Consumers can implement `ContractSignerProvider.getSigner` and `ContractSigner.s
 
 ### Breaking
 
-- **Lifecycle signing takes a consumer-implementable provider.** `acceptOffer(offer, params, signers)`, `signAccept(offer, accept, signers, signedFundingPsbt)`, and `finalizeSign(offer, accept, sign, signedFundingPsbt, signers)` automatically resolve splice keys from message metadata. Previous-contract lists and per-call temporary IDs are removed. Settlement takes no signer at all: `contractCetTransaction(offer, accept, sign, attestations)` and `contractRefundTransaction(offer, accept, sign)` replace `signContractCet` / `signContractRefund`. Both parties' signatures are already in the messages — the refund ones in the clear, the CET ones as adaptor signatures the attestation decrypts — so either party builds the same transaction from the three messages, with no key and no `Party`.
+- **Lifecycle signing takes a consumer-implementable provider.** `acceptOffer(offer, params, signers)`, `signAccept(offer, accept, signers)`, and `finalizeSign(offer, accept, sign, signers)` automatically resolve splice keys from message metadata. Previous-contract lists and per-call temporary IDs are removed. Settlement takes no signer at all: `contractCetTransaction(offer, accept, sign, attestations)` and `contractRefundTransaction(offer, accept, sign)` replace `signContractCet` / `signContractRefund`. Both parties' signatures are already in the messages — the refund ones in the clear, the CET ones as adaptor signatures the attestation decrypts — so either party builds the same transaction from the three messages, with no key and no `Party`.
 - **Provider and external signing share the enum-only preparation/completion flow.** Numeric contract preparation returns `Unsupported`.
 - **External request/completion functions are renamed to prepare/complete.** Completion takes the preserved `SigningContext`. `SigningRequest.splice.dlcInputs` replaces the bare index list with input indexes and key identities.
 - **`createDlcSpliceInput` no longer takes `maxWitnessLen`.** It applies the DLC input's (220) itself.

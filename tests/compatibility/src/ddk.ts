@@ -11,8 +11,6 @@ export interface DdkFundedInput {
   /** Wire-encoded FundingInput bytes, ready for a party's fundingInputs. */
   fundingInput: Uint8Array
   inputSerialId: bigint
-  /** Descriptor wildcard index that derives this input's key. */
-  derivationIndex: number
   prevTxHex: string
   vout: number
 }
@@ -25,6 +23,8 @@ export interface DdkFundedInput {
 export class DdkParty {
   readonly descriptor: string
   readonly keys: ddk.ContractKeyProviderInterface
+  /** What this party signs with: its contract keys and its descriptor wallet. */
+  readonly signers: ddk.Signers
   private readonly masterXprv: Uint8Array
   private nextAddressIndex = 0
 
@@ -34,6 +34,7 @@ export class DdkParty {
     const tprv = bs58check.encode(bytes(this.masterXprv))
     this.descriptor = `wpkh(${tprv}/84h/1h/0h/0/*)`
     this.keys = ddk.ContractKeyProvider.fromDescriptor(this.descriptor)
+    this.signers = new ddk.Signers(this.keys).withWallet(new ddk.DescriptorWallet(this.descriptor))
   }
 
   /** The P2WPKH address at descriptor wildcard index `index`. */
@@ -65,25 +66,8 @@ export class DdkParty {
     return {
       fundingInput: ddk.fundingInput(Buffer.from(hex, 'hex'), vout, inputSerialId, 0xffffffff, 108, Buffer.alloc(0)),
       inputSerialId,
-      derivationIndex: index,
       prevTxHex: hex,
       vout,
     }
-  }
-
-  /** Signs the party's own wallet inputs in a funding PSBT. */
-  signFundingPsbt(
-    offer: Uint8Array,
-    accept: Uint8Array,
-    fundingPsbt: Uint8Array,
-    inputs: DdkFundedInput[],
-  ): Uint8Array {
-    return ddk.signFundingPsbtWithDescriptor(
-      offer,
-      accept,
-      fundingPsbt,
-      this.descriptor,
-      inputs.map((i) => ({ inputSerialId: i.inputSerialId, derivationIndex: i.derivationIndex })),
-    )
   }
 }

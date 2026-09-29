@@ -219,10 +219,9 @@ pub fn contract_refund_transaction(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::contract::tests::{
-        attestation_ref, offerer_signed_funding_psbt, single_funded_offer,
-    };
-    use crate::contract::{accept_offer, encode_msg, sign_accept};
+    use crate::contract::tests::sign_accept;
+    use crate::contract::tests::{attestation_ref, signers, single_funded_offer};
+    use crate::contract::{accept_offer, encode_msg};
     use secp256k1_zkp::PublicKey;
 
     fn signed_contract() -> (Vec<u8>, Vec<u8>, Vec<u8>) {
@@ -230,17 +229,14 @@ mod tests {
         let accept = accept_offer(
             fixture.offer.clone(),
             fixture.accept_params.clone(),
-            fixture.acceptor_keys.clone(),
+            signers(fixture.acceptor_keys.clone(), None),
         )
         .unwrap()
         .accept;
-        let psbt =
-            offerer_signed_funding_psbt(&fixture.offer, &accept, &fixture.offerer_descriptor);
         let sign = sign_accept(
             fixture.offer.clone(),
             accept.clone(),
-            fixture.offerer_keys,
-            psbt,
+            signers(fixture.offerer_keys, Some(&fixture.offerer_descriptor)),
         )
         .unwrap()
         .sign;

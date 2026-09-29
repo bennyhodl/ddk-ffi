@@ -66,7 +66,6 @@ const vectors: CompatVectors = {
     fundingPrevTxHex: offererInput.prevTxHex,
     fundingVout: offererInput.vout,
     fundingSerialId: '100',
-    derivationIndex: 0,
   },
   acceptor: {
     descriptor: acceptor.descriptor,
@@ -75,7 +74,6 @@ const vectors: CompatVectors = {
     fundingPrevTxHex: acceptorInput.prevTxHex,
     fundingVout: acceptorInput.vout,
     fundingSerialId: '200',
-    derivationIndex: 0,
   },
   contract: {
     contractInfoHex: scenario1.contractInfoBytes.toString('hex'),
@@ -108,16 +106,12 @@ const vectors: CompatVectors = {
 // these bytes exist only in this file once committed) ---
 {
   const offer = buildOffer(ddk, vectors)
-  const { accept, fundingPsbt } = buildAccept(ddk, vectors, offer)
-  const offererKeys = ddk.ContractKeyProvider.fromDescriptor(offerer.descriptor)
-  const signedPsbt = ddk.signFundingPsbtWithDescriptor(offer, accept, fundingPsbt, offerer.descriptor, [
-    { inputSerialId: 100n, derivationIndex: 0 },
-  ])
-  const sign = ddk.signAccept(offer, accept, offererKeys, signedPsbt).sign
+  const { accept } = buildAccept(ddk, vectors, offer)
+  const sign = (await ddk.signAccept(offer, accept, offerer.signers)).sign
 
   const { offer2 } = buildSpliceOffer(ddk, vectors, offer, accept, sign)
-  const { accept2, fundingPsbt2 } = buildSpliceAccept(ddk, vectors, offer2)
-  const sign2 = ddk.signAccept(offer2, accept2, offererKeys, fundingPsbt2).sign
+  const { accept2 } = buildSpliceAccept(ddk, vectors, offer2)
+  const sign2 = (await ddk.signAccept(offer2, accept2, offerer.signers)).sign
 
   vectors.transcript = {
     offerHex: toHexString(offer),
@@ -130,9 +124,9 @@ const vectors: CompatVectors = {
 }
 
 // Derive the expected artifacts, then re-run to prove they are deterministic.
-vectors.expected = runDdkReplay(ddk, vectors)
+vectors.expected = await runDdkReplay(ddk, vectors)
 {
-  const second = runDdkReplay(ddk, vectors)
+  const second = await runDdkReplay(ddk, vectors)
   for (const [key, value] of Object.entries(vectors.expected)) {
     if (second[key] !== value) {
       throw new Error(`expected artifact ${key} is not deterministic across replays`)

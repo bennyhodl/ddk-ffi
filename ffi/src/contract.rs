@@ -8,7 +8,9 @@
 //! process. Splice signing recovers the previous contract's temporary id from
 //! the splice input.
 
-use crate::signer::{ContractKeyRequest, ContractSigner, ContractSignerProvider, PrivateKeySigner};
+use crate::signer::{
+    ContractKeyRequest, ContractSigner, ContractSignerProvider, PrivateKeySigner, Signers,
+};
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -22,7 +24,7 @@ use ddk::contract as ddk_contract;
 use ddk::ddk_manager;
 use ddk_contract::{
     AcceptOfferParams as RustAcceptOfferParams, CreateOfferParams as RustCreateOfferParams,
-    DescriptorInput as RustDescriptorInput, Party as RustParty, PartyParams as RustPartyParams,
+    Party as RustParty, PartyParams as RustPartyParams,
 };
 use ddk_messages::contract_msgs::ContractInfo;
 use ddk_messages::oracle_msgs::OracleAttestation;
@@ -438,26 +440,6 @@ impl OracleAttestationRef {
     }
 }
 
-/// Identifies a funding input and the descriptor wildcard index that derives its
-/// key, for [`sign_funding_psbt_with_descriptor`].
-#[derive(uniffi::Record)]
-pub struct DescriptorInput {
-    /// The serial id of the funding input to sign.
-    pub input_serial_id: u64,
-    /// The descriptor wildcard derivation index of the input's script (ignored
-    /// for descriptors without a wildcard).
-    pub derivation_index: u32,
-}
-
-impl From<DescriptorInput> for RustDescriptorInput {
-    fn from(input: DescriptorInput) -> Self {
-        RustDescriptorInput {
-            input_serial_id: input.input_serial_id,
-            derivation_index: input.derivation_index,
-        }
-    }
-}
-
 // ---------------------------------------------------------------------------
 // Offer-building helpers
 // ---------------------------------------------------------------------------
@@ -691,52 +673,28 @@ pub fn contract_info_payouts(contract_info: Vec<u8>) -> Result<ContractPayouts, 
     })
 }
 
-/// Accept an offer using a consumer's signer provider. Key lookup and signing
-/// are separate from preparing and completing the contract.
+/// Accept an offer. The accepting party signs nothing with its wallet yet;
+/// its wallet inputs are signed in [`finalize_sign`], once the offerer has
+/// signed.
 #[uniffi::export]
 pub fn accept_offer(
     offer: Vec<u8>,
     params: AcceptOfferParams,
-    signers: Arc<dyn ContractSignerProvider>,
+    signers: Arc<Signers>,
 ) -> Result<AcceptResult, ContractError> {
     let prepared = crate::external::prepare_accept_offer(offer, params)?;
-    let signatures = crate::external::sign_contract_request(&prepared.request, signers.as_ref())?;
+    let signatures =
+        crate::external::sign_contract_request(&prepared.request, signers.contract_keys.as_ref())?;
     crate::external::complete_accept_offer(prepared.context, signatures)
 }
 
-/// Rebuilds the BIP-174 funding PSBT from the offer and accept messages.
+/// Rebuilds the BIP-174 funding PSBT from the offer and accept messages, for
+/// a wallet that signs outside the lifecycle calls.
 #[uniffi::export]
 pub fn create_funding_psbt(offer: Vec<u8>, accept: Vec<u8>) -> Result<Vec<u8>, ContractError> {
     let offer: OfferDlc = decode_msg(&offer, "offer")?;
     let accept: AcceptDlc = decode_msg(&accept, "accept")?;
     let psbt = ddk_contract::create_funding_psbt(&offer, &accept)?;
-    Ok(psbt.serialize())
-}
-
-/// Signs a party's own funding inputs on the funding PSBT using a private output
-/// descriptor (e.g. bdk's `wpkh(...)` with an xprv), returning the updated PSBT.
-/// Each entry in `inputs` names one of this party's funding inputs (by serial
-/// id) and the descriptor wildcard index that derives its key. Supports `wpkh()`
-/// and `sh(wpkh())`, with or without a wildcard.
-#[uniffi::export]
-pub fn sign_funding_psbt_with_descriptor(
-    offer: Vec<u8>,
-    accept: Vec<u8>,
-    funding_psbt: Vec<u8>,
-    descriptor: String,
-    inputs: Vec<DescriptorInput>,
-) -> Result<Vec<u8>, ContractError> {
-    let offer: OfferDlc = decode_msg(&offer, "offer")?;
-    let accept: AcceptDlc = decode_msg(&accept, "accept")?;
-    let mut psbt = decode_psbt(&funding_psbt)?;
-    let inputs: Vec<RustDescriptorInput> = inputs.into_iter().map(Into::into).collect();
-    ddk_contract::signing::sign_funding_psbt_with_descriptor(
-        &offer,
-        &accept,
-        &mut psbt,
-        &descriptor,
-        &inputs,
-    )?;
     Ok(psbt.serialize())
 }
 
@@ -772,19 +730,27 @@ pub fn dlc_transactions_from_signed_messages(
     Ok(crate::rust_dlc_transactions_to_uniffi(transactions))
 }
 
-/// Verify the accept and produce SignDlc. DLC inputs automatically resolve
-/// their previous funding keys through `signers`, using the offer's metadata.
+/// Verify the accept and produce SignDlc: the contract key signs the refund,
+/// the CETs and this party's half of each spliced input, and the wallet signs
+/// this party's funding inputs. Every key is found from the messages.
 #[uniffi::export]
-pub fn sign_accept(
+pub async fn sign_accept(
     offer: Vec<u8>,
     accept: Vec<u8>,
-    signers: Arc<dyn ContractSignerProvider>,
-    signed_funding_psbt: Vec<u8>,
+    signers: Arc<Signers>,
 ) -> Result<SignResult, ContractError> {
     let prepared = crate::external::prepare_sign_accept(offer, accept)?;
-    let contract = crate::external::sign_contract_request(&prepared.request, signers.as_ref())?;
+    let contract_keys = signers.contract_keys.as_ref();
+    let contract = crate::external::sign_contract_request(&prepared.request, contract_keys)?;
     let dlc_input_signatures =
-        crate::external::sign_dlc_inputs(&prepared.request.splice, signers.as_ref())?;
+        crate::external::sign_dlc_inputs(&prepared.request.splice, contract_keys)?;
+    let signed_funding_psbt = crate::external::sign_wallet_inputs(
+        &prepared.context,
+        RustParty::Offer,
+        prepared.request.splice.funding_psbt,
+        signers.wallet.as_deref(),
+    )
+    .await?;
     crate::external::complete_sign_accept(
         prepared.context,
         crate::external::SigningResponse {
@@ -795,19 +761,29 @@ pub fn sign_accept(
     )
 }
 
-/// Verify SignDlc and complete the funding transaction. Previous-contract
-/// signers are resolved automatically when the offer contains DLC inputs.
+/// Verify SignDlc and complete the funding transaction: the wallet signs the
+/// accepting party's funding inputs, and the contract key its half of each
+/// spliced input.
 #[uniffi::export]
-pub fn finalize_sign(
+pub async fn finalize_sign(
     offer: Vec<u8>,
     accept: Vec<u8>,
     sign: Vec<u8>,
-    signed_funding_psbt: Vec<u8>,
-    signers: Arc<dyn ContractSignerProvider>,
+    signers: Arc<Signers>,
 ) -> Result<Vec<u8>, ContractError> {
     let request =
         crate::external::prepare_finalize_sign(offer.clone(), accept.clone(), sign.clone())?;
-    let signatures = crate::external::sign_dlc_inputs(&request, signers.as_ref())?;
+    let signatures = crate::external::sign_dlc_inputs(&request, signers.contract_keys.as_ref())?;
+    let signed_funding_psbt = crate::external::sign_wallet_inputs(
+        &crate::external::SigningContext {
+            offer: offer.clone(),
+            accept: accept.clone(),
+        },
+        RustParty::Accept,
+        request.funding_psbt,
+        signers.wallet.as_deref(),
+    )
+    .await?;
     crate::external::finalize_sign_with_signatures(
         offer,
         accept,
@@ -1244,7 +1220,7 @@ pub(crate) mod tests {
                 max_timeout_interval: 100_000,
                 now_unix: NOW_UNIX,
             },
-            acceptor.provider.clone(),
+            signers(acceptor.provider.clone(), None),
         )
         .unwrap();
 
@@ -1353,8 +1329,7 @@ pub(crate) mod tests {
             contract.offer,
             contract.accept,
             contract.sign,
-            contract.funding_psbt,
-            contract.acceptor_keys,
+            signers(contract.acceptor_keys, None),
         )
         .unwrap();
 
@@ -1464,21 +1439,52 @@ pub(crate) mod tests {
         }
     }
 
-    /// The offerer's funding PSBT with its one wallet input signed.
+    /// The async lifecycle calls, driven to completion. Defined here so they
+    /// shadow the glob-imported originals in this module and can be imported
+    /// by the other test modules.
+    pub(crate) fn sign_accept(
+        offer: Vec<u8>,
+        accept: Vec<u8>,
+        signers: Arc<Signers>,
+    ) -> Result<SignResult, ContractError> {
+        futures::executor::block_on(super::sign_accept(offer, accept, signers))
+    }
+
+    pub(crate) fn finalize_sign(
+        offer: Vec<u8>,
+        accept: Vec<u8>,
+        sign: Vec<u8>,
+        signers: Arc<Signers>,
+    ) -> Result<Vec<u8>, ContractError> {
+        futures::executor::block_on(super::finalize_sign(offer, accept, sign, signers))
+    }
+
+    /// A party's signers: its contract keys and, if it funds anything, the
+    /// descriptor wallet holding its inputs.
+    pub(crate) fn signers(
+        keys: Arc<dyn ContractSignerProvider>,
+        descriptor: Option<&str>,
+    ) -> Arc<Signers> {
+        let signers = Signers::new(keys);
+        match descriptor {
+            Some(descriptor) => signers.with_wallet(
+                crate::signer::DescriptorWallet::new(descriptor.to_string(), 1000).unwrap(),
+            ),
+            None => signers,
+        }
+    }
+
+    /// The offerer's funding PSBT with its one wallet input signed, as a
+    /// wallet signing outside the lifecycle calls would produce it.
     pub(crate) fn offerer_signed_funding_psbt(
         offer: &[u8],
         accept: &[u8],
         descriptor: &str,
     ) -> Vec<u8> {
-        sign_funding_psbt_with_descriptor(
-            offer.to_vec(),
-            accept.to_vec(),
-            create_funding_psbt(offer.to_vec(), accept.to_vec()).unwrap(),
-            descriptor.to_string(),
-            vec![DescriptorInput {
-                input_serial_id: 100,
-                derivation_index: 0,
-            }],
+        futures::executor::block_on(
+            crate::signer::DescriptorWallet::new(descriptor.to_string(), 1000)
+                .unwrap()
+                .sign_funding_psbt(create_funding_psbt(offer.to_vec(), accept.to_vec()).unwrap()),
         )
         .unwrap()
     }
@@ -1489,32 +1495,31 @@ pub(crate) mod tests {
         offer: Vec<u8>,
         accept: Vec<u8>,
         sign: Vec<u8>,
-        funding_psbt: Vec<u8>,
         acceptor_keys: Arc<ContractKeyProvider>,
     }
 
-    /// Drives [`single_funded_offer`] through accept -> funding PSBT -> sign
-    /// entirely through the FFI surface.
+    /// Drives [`single_funded_offer`] through accept -> sign entirely through
+    /// the FFI surface.
     fn single_funded_contract() -> FundedContract {
         let fixture = single_funded_offer();
         let offer = fixture.offer;
         let accept = accept_offer(
             offer.clone(),
             fixture.accept_params,
-            fixture.acceptor_keys.clone(),
+            signers(fixture.acceptor_keys.clone(), None),
         )
         .unwrap()
         .accept;
 
-        // Offerer signs its wallet input and produces the sign message; the
+        // The offerer's wallet signs its input inside sign_accept; the
         // acceptor (no inputs) finalizes.
-        let funding_psbt = create_funding_psbt(offer.clone(), accept.clone()).unwrap();
-        let signed_psbt = offerer_signed_funding_psbt(&offer, &accept, &fixture.offerer_descriptor);
         let sign = sign_accept(
             offer.clone(),
             accept.clone(),
-            fixture.offerer_keys.clone(),
-            signed_psbt,
+            signers(
+                fixture.offerer_keys.clone(),
+                Some(&fixture.offerer_descriptor),
+            ),
         )
         .unwrap()
         .sign;
@@ -1523,7 +1528,6 @@ pub(crate) mod tests {
             offer,
             accept,
             sign,
-            funding_psbt,
             acceptor_keys: fixture.acceptor_keys,
         }
     }
@@ -1633,26 +1637,12 @@ pub(crate) mod tests {
             .accept,
         );
 
-        let funding_psbt = create_funding_psbt(offer.clone(), accept.clone()).unwrap();
-        let signed_psbt = sign_funding_psbt_with_descriptor(
-            offer.clone(),
-            accept.clone(),
-            funding_psbt,
-            offerer_descriptor,
-            vec![DescriptorInput {
-                input_serial_id: 100,
-                derivation_index: 0,
-            }],
-        )
-        .unwrap();
-
         // The three paths that sign an existing contract, each given only the
         // restored provider and no derivation metadata on the signing calls.
         let sign = sign_accept(
             offer.clone(),
             accept.clone(),
-            offerer_keys.clone(),
-            signed_psbt,
+            signers(offerer_keys.clone(), Some(&offerer_descriptor)),
         )
         .unwrap()
         .sign;
@@ -1901,32 +1891,22 @@ pub(crate) mod tests {
                 max_timeout_interval: 100_000,
                 now_unix: NOW_UNIX,
             },
-            acceptor_a.provider.clone(),
+            signers(acceptor_a.provider.clone(), None),
         )
         .unwrap()
         .accept;
 
         // The offerer's sign message: its contract id is what selects the fee
-        // rule A's transactions are rebuilt under.
-        let offer_a_msg: OfferDlc = decode_msg(&offer_a, "offer").unwrap();
-        let accept_a_msg: AcceptDlc = decode_msg(&accept_a, "accept").unwrap();
-        let mut psbt_a = ddk_contract::create_funding_psbt(&offer_a_msg, &accept_a_msg).unwrap();
-        ddk_contract::signing::sign_funding_psbt_with_xpriv(
-            &offer_a_msg,
-            &accept_a_msg,
-            &mut psbt_a,
-            &Xpriv::new_master(NETWORK, &[11; 64]).unwrap(),
-            &[ddk_contract::InputDerivation {
-                input_serial_id: 100,
-                derivation_path: DerivationPath::from_str("84h/1h/0h/0/0").unwrap(),
-            }],
-        )
-        .unwrap();
+        // rule A's transactions are rebuilt under. Its wallet is the BIP84
+        // descriptor over the seed `build_party` funded it from.
+        let offerer_a_wallet = format!(
+            "wpkh({}/84h/1h/0h/0/*)",
+            Xpriv::new_master(NETWORK, &[11; 64]).unwrap()
+        );
         let sign_a = sign_accept(
             offer_a.clone(),
             accept_a.clone(),
-            offerer_a.provider.clone(),
-            psbt_a.serialize(),
+            signers(offerer_a.provider.clone(), Some(&offerer_a_wallet)),
         )
         .unwrap()
         .sign;
@@ -1979,7 +1959,7 @@ pub(crate) mod tests {
         let accept_b = accept_offer(
             offer_b.clone(),
             accept_params_b.clone(),
-            acceptor_b.provider.clone(),
+            signers(acceptor_b.provider.clone(), None),
         )
         .unwrap()
         .accept;
@@ -2009,26 +1989,20 @@ pub(crate) mod tests {
         );
 
         // Offerer signs its half of the prior 2-of-2 (no wallet inputs to sign).
-        let offer_psbt =
-            create_funding_psbt(splice.offer_b.clone(), splice.accept_b.clone()).unwrap();
         let sign = sign_accept(
             splice.offer_b.clone(),
             splice.accept_b.clone(),
-            splice.offerer_keys.clone(),
-            offer_psbt,
+            signers(splice.offerer_keys.clone(), None),
         )
         .unwrap()
         .sign;
 
         // Accepter completes the other half -> fully-signed funding transaction.
-        let accept_psbt =
-            create_funding_psbt(splice.offer_b.clone(), splice.accept_b.clone()).unwrap();
         let tx_bytes = finalize_sign(
             splice.offer_b,
             splice.accept_b,
             sign,
-            accept_psbt,
-            splice.acceptor_keys,
+            signers(splice.acceptor_keys, None),
         )
         .unwrap();
 
@@ -2046,7 +2020,6 @@ pub(crate) mod tests {
     #[test]
     fn splice_signing_derives_the_previous_key_from_the_input() {
         let splice = splice_fixture();
-        let psbt = create_funding_psbt(splice.offer_b.clone(), splice.accept_b.clone()).unwrap();
         let provider = |seed: u8| {
             ContractKeyProvider::from_xprv(
                 Xpriv::new_master(NETWORK, &[seed; 64])
@@ -2060,8 +2033,7 @@ pub(crate) mod tests {
             sign_accept(
                 splice.offer_b.clone(),
                 splice.accept_b.clone(),
-                keys,
-                psbt.clone(),
+                signers(keys, None),
             )
         };
         let signed = sign_with(provider(11)).unwrap();

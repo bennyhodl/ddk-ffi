@@ -37,7 +37,6 @@ const FUNCTIONS = [
   'acceptOffer',
   'createFundingPsbt',
   'dlcTransactionsFromMessages',
-  'signFundingPsbtWithDescriptor',
   'signAccept',
   'finalizeSign',
   'contractCetTransaction',
@@ -69,7 +68,6 @@ const RECORD_TYPES = [
   'ContractSignatures',
   'DlcInputSignature',
   'OracleAttestationRef',
-  'DescriptorInput',
   'PayoutRow',
   'ContractPayouts',
 ];
@@ -78,7 +76,8 @@ const CONSTRUCTORS = ['fromMnemonic', 'fromSeed', 'fromXprv', 'fromDescriptor'];
 
 describe('generated ddk-rn bindings — stateless contract surface', () => {
   test.each(FUNCTIONS)('exposes function %s in the TS surface', (name) => {
-    expect(ddkFfi).toContain(`export function ${name}(`);
+    // signAccept and finalizeSign await the wallet, so they are async.
+    expect(ddkFfi).toMatch(new RegExp(`export (async )?function ${name}\\(`));
   });
 
   test.each(FUNCTIONS)('function %s has a native JSI binding', (name) => {
@@ -106,6 +105,23 @@ describe('generated ddk-rn bindings — stateless contract surface', () => {
       );
     }
   );
+
+  test('exposes the Signers class with its wallet builder', () => {
+    expect(ddkFfi).toContain('export class Signers');
+    expect(ddkFfi).toMatch(/withWallet\(wallet/);
+    expect(ffiLayer).toContain('ddk_ffi_fn_constructor_signers_new');
+    expect(ffiLayer).toContain('ddk_ffi_fn_method_signers_with_wallet');
+  });
+
+  test('exposes the DescriptorWallet class and the FundingWallet callback', () => {
+    expect(ddkFfi).toContain('export class DescriptorWallet');
+    expect(ddkFfi).toContain('export interface FundingWallet');
+    expect(ddkFfi).toMatch(/signFundingPsbt\(\s*psbt/);
+    expect(ffiLayer).toContain(
+      'ddk_ffi_fn_method_descriptorwallet_sign_funding_psbt'
+    );
+    expect(ffiLayer).toContain('ddk_ffi_fn_constructor_descriptorwallet_new');
+  });
 
   test('exposes the Party enum with both variants', () => {
     expect(ddkFfi).toContain('export enum Party {');

@@ -12,14 +12,14 @@
  */
 import {
   ContractKeyProvider,
+  DescriptorWallet,
+  Signers,
   chainHashFromNetwork,
   fundingInput,
   createOffer,
   validateOffer,
   acceptOffer,
   validateAccept,
-  createFundingPsbt,
-  signFundingPsbtWithDescriptor,
   signAccept,
   validateSign,
   finalizeSign,
@@ -63,6 +63,10 @@ console.log('=== Stateless Contract API (Node) ===\n')
 //    boundary — only the public key comes back).
 const offererKeys = ContractKeyProvider.fromDescriptor(OFFERER_DESCRIPTOR)
 const acceptorKeys = ContractKeyProvider.fromMnemonic(ACCEPTOR_MNEMONIC, undefined, 'regtest')
+// What each party signs with, built once per wallet: its contract keys and the
+// wallet that signs its funding inputs. The acceptor funds nothing here.
+const offererSigners = new Signers(offererKeys).withWallet(new DescriptorWallet(OFFERER_DESCRIPTOR))
+const acceptorSigners = new Signers(acceptorKeys)
 const offerTempId = Buffer.alloc(32, 0x5c)
 const spk = Buffer.from(P2WPKH_SPK_HEX, 'hex')
 console.log(`Offerer funding pubkey: ${hex(offererKeys.fundingPubkey(offerTempId))}`)
@@ -112,28 +116,22 @@ const acceptResult = acceptOffer(
     maxTimeoutInterval: 100_000,
     nowUnix: 100n,
   },
-  acceptorKeys,
+  acceptorSigners,
 )
 console.log(`✅ acceptOffer  -> AcceptDlc (${acceptResult.accept.length} bytes)`)
 validateAccept(offer, acceptResult.accept)
 console.log('✅ validateAccept passed')
 
-// 4) Fund. The PSBT is rebuilt from the two messages, the offerer signs its own
-//    input with its descriptor, and the sign message carries its half of the
+// 4) Sign. The offerer's wallet signs its funding input and its contract key
+//    signs the refund and CETs; the sign message carries its half of the
 //    contract. The acceptor (no inputs here) finalizes.
 const accept = acceptResult.accept
-const fundingPsbt = createFundingPsbt(offer, accept)
-const signedPsbt = signFundingPsbtWithDescriptor(offer, accept, fundingPsbt, OFFERER_DESCRIPTOR, [
-  { inputSerialId: FUNDING_SERIAL, derivationIndex: 0 },
-])
-console.log(`✅ signFundingPsbtWithDescriptor -> signed PSBT (${signedPsbt.length} bytes)`)
-
-const signResult = signAccept(offer, accept, offererKeys, signedPsbt)
+const signResult = await signAccept(offer, accept, offererSigners)
 console.log(`✅ signAccept   -> SignDlc (${signResult.sign.length} bytes)`)
 validateSign(offer, accept, signResult.sign)
 console.log('✅ validateSign passed')
 
-const fundingTx = finalizeSign(offer, accept, signResult.sign, fundingPsbt, acceptorKeys)
+const fundingTx = await finalizeSign(offer, accept, signResult.sign, acceptorSigners)
 console.log(`✅ finalizeSign -> signed funding transaction (${fundingTx.length} bytes)`)
 
 // 5) Inspect: contract id + the payout table for display.
