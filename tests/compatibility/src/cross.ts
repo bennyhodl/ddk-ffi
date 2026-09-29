@@ -22,7 +22,6 @@ export interface CrossContract {
   fundTxId: string
   /** The ddk party and the temp id that derives its keys in this contract. */
   ddkParty: DdkParty
-  ddkTempId: Buffer
   ddkIsOfferer: boolean
 }
 
@@ -180,7 +179,6 @@ export async function enterDdkOfferBalAccept(
     ddkTransactions,
     fundTxId,
     ddkParty,
-    ddkTempId,
     ddkIsOfferer: true,
   }
 }
@@ -209,13 +207,12 @@ export async function enterBalOfferDdkAccept(
 
   // --- over the wire to ddk ---
   ddk.validateOffer(offer, MIN_TIMEOUT_INTERVAL, MAX_TIMEOUT_INTERVAL, NOW_UNIX)
-  const ddkTempId = tempId(0xa0 + contractCounter++)
   const ddkInput = await ddkParty.fundInput(rpc, 4_000n)
   const acceptResult = ddk.acceptOffer(
     offer,
     {
       party: {
-        fundingPubkey: ddkParty.keys.fundingPubkey(ddkTempId),
+        fundingPubkey: ddkParty.keys.fundingPubkey(ddk.offerTemporaryContractId(offer)),
         fundingInputs: [ddkInput.fundingInput],
         payoutSpk: ddkParty.scriptPubkey(1),
         payoutSerialId: 4_001n,
@@ -259,7 +256,6 @@ export async function enterBalOfferDdkAccept(
     ddkTransactions,
     fundTxId,
     ddkParty,
-    ddkTempId,
     ddkIsOfferer: false,
   }
 }
@@ -288,14 +284,9 @@ export async function ddkSettleCet(
   contract: CrossContract,
   attestationBody: Buffer,
 ): Promise<string> {
-  const cet = ddk.signContractCet(
-    contract.offer,
-    contract.accept,
-    contract.sign,
-    contract.ddkParty.keys,
-    contract.ddkIsOfferer ? ddk.Party.Offer : ddk.Party.Accept,
-    [{ oracleIndex: 0, attestation: attestationBody }],
-  )
+  const cet = ddk.contractCetTransaction(contract.offer, contract.accept, contract.sign, [
+    { oracleIndex: 0, attestation: attestationBody },
+  ])
   return rpc.broadcastAndConfirm(hex(cet))
 }
 
@@ -310,15 +301,9 @@ export async function balRefund(rpc: BitcoindRpc, balParty: BalParty, contract: 
   return rpc.broadcastAndConfirm(refund.serialize().toString('hex'))
 }
 
-/** The ddk party signs and broadcasts the refund transaction. */
+/** The ddk party builds and broadcasts the refund transaction. */
 export async function ddkRefund(rpc: BitcoindRpc, contract: CrossContract): Promise<string> {
-  const refund = ddk.signContractRefund(
-    contract.offer,
-    contract.accept,
-    contract.sign,
-    contract.ddkParty.keys,
-    contract.ddkIsOfferer ? ddk.Party.Offer : ddk.Party.Accept,
-  )
+  const refund = ddk.contractRefundTransaction(contract.offer, contract.accept, contract.sign)
   return rpc.broadcastAndConfirm(hex(refund))
 }
 

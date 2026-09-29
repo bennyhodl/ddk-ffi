@@ -82,7 +82,6 @@ const vectors: CompatVectors = {
     totalCollateralSats: scenario1.totalCollateral.toString(),
     offerCollateralSats: '600000',
     offerTempIdHex: tempId(0x5c).toString('hex'),
-    acceptTempIdHex: tempId(0xa1).toString('hex'),
     feeRatePerVb: FEE_RATE_PER_VB.toString(),
     cetLocktime: CET_LOCKTIME,
     refundLocktime: REFUND_LOCKTIME,
@@ -98,7 +97,6 @@ const vectors: CompatVectors = {
     totalCollateralSats: scenario2.totalCollateral.toString(),
     spliceSerialId: '7',
     offerTempIdHex: tempId(0xd1).toString('hex'),
-    acceptTempIdHex: tempId(0xd2).toString('hex'),
     attestationHex: tlvBody(attestation2.serialize()).toString('hex'),
     attestedOutcome: 'up',
   },
@@ -112,8 +110,6 @@ const vectors: CompatVectors = {
   const offer = buildOffer(ddk, vectors)
   const { accept, fundingPsbt } = buildAccept(ddk, vectors, offer)
   const offererKeys = ddk.ContractKeyProvider.fromDescriptor(offerer.descriptor)
-  offererKeys.fundingPubkey(fromHexString(vectors.contract.offerTempIdHex))
-  offererKeys.fundingPubkey(fromHexString(vectors.splice.offerTempIdHex))
   const signedPsbt = ddk.signFundingPsbtWithDescriptor(offer, accept, fundingPsbt, offerer.descriptor, [
     { inputSerialId: 100n, derivationIndex: 0 },
   ])

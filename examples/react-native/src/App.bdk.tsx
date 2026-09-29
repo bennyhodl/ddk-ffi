@@ -56,6 +56,7 @@ import {
   validateSign,
   finalizeSign,
   computeContractId,
+  offerTemporaryContractId,
   version,
 } from '@bennyblader/ddk-rn';
 import {
@@ -229,7 +230,6 @@ export default function App() {
         NETWORK
       );
       const offerTempId = temporaryContractId(0x5c);
-      const acceptTempId = temporaryContractId(0xa1);
       const chainHash = chainHashFromNetwork(NETWORK);
 
       // The offerer's funding UTXO pays to its own index-0 address, then becomes
@@ -275,7 +275,9 @@ export default function App() {
         offer,
         {
           party: {
-            fundingPubkey: acceptorKeys.fundingPubkey(acceptTempId),
+            fundingPubkey: acceptorKeys.fundingPubkey(
+              offerTemporaryContractId(offer)
+            ),
             fundingInputs: [],
             payoutSpk: u8ToArrayBuffer(acceptor.scriptPubkey),
             payoutSerialId: 4n,

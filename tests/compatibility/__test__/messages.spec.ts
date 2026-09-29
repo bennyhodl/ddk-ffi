@@ -12,7 +12,6 @@ const offerer = new DdkParty(DDK_MNEMONIC)
 const acceptor = new DdkParty(BAL_MNEMONIC)
 
 const OFFER_TEMP_ID = tempId(0x11)
-const ACCEPT_TEMP_ID = tempId(0x22)
 
 /** Deterministic offline dual-funded flow, entirely through the ddk API. */
 function runOfflineFlow(scenario = upDownScenario()) {
@@ -36,7 +35,7 @@ function runOfflineFlow(scenario = upDownScenario()) {
     offer,
     {
       party: {
-        fundingPubkey: acceptor.keys.fundingPubkey(ACCEPT_TEMP_ID),
+        fundingPubkey: acceptor.keys.fundingPubkey(ddk.offerTemporaryContractId(offer)),
         fundingInputs: [acceptorInput.fundingInput],
         payoutSpk: acceptor.scriptPubkey(1),
         payoutSerialId: 4n,
@@ -280,7 +279,7 @@ describe('oracle message compatibility', () => {
   })
 
   test('ddk settles a CET from a node-dlc attestation', () => {
-    const cet = ddk.signContractCet(flow.offer, flow.accept, flow.sign, acceptor.keys, ddk.Party.Accept, [
+    const cet = ddk.contractCetTransaction(flow.offer, flow.accept, flow.sign, [
       { oracleIndex: 0, attestation: tlvBody(attestation.serialize()) },
     ])
     expect(cet.length).toBeGreaterThan(0)
@@ -289,15 +288,15 @@ describe('oracle message compatibility', () => {
     expect(txidOf(flow.fundingTx)).toBe(txidOf(flow.acceptResult.transactions.fund.rawBytes))
   })
 
-  test('ddk signs the refund transaction', () => {
-    const refund = ddk.signContractRefund(flow.offer, flow.accept, flow.sign, acceptor.keys, ddk.Party.Accept)
+  test('ddk builds the refund transaction', () => {
+    const refund = ddk.contractRefundTransaction(flow.offer, flow.accept, flow.sign)
     expect(refund.length).toBeGreaterThan(0)
   })
 
   test('an attestation for an outcome the contract lacks is NoMatchingOutcome', () => {
     const stray = scenario.oracle.attestEnum(scenario.eventId, 'sideways')
     try {
-      ddk.signContractCet(flow.offer, flow.accept, flow.sign, acceptor.keys, ddk.Party.Accept, [
+      ddk.contractCetTransaction(flow.offer, flow.accept, flow.sign, [
         { oracleIndex: 0, attestation: tlvBody(stray.serialize()) },
       ])
       expect.unreachable('should have thrown')
@@ -315,7 +314,7 @@ describe('oracle message compatibility', () => {
     const announcement = (scenario.contractInfo.oracleInfo as any).announcement
     expect(() => legacy.validate(announcement)).toThrow(/Invalid signature/)
     try {
-      ddk.signContractCet(flow.offer, flow.accept, flow.sign, acceptor.keys, ddk.Party.Accept, [
+      ddk.contractCetTransaction(flow.offer, flow.accept, flow.sign, [
         { oracleIndex: 0, attestation: tlvBody(legacy.serialize()) },
       ])
       expect.unreachable('should have thrown')

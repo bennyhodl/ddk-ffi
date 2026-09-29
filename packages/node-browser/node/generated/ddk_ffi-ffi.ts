@@ -337,8 +337,18 @@ const DEFINITIONS = {
       ret: FfiType.RustBuffer,
       hasRustCallStatus: true,
     },
+    uniffi_ddk_ffi_fn_func_contract_cet_transaction: {
+      args: [FfiType.RustBuffer, FfiType.RustBuffer, FfiType.RustBuffer, FfiType.RustBuffer],
+      ret: FfiType.RustBuffer,
+      hasRustCallStatus: true,
+    },
     uniffi_ddk_ffi_fn_func_contract_info_payouts: {
       args: [FfiType.RustBuffer],
+      ret: FfiType.RustBuffer,
+      hasRustCallStatus: true,
+    },
+    uniffi_ddk_ffi_fn_func_contract_refund_transaction: {
+      args: [FfiType.RustBuffer, FfiType.RustBuffer, FfiType.RustBuffer],
       ret: FfiType.RustBuffer,
       hasRustCallStatus: true,
     },
@@ -563,8 +573,18 @@ const DEFINITIONS = {
       ret: FfiType.RustBuffer,
       hasRustCallStatus: true,
     },
+    uniffi_ddk_ffi_fn_func_offer_temporary_contract_id: {
+      args: [FfiType.RustBuffer],
+      ret: FfiType.RustBuffer,
+      hasRustCallStatus: true,
+    },
     uniffi_ddk_ffi_fn_func_prepare_accept_offer: {
       args: [FfiType.RustBuffer, FfiType.RustBuffer],
+      ret: FfiType.RustBuffer,
+      hasRustCallStatus: true,
+    },
+    uniffi_ddk_ffi_fn_func_prepare_finalize_sign: {
+      args: [FfiType.RustBuffer, FfiType.RustBuffer, FfiType.RustBuffer],
       ret: FfiType.RustBuffer,
       hasRustCallStatus: true,
     },
@@ -575,23 +595,6 @@ const DEFINITIONS = {
     },
     uniffi_ddk_ffi_fn_func_sign_accept: {
       args: [FfiType.RustBuffer, FfiType.RustBuffer, FfiType.Handle, FfiType.RustBuffer],
-      ret: FfiType.RustBuffer,
-      hasRustCallStatus: true,
-    },
-    uniffi_ddk_ffi_fn_func_sign_contract_cet: {
-      args: [
-        FfiType.RustBuffer,
-        FfiType.RustBuffer,
-        FfiType.RustBuffer,
-        FfiType.Handle,
-        FfiType.RustBuffer,
-        FfiType.RustBuffer,
-      ],
-      ret: FfiType.RustBuffer,
-      hasRustCallStatus: true,
-    },
-    uniffi_ddk_ffi_fn_func_sign_contract_refund: {
-      args: [FfiType.RustBuffer, FfiType.RustBuffer, FfiType.RustBuffer, FfiType.Handle, FfiType.RustBuffer],
       ret: FfiType.RustBuffer,
       hasRustCallStatus: true,
     },
@@ -758,11 +761,6 @@ const DEFINITIONS = {
       ret: FfiType.Handle,
       hasRustCallStatus: true,
     },
-    uniffi_ddk_ffi_fn_method_contractkeyprovider_signer_for_contract: {
-      args: [FfiType.Handle, FfiType.RustBuffer, FfiType.RustBuffer],
-      ret: FfiType.Handle,
-      hasRustCallStatus: true,
-    },
     uniffi_ddk_ffi_fn_method_contractsigner_sign_ecdsa: {
       args: [FfiType.Handle, FfiType.RustBuffer],
       ret: FfiType.RustBuffer,
@@ -828,7 +826,17 @@ const DEFINITIONS = {
       ret: FfiType.UInt16,
       hasRustCallStatus: false,
     },
+    uniffi_ddk_ffi_checksum_func_contract_cet_transaction: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
     uniffi_ddk_ffi_checksum_func_contract_info_payouts: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
+    uniffi_ddk_ffi_checksum_func_contract_refund_transaction: {
       args: [],
       ret: FfiType.UInt16,
       hasRustCallStatus: false,
@@ -973,7 +981,17 @@ const DEFINITIONS = {
       ret: FfiType.UInt16,
       hasRustCallStatus: false,
     },
+    uniffi_ddk_ffi_checksum_func_offer_temporary_contract_id: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
     uniffi_ddk_ffi_checksum_func_prepare_accept_offer: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
+    uniffi_ddk_ffi_checksum_func_prepare_finalize_sign: {
       args: [],
       ret: FfiType.UInt16,
       hasRustCallStatus: false,
@@ -984,16 +1002,6 @@ const DEFINITIONS = {
       hasRustCallStatus: false,
     },
     uniffi_ddk_ffi_checksum_func_sign_accept: {
-      args: [],
-      ret: FfiType.UInt16,
-      hasRustCallStatus: false,
-    },
-    uniffi_ddk_ffi_checksum_func_sign_contract_cet: {
-      args: [],
-      ret: FfiType.UInt16,
-      hasRustCallStatus: false,
-    },
-    uniffi_ddk_ffi_checksum_func_sign_contract_refund: {
       args: [],
       ret: FfiType.UInt16,
       hasRustCallStatus: false,
@@ -1059,11 +1067,6 @@ const DEFINITIONS = {
       hasRustCallStatus: false,
     },
     uniffi_ddk_ffi_checksum_method_contractkeyprovider_get_signer: {
-      args: [],
-      ret: FfiType.UInt16,
-      hasRustCallStatus: false,
-    },
-    uniffi_ddk_ffi_checksum_method_contractkeyprovider_signer_for_contract: {
       args: [],
       ret: FfiType.UInt16,
       hasRustCallStatus: false,
@@ -1304,8 +1307,21 @@ interface NativeModuleInterface {
     accept: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus,
   ): Uint8Array
+  uniffi_ddk_ffi_fn_func_contract_cet_transaction(
+    offer: Uint8Array,
+    accept: Uint8Array,
+    sign: Uint8Array,
+    attestations: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Uint8Array
   uniffi_ddk_ffi_fn_func_contract_info_payouts(
     contractInfo: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Uint8Array
+  uniffi_ddk_ffi_fn_func_contract_refund_transaction(
+    offer: Uint8Array,
+    accept: Uint8Array,
+    sign: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus,
   ): Uint8Array
   uniffi_ddk_ffi_fn_func_convert_mnemonic_to_seed(
@@ -1505,9 +1521,19 @@ interface NativeModuleInterface {
     network: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus,
   ): Uint8Array
+  uniffi_ddk_ffi_fn_func_offer_temporary_contract_id(
+    offer: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Uint8Array
   uniffi_ddk_ffi_fn_func_prepare_accept_offer(
     offer: Uint8Array,
     params: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Uint8Array
+  uniffi_ddk_ffi_fn_func_prepare_finalize_sign(
+    offer: Uint8Array,
+    accept: Uint8Array,
+    sign: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus,
   ): Uint8Array
   uniffi_ddk_ffi_fn_func_prepare_sign_accept(
@@ -1520,23 +1546,6 @@ interface NativeModuleInterface {
     accept: Uint8Array,
     signers: bigint,
     signedFundingPsbt: Uint8Array,
-    uniffi_out_err: UniffiRustCallStatus,
-  ): Uint8Array
-  uniffi_ddk_ffi_fn_func_sign_contract_cet(
-    offer: Uint8Array,
-    accept: Uint8Array,
-    sign: Uint8Array,
-    signers: bigint,
-    party: Uint8Array,
-    attestations: Uint8Array,
-    uniffi_out_err: UniffiRustCallStatus,
-  ): Uint8Array
-  uniffi_ddk_ffi_fn_func_sign_contract_refund(
-    offer: Uint8Array,
-    accept: Uint8Array,
-    sign: Uint8Array,
-    signers: bigint,
-    party: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus,
   ): Uint8Array
   uniffi_ddk_ffi_fn_func_sign_funding_psbt_with_descriptor(
@@ -1694,12 +1703,6 @@ interface NativeModuleInterface {
     key: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus,
   ): bigint
-  uniffi_ddk_ffi_fn_method_contractkeyprovider_signer_for_contract(
-    uniffiSelf: bigint,
-    temporaryContractId: Uint8Array,
-    fundingPubkey: Uint8Array,
-    uniffi_out_err: UniffiRustCallStatus,
-  ): bigint
   uniffi_ddk_ffi_fn_method_contractsigner_sign_ecdsa(
     uniffiSelf: bigint,
     sighash: Uint8Array,
@@ -1741,7 +1744,9 @@ interface NativeModuleInterface {
   uniffi_ddk_ffi_checksum_func_complete_accept_offer(): number
   uniffi_ddk_ffi_checksum_func_complete_sign_accept(): number
   uniffi_ddk_ffi_checksum_func_compute_contract_id(): number
+  uniffi_ddk_ffi_checksum_func_contract_cet_transaction(): number
   uniffi_ddk_ffi_checksum_func_contract_info_payouts(): number
+  uniffi_ddk_ffi_checksum_func_contract_refund_transaction(): number
   uniffi_ddk_ffi_checksum_func_convert_mnemonic_to_seed(): number
   uniffi_ddk_ffi_checksum_func_create_cet(): number
   uniffi_ddk_ffi_checksum_func_create_cet_adaptor_points_from_oracle_info(): number
@@ -1770,11 +1775,11 @@ interface NativeModuleInterface {
   uniffi_ddk_ffi_checksum_func_get_pubkey_from_extkey(): number
   uniffi_ddk_ffi_checksum_func_get_total_input_vsize(): number
   uniffi_ddk_ffi_checksum_func_get_xpub_from_xpriv(): number
+  uniffi_ddk_ffi_checksum_func_offer_temporary_contract_id(): number
   uniffi_ddk_ffi_checksum_func_prepare_accept_offer(): number
+  uniffi_ddk_ffi_checksum_func_prepare_finalize_sign(): number
   uniffi_ddk_ffi_checksum_func_prepare_sign_accept(): number
   uniffi_ddk_ffi_checksum_func_sign_accept(): number
-  uniffi_ddk_ffi_checksum_func_sign_contract_cet(): number
-  uniffi_ddk_ffi_checksum_func_sign_contract_refund(): number
   uniffi_ddk_ffi_checksum_func_sign_funding_psbt_with_descriptor(): number
   uniffi_ddk_ffi_checksum_func_spliced_contract_ids(): number
   uniffi_ddk_ffi_checksum_func_validate_accept(): number
@@ -1788,7 +1793,6 @@ interface NativeModuleInterface {
   uniffi_ddk_ffi_checksum_constructor_contractkeyprovider_from_xprv(): number
   uniffi_ddk_ffi_checksum_method_contractkeyprovider_funding_pubkey(): number
   uniffi_ddk_ffi_checksum_method_contractkeyprovider_get_signer(): number
-  uniffi_ddk_ffi_checksum_method_contractkeyprovider_signer_for_contract(): number
   uniffi_ddk_ffi_checksum_method_contractsigner_sign_ecdsa(): number
   uniffi_ddk_ffi_checksum_method_contractsigner_sign_adaptor(): number
   uniffi_ddk_ffi_checksum_method_contractsignerprovider_get_signer(): number

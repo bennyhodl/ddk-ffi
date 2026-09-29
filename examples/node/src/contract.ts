@@ -12,7 +12,6 @@
  */
 import {
   ContractKeyProvider,
-  Party,
   chainHashFromNetwork,
   fundingInput,
   createOffer,
@@ -24,9 +23,10 @@ import {
   signAccept,
   validateSign,
   finalizeSign,
-  signContractCet,
-  signContractRefund,
+  contractCetTransaction,
+  contractRefundTransaction,
   computeContractId,
+  offerTemporaryContractId,
   contractInfoPayouts,
 } from '@bennyblader/ddk'
 
@@ -64,7 +64,6 @@ console.log('=== Stateless Contract API (Node) ===\n')
 const offererKeys = ContractKeyProvider.fromDescriptor(OFFERER_DESCRIPTOR)
 const acceptorKeys = ContractKeyProvider.fromMnemonic(ACCEPTOR_MNEMONIC, undefined, 'regtest')
 const offerTempId = Buffer.alloc(32, 0x5c)
-const acceptTempId = Buffer.alloc(32, 0xa1)
 const spk = Buffer.from(P2WPKH_SPK_HEX, 'hex')
 console.log(`Offerer funding pubkey: ${hex(offererKeys.fundingPubkey(offerTempId))}`)
 
@@ -101,7 +100,8 @@ const acceptResult = acceptOffer(
   offer,
   {
     party: {
-      fundingPubkey: acceptorKeys.fundingPubkey(acceptTempId),
+      // The acceptor derives its key from the offer's temporary id.
+      fundingPubkey: acceptorKeys.fundingPubkey(offerTemporaryContractId(offer)),
       fundingInputs: [],
       payoutSpk: spk,
       payoutSerialId: 4n,
@@ -152,12 +152,12 @@ for (const row of payouts.rows) {
 //    offer's cetLocktime and the refund its refundLocktime, and deciding which
 //    path to take is the caller's policy.
 console.log('')
-const cet = signContractCet(offer, accept, signResult.sign, offererKeys, Party.Offer, [
+const cet = contractCetTransaction(offer, accept, signResult.sign, [
   { oracleIndex: 0, attestation: Buffer.from(ATTESTATION_UP_HEX, 'hex') },
 ])
-console.log(`✅ signContractCet    -> CET for the attested "up" (${cet.length} bytes), signed by the offerer`)
+console.log(`✅ contractCetTransaction    -> CET for the attested "up" (${cet.length} bytes), both signatures from the messages`)
 
-const refund = signContractRefund(offer, accept, signResult.sign, acceptorKeys, Party.Accept)
-console.log(`✅ signContractRefund -> refund transaction (${refund.length} bytes), signed by the acceptor`)
+const refund = contractRefundTransaction(offer, accept, signResult.sign)
+console.log(`✅ contractRefundTransaction -> refund transaction (${refund.length} bytes)`)
 
 console.log('\n✅ Stateless contract API works in Node — offer to settlement.')

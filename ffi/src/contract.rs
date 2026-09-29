@@ -2,14 +2,15 @@
 //! key derivation, backed by the `ddk::contract` module.
 //!
 //! Consumers own key lookup through `ContractSignerProvider`. The built-in
-//! `ContractKeyProvider` derives and registers keys from local temporary ids;
-//! the app persists those ids and restores mappings after restart. Splice
-//! signing reads the previous contract id and public keys from the messages.
+//! `ContractKeyProvider` is one such provider with nothing stored: both
+//! parties derive their key from the offer's temporary id, and every request
+//! names that id, so any provider built from the seed can sign, in any
+//! process. Splice signing recovers the previous contract's temporary id from
+//! the splice input.
 
 use crate::signer::{ContractKeyRequest, ContractSigner, ContractSignerProvider, PrivateKeySigner};
-use std::collections::BTreeMap;
 use std::str::FromStr;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use bitcoin::bip32::Xpriv;
 use bitcoin::psbt::Psbt;
@@ -131,7 +132,6 @@ pub(crate) fn to_array_32(bytes: &[u8], field: &str) -> Result<[u8; 32], Contrac
 #[derive(uniffi::Object)]
 pub struct ContractKeyProvider {
     pub(crate) inner: ddk_contract::ContractKeyProvider,
-    known_keys: Mutex<BTreeMap<Vec<u8>, [u8; 32]>>,
 }
 
 #[uniffi::export]
@@ -149,10 +149,7 @@ impl ContractKeyProvider {
             passphrase.as_deref(),
             network,
         )?;
-        Ok(Arc::new(Self {
-            inner,
-            known_keys: Mutex::new(BTreeMap::new()),
-        }))
+        Ok(Arc::new(Self { inner }))
     }
 
     /// Builds a provider from a raw seed (for example the 64 bytes produced by
@@ -161,10 +158,7 @@ impl ContractKeyProvider {
     pub fn from_seed(seed: Vec<u8>, network: String) -> Result<Arc<Self>, ContractError> {
         let network = parse_network(&network)?;
         let inner = ddk_contract::ContractKeyProvider::from_seed(&seed, network)?;
-        Ok(Arc::new(Self {
-            inner,
-            known_keys: Mutex::new(BTreeMap::new()),
-        }))
+        Ok(Arc::new(Self { inner }))
     }
 
     /// Builds a provider from a 78-byte encoded master extended private key
@@ -176,7 +170,6 @@ impl ContractKeyProvider {
         })?;
         Ok(Arc::new(Self {
             inner: ddk_contract::ContractKeyProvider::from_xprv(xprv),
-            known_keys: Mutex::new(BTreeMap::new()),
         }))
     }
 
@@ -187,53 +180,34 @@ impl ContractKeyProvider {
     #[uniffi::constructor]
     pub fn from_descriptor(descriptor: String) -> Result<Arc<Self>, ContractError> {
         let inner = ddk_contract::ContractKeyProvider::from_descriptor(&descriptor)?;
-        Ok(Arc::new(Self {
-            inner,
-            known_keys: Mutex::new(BTreeMap::new()),
-        }))
+        Ok(Arc::new(Self { inner }))
     }
 
-    /// The 33-byte compressed funding public key for a contract, from its
-    /// 32-byte temporary id. Publish this in the offer or accept message.
+    /// The 33-byte compressed funding public key for a contract, from the
+    /// offer's 32-byte temporary id. The offering party chooses that id and
+    /// publishes this key in the offer; the accepting party reads the id from
+    /// the offer ([`offer_temporary_contract_id`]) and publishes this key in
+    /// the accept.
     pub fn funding_pubkey(&self, temporary_contract_id: Vec<u8>) -> Result<Vec<u8>, ContractError> {
         let temp_id = to_array_32(&temporary_contract_id, "temporary_contract_id")?;
-        let pubkey = self.inner.funding_pubkey(temp_id)?;
-        let pubkey = pubkey.serialize().to_vec();
-        self.known_keys
-            .lock()
-            .unwrap()
-            .insert(pubkey.clone(), temp_id);
-        Ok(pubkey)
+        Ok(self.inner.funding_pubkey(temp_id)?.serialize().to_vec())
     }
 
-    /// Restore a stored contract's key and return its signer. The expected
-    /// public key selects the current or legacy DDK derivation. Call again
-    /// after constructing a provider on restart; the registry is in memory.
-    pub fn signer_for_contract(
-        &self,
-        temporary_contract_id: Vec<u8>,
-        funding_pubkey: Vec<u8>,
-    ) -> Result<Arc<dyn ContractSigner>, ContractError> {
-        let temp_id = to_array_32(&temporary_contract_id, "temporary_contract_id")?;
-        let pubkey = PublicKey::from_slice(&funding_pubkey).map_err(|e| ContractError::Key {
-            message: e.to_string(),
-        })?;
-        let secret = self.inner.funding_secret_key_for_pubkey(temp_id, &pubkey)?;
-        self.known_keys
-            .lock()
-            .unwrap()
-            .insert(pubkey.serialize().to_vec(), temp_id);
-        Ok(Arc::new(PrivateKeySigner { secret }))
-    }
-
-    /// Resolve a key created or restored on this provider.
+    /// Derive the key a request names: from its temporary contract id, under
+    /// the current scheme or the legacy one, whichever reproduces the
+    /// published funding public key. Nothing is stored, so a provider built
+    /// from the seed in any process can sign.
     pub fn get_signer(
         &self,
         key: ContractKeyRequest,
     ) -> Result<Arc<dyn ContractSigner>, ContractError> {
-        let temp_id = self.known_keys.lock().unwrap().get(&key.funding_pubkey).copied()
-            .ok_or_else(|| ContractError::Key { message: "unknown funding public key; restore this contract with signerForContract or use a consumer ContractSignerProvider".into() })?;
-        self.signer_for_contract(temp_id.to_vec(), key.funding_pubkey)
+        let temp_id = to_array_32(&key.temporary_contract_id, "temporary_contract_id")?;
+        let pubkey =
+            PublicKey::from_slice(&key.funding_pubkey).map_err(|e| ContractError::Key {
+                message: e.to_string(),
+            })?;
+        let secret = self.inner.funding_secret_key_for_pubkey(temp_id, &pubkey)?;
+        Ok(Arc::new(PrivateKeySigner { secret }))
     }
 }
 
@@ -277,7 +251,7 @@ pub(crate) fn decode_psbt(bytes: &[u8]) -> Result<Psbt, ContractError> {
 // ---------------------------------------------------------------------------
 
 /// Identifies which party's funding inputs an operation applies to.
-#[derive(uniffi::Enum)]
+#[derive(Clone, Copy, uniffi::Enum)]
 pub enum Party {
     /// The party that created the offer.
     Offer,
@@ -448,7 +422,7 @@ impl SignResult {
 }
 
 /// An oracle attestation paired with the position of the oracle that produced it
-/// in the contract's announcements, for [`sign_contract_cet`].
+/// in the contract's announcements, for [`contract_cet_transaction`].
 #[derive(uniffi::Record)]
 pub struct OracleAttestationRef {
     /// The index of the attesting oracle in the contract info's announcements.
@@ -599,6 +573,15 @@ pub fn validate_sign(offer: Vec<u8>, accept: Vec<u8>, sign: Vec<u8>) -> Result<(
         &sign.cet_adaptor_signatures,
     )?;
     Ok(())
+}
+
+/// The 32-byte temporary contract id an offer carries. The accepting party
+/// passes it to `ContractKeyProvider::funding_pubkey` to derive its key for
+/// the contract, as the offering party did when it chose the id.
+#[uniffi::export]
+pub fn offer_temporary_contract_id(offer: Vec<u8>) -> Result<Vec<u8>, ContractError> {
+    let offer: OfferDlc = decode_msg(&offer, "offer")?;
+    Ok(offer.temporary_contract_id.to_vec())
 }
 
 /// The 32-byte contract id derived from the offer and accept messages — the
@@ -774,7 +757,7 @@ pub fn dlc_transactions_from_messages(
 /// Unlike [`dlc_transactions_from_messages`], this also rebuilds a contract
 /// created before ddk-dlc 2.0.0-rc.4, whose single-funded funding transaction
 /// was priced under the old fee rule: the rule is chosen by which rebuild
-/// reproduces `sign`'s contract id. `sign_contract_cet`, `sign_contract_refund`
+/// reproduces `sign`'s contract id. `contract_cet_transaction`, `contract_refund_transaction`
 /// and `create_dlc_splice_input` rebuild the same way.
 #[uniffi::export]
 pub fn dlc_transactions_from_signed_messages(
@@ -801,7 +784,7 @@ pub fn sign_accept(
     let prepared = crate::external::prepare_sign_accept(offer, accept)?;
     let contract = crate::external::sign_contract_request(&prepared.request, signers.as_ref())?;
     let dlc_input_signatures =
-        crate::external::sign_dlc_inputs(&prepared.request, signers.as_ref())?;
+        crate::external::sign_dlc_inputs(&prepared.request.splice, signers.as_ref())?;
     crate::external::complete_sign_accept(
         prepared.context,
         crate::external::SigningResponse {
@@ -822,7 +805,8 @@ pub fn finalize_sign(
     signed_funding_psbt: Vec<u8>,
     signers: Arc<dyn ContractSignerProvider>,
 ) -> Result<Vec<u8>, ContractError> {
-    let request = crate::external::finalize_request(&offer, &accept, &sign)?;
+    let request =
+        crate::external::prepare_finalize_sign(offer.clone(), accept.clone(), sign.clone())?;
     let signatures = crate::external::sign_dlc_inputs(&request, signers.as_ref())?;
     crate::external::finalize_sign_with_signatures(
         offer,
@@ -833,7 +817,7 @@ pub fn finalize_sign(
     )
 }
 
-pub use crate::settlement::{sign_contract_cet, sign_contract_refund};
+pub use crate::settlement::{contract_cet_transaction, contract_refund_transaction};
 
 // ---------------------------------------------------------------------------
 // Splicing
@@ -991,7 +975,6 @@ pub(crate) mod tests {
 
     const TOTAL_COLLATERAL: Amount = Amount::from_sat(100_000);
     const OFFER_TEMP_ID: [u8; 32] = [0x5c; 32];
-    const ACCEPT_TEMP_ID: [u8; 32] = [0xa1; 32];
     const NETWORK: Network = Network::Regtest;
     // The oracle behind the fixture announcement. Held as constants so
     // `attestation` can sign the outcomes the announcement commits to — the
@@ -1233,12 +1216,12 @@ pub(crate) mod tests {
         .unwrap();
         let offer_bytes = encode_msg(&offer);
 
-        // Acceptor derives its DLC funding key from a provider (by temp id).
-        let acceptor = build_party(22, ACCEPT_TEMP_ID, 200);
+        // The acceptor derives its DLC funding key from the offer's temp id.
+        let acceptor = build_party(22, OFFER_TEMP_ID, 200);
         let funding_secret_key = acceptor
             .provider
             .inner
-            .funding_secret_key(ACCEPT_TEMP_ID)
+            .funding_secret_key(OFFER_TEMP_ID)
             .unwrap();
 
         let direct = ddk_contract::accept_offer(
@@ -1399,7 +1382,6 @@ pub(crate) mod tests {
         pub offerer_keys: Arc<ContractKeyProvider>,
         pub offer_temp_id: Vec<u8>,
         pub acceptor_keys: Arc<ContractKeyProvider>,
-        pub accept_temp_id: Vec<u8>,
     }
 
     pub(crate) fn single_funded_offer() -> SingleFundedOffer {
@@ -1430,10 +1412,7 @@ pub(crate) mod tests {
         let acceptor_master = Xpriv::new_master(NETWORK, &[4u8; 64]).unwrap();
         let acceptor_keys =
             ContractKeyProvider::from_xprv(acceptor_master.encode().to_vec()).unwrap();
-        let accept_temp_id = vec![0xa1; 32];
-        let acceptor_funding_pubkey = acceptor_keys
-            .funding_pubkey(accept_temp_id.clone())
-            .unwrap();
+        let acceptor_funding_pubkey = acceptor_keys.funding_pubkey(offer_temp_id.clone()).unwrap();
         let acceptor_script = p2wpkh_script(&secp, &acceptor_master, &path)
             .as_bytes()
             .to_vec();
@@ -1482,7 +1461,6 @@ pub(crate) mod tests {
             offerer_keys,
             offer_temp_id,
             acceptor_keys,
-            accept_temp_id,
         }
     }
 
@@ -1505,14 +1483,13 @@ pub(crate) mod tests {
         .unwrap()
     }
 
-    /// A funded single-funded contract: the three wire messages plus each
-    /// party's signer provider, ready for settlement.
+    /// A funded single-funded contract: the three wire messages, which are all
+    /// settlement needs, plus the acceptor's provider for finalizing.
     struct FundedContract {
         offer: Vec<u8>,
         accept: Vec<u8>,
         sign: Vec<u8>,
         funding_psbt: Vec<u8>,
-        offerer_keys: Arc<ContractKeyProvider>,
         acceptor_keys: Arc<ContractKeyProvider>,
     }
 
@@ -1547,7 +1524,6 @@ pub(crate) mod tests {
             accept,
             sign,
             funding_psbt,
-            offerer_keys: fixture.offerer_keys,
             acceptor_keys: fixture.acceptor_keys,
         }
     }
@@ -1588,12 +1564,13 @@ pub(crate) mod tests {
         let acceptor_master = Xpriv::new_master(NETWORK, &[4u8; 64]).unwrap();
         let acceptor_keys =
             ContractKeyProvider::from_xprv(acceptor_master.encode().to_vec()).unwrap();
-        let accept_temp_id = vec![0xa1; 32];
         let acceptor_script = p2wpkh_script(&secp, &acceptor_master, &path)
             .as_bytes()
             .to_vec();
 
-        // Both parties' keys as the old release would have derived them.
+        // Both parties' keys as the old release would have derived them. The
+        // provider selects the scheme from the published key, so nothing has
+        // to be registered for either.
         let legacy_key = |keys: &ContractKeyProvider, temp_id: &[u8]| {
             keys.inner
                 .funding_secret_key_with_scheme(
@@ -1603,19 +1580,7 @@ pub(crate) mod tests {
                 .unwrap()
         };
         let offerer_secret = legacy_key(&offerer_keys, &offer_temp_id);
-        let acceptor_secret = legacy_key(&acceptor_keys, &accept_temp_id);
-        offerer_keys
-            .signer_for_contract(
-                offer_temp_id.clone(),
-                offerer_secret.public_key(&secp).serialize().to_vec(),
-            )
-            .unwrap();
-        acceptor_keys
-            .signer_for_contract(
-                accept_temp_id.clone(),
-                acceptor_secret.public_key(&secp).serialize().to_vec(),
-            )
-            .unwrap();
+        let acceptor_secret = legacy_key(&acceptor_keys, &offer_temp_id);
         assert_ne!(
             offerer_secret.public_key(&secp).serialize().to_vec(),
             offerer_keys.funding_pubkey(offer_temp_id.clone()).unwrap(),
@@ -1692,17 +1657,14 @@ pub(crate) mod tests {
         .unwrap()
         .sign;
 
-        let cet = sign_contract_cet(
+        let cet = contract_cet_transaction(
             offer.clone(),
             accept.clone(),
             sign.clone(),
-            offerer_keys,
-            Party::Offer,
             vec![attestation_ref("up")],
         )
         .unwrap();
-        let refund =
-            sign_contract_refund(offer, accept, sign, acceptor_keys, Party::Accept).unwrap();
+        let refund = contract_refund_transaction(offer, accept, sign).unwrap();
 
         let cet: Transaction = bitcoin::consensus::deserialize(&cet).unwrap();
         let refund: Transaction = bitcoin::consensus::deserialize(&refund).unwrap();
@@ -1720,48 +1682,20 @@ pub(crate) mod tests {
     // Settlement
     // -----------------------------------------------------------------------
 
-    /// Both parties can settle the same contract independently and each ends up
-    /// broadcasting the same CET for the same attested outcome. "up" pays the
-    /// whole 100 000 sats to the offerer.
+    /// The attested outcome selects the CET. "up" pays the whole 100 000 sats
+    /// to the offerer.
     #[test]
-    fn settlement_signs_the_matching_cet() {
+    fn settlement_builds_the_matching_cet() {
         let contract = single_funded_contract();
 
-        let by_offerer = sign_contract_cet(
+        let up = contract_cet_transaction(
             contract.offer.clone(),
             contract.accept.clone(),
             contract.sign.clone(),
-            contract.offerer_keys.clone(),
-            Party::Offer,
             vec![attestation_ref("up")],
         )
         .unwrap();
-        let by_acceptor = sign_contract_cet(
-            contract.offer.clone(),
-            contract.accept.clone(),
-            contract.sign.clone(),
-            contract.acceptor_keys.clone(),
-            Party::Accept,
-            vec![attestation_ref("up")],
-        )
-        .unwrap();
-
-        let cet: Transaction = bitcoin::consensus::deserialize(&by_offerer).unwrap();
-        let acceptor_cet: Transaction = bitcoin::consensus::deserialize(&by_acceptor).unwrap();
-        // Not byte-equal: each party signs its own half fresh (RFC 6979) and
-        // recovers the counterparty's by decrypting its adaptor signature, whose
-        // nonce comes from the adaptor point rather than RFC 6979. Both
-        // witnesses are valid, so the transaction — which is what gets
-        // broadcast — is the same one.
-        assert_eq!(
-            cet.compute_txid(),
-            acceptor_cet.compute_txid(),
-            "either party settling broadcasts the same CET"
-        );
-        assert!(
-            !acceptor_cet.input[0].witness.is_empty(),
-            "the acceptor's 2-of-2 witness is complete too"
-        );
+        let cet: Transaction = bitcoin::consensus::deserialize(&up).unwrap();
 
         assert_eq!(cet.input.len(), 1, "spends the 2-of-2 funding output");
         assert!(
@@ -1775,16 +1709,14 @@ pub(crate) mod tests {
         );
 
         // The other outcome is a different CET.
-        let down = sign_contract_cet(
+        let down = contract_cet_transaction(
             contract.offer.clone(),
             contract.accept.clone(),
             contract.sign.clone(),
-            contract.offerer_keys.clone(),
-            Party::Offer,
             vec![attestation_ref("down")],
         )
         .unwrap();
-        assert_ne!(down, by_offerer);
+        assert_ne!(down, up);
     }
 
     /// An attestation to an outcome the contract does not have resolves to no
@@ -1793,12 +1725,10 @@ pub(crate) mod tests {
     fn settlement_rejects_unusable_attestations() {
         let contract = single_funded_contract();
 
-        let unknown_outcome = sign_contract_cet(
+        let unknown_outcome = contract_cet_transaction(
             contract.offer.clone(),
             contract.accept.clone(),
             contract.sign.clone(),
-            contract.offerer_keys.clone(),
-            Party::Offer,
             vec![attestation_ref("sideways")],
         );
         assert!(matches!(
@@ -1812,12 +1742,10 @@ pub(crate) mod tests {
         let impostor = Keypair::from_secret_key(&secp, &SecretKey::from_slice(&[77; 32]).unwrap());
         let mut forged = attestation("up");
         forged.oracle_public_key = XOnlyPublicKey::from_keypair(&impostor).0;
-        let result = sign_contract_cet(
+        let result = contract_cet_transaction(
             contract.offer.clone(),
             contract.accept.clone(),
             contract.sign.clone(),
-            contract.offerer_keys.clone(),
-            Party::Offer,
             vec![OracleAttestationRef {
                 oracle_index: 0,
                 attestation: encode_msg(&forged),
@@ -1829,12 +1757,10 @@ pub(crate) mod tests {
         ));
 
         // An out-of-range oracle index is reported the same way.
-        let bad_index = sign_contract_cet(
+        let bad_index = contract_cet_transaction(
             contract.offer.clone(),
             contract.accept.clone(),
             contract.sign.clone(),
-            contract.offerer_keys.clone(),
-            Party::Offer,
             vec![OracleAttestationRef {
                 oracle_index: 3,
                 attestation: encode_msg(&attestation("up")),
@@ -1846,31 +1772,18 @@ pub(crate) mod tests {
         ));
     }
 
-    /// The refund needs no oracle at all, and likewise both parties reach the
-    /// same transaction.
+    /// The refund needs no oracle at all.
     #[test]
-    fn settlement_signs_the_refund() {
+    fn settlement_builds_the_refund() {
         let contract = single_funded_contract();
 
-        let by_offerer = sign_contract_refund(
+        let refund = contract_refund_transaction(
             contract.offer.clone(),
             contract.accept.clone(),
             contract.sign.clone(),
-            contract.offerer_keys.clone(),
-            Party::Offer,
         )
         .unwrap();
-        let by_acceptor = sign_contract_refund(
-            contract.offer.clone(),
-            contract.accept.clone(),
-            contract.sign.clone(),
-            contract.acceptor_keys.clone(),
-            Party::Accept,
-        )
-        .unwrap();
-        assert_eq!(by_offerer, by_acceptor);
-
-        let refund: Transaction = bitcoin::consensus::deserialize(&by_offerer).unwrap();
+        let refund: Transaction = bitcoin::consensus::deserialize(&refund).unwrap();
         assert_eq!(refund.input.len(), 1);
         assert!(!refund.input[0].witness.is_empty());
         assert_eq!(
@@ -1915,23 +1828,6 @@ pub(crate) mod tests {
                 hex(&encode_msg(&attestation(outcome)))
             );
         }
-    }
-
-    /// A provider that is neither party's cannot settle: the derived key matches
-    /// no funding pubkey in the contract.
-    #[test]
-    fn settlement_rejects_a_stranger_key() {
-        let contract = single_funded_contract();
-        let stranger = provider("regtest");
-
-        let result = sign_contract_refund(
-            contract.offer.clone(),
-            contract.accept.clone(),
-            contract.sign.clone(),
-            stranger,
-            Party::Offer,
-        );
-        assert!(matches!(result, Err(ContractError::Key { .. })));
     }
 
     #[test]
@@ -2045,20 +1941,6 @@ pub(crate) mod tests {
         // (splice-out).
         let offerer_b = build_party(11, [0xbb; 32], 300);
         let acceptor_b = build_party(22, [0xbb; 32], 400);
-        offerer_b
-            .provider
-            .signer_for_contract(
-                temp_id_a.clone(),
-                offerer_a.rust.funding_pubkey.serialize().to_vec(),
-            )
-            .unwrap();
-        acceptor_b
-            .provider
-            .signer_for_contract(
-                temp_id_a.clone(),
-                acceptor_a.rust.funding_pubkey.serialize().to_vec(),
-            )
-            .unwrap();
         let collateral_b = 60_000_u64; // 100k prior value - 40k spliced out
 
         let offer_b = create_offer(CreateOfferParams {
@@ -2158,49 +2040,36 @@ pub(crate) mod tests {
         );
     }
 
-    /// A provider restored with only the new key cannot sign the old input.
-    /// Restoring the wrong old key still fails; restoring the published key
-    /// makes the same signing operation succeed without splice arguments.
+    /// The previous contract's key is derived from the splice input alone: a
+    /// provider built from the seed signs with nothing registered, and one
+    /// built from another seed fails at key lookup.
     #[test]
-    fn splice_signing_resolves_the_previous_key() {
+    fn splice_signing_derives_the_previous_key_from_the_input() {
         let splice = splice_fixture();
-        let offer: OfferDlc = decode_msg(&splice.offer_b, "offer").unwrap();
-        let fresh = ContractKeyProvider::from_xprv(
-            Xpriv::new_master(NETWORK, &[11; 64])
-                .unwrap()
-                .encode()
-                .to_vec(),
-        )
-        .unwrap();
-        fresh
-            .funding_pubkey(offer.temporary_contract_id.to_vec())
-            .unwrap();
         let psbt = create_funding_psbt(splice.offer_b.clone(), splice.accept_b.clone()).unwrap();
-        let sign_with = || {
+        let provider = |seed: u8| {
+            ContractKeyProvider::from_xprv(
+                Xpriv::new_master(NETWORK, &[seed; 64])
+                    .unwrap()
+                    .encode()
+                    .to_vec(),
+            )
+            .unwrap()
+        };
+        let sign_with = |keys: Arc<ContractKeyProvider>| {
             sign_accept(
                 splice.offer_b.clone(),
                 splice.accept_b.clone(),
-                fresh.clone(),
+                keys,
                 psbt.clone(),
             )
         };
-        assert!(matches!(sign_with(), Err(ContractError::Key { .. })));
-        let old_pubkey = offer.funding_inputs[0]
-            .dlc_input
-            .as_ref()
-            .unwrap()
-            .local_fund_pubkey
-            .serialize()
-            .to_vec();
-        assert!(fresh
-            .signer_for_contract(vec![0x42; 32], old_pubkey.clone())
-            .is_err());
-        assert!(matches!(sign_with(), Err(ContractError::Key { .. })));
-        fresh
-            .signer_for_contract(splice.prior_temp_id, old_pubkey)
-            .unwrap();
-        let signed = sign_with().unwrap();
-        validate_sign(splice.offer_b, splice.accept_b, signed.sign).unwrap();
+        let signed = sign_with(provider(11)).unwrap();
+        validate_sign(splice.offer_b.clone(), splice.accept_b.clone(), signed.sign).unwrap();
+        assert!(matches!(
+            sign_with(provider(99)),
+            Err(ContractError::Key { .. })
+        ));
     }
 
     /// A single-funded contract created, funded and settled by ddk 2.0.0-rc.3,

@@ -62,7 +62,7 @@ appId: ddkrn.example
 
       # Runs createOffer -> validateOffer -> acceptOffer -> validateAccept ->
       # createFundingPsbt -> signFundingPsbtWithDescriptor -> signAccept ->
-      # validateSign -> finalizeSign -> signContractCet -> signContractRefund
+      # validateSign -> finalizeSign -> contractCetTransaction -> contractRefundTransaction
       # natively, then renders the results.
       - tapOn:
           id: 'run-flow'
