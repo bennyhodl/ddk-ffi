@@ -103,8 +103,14 @@ example:
   just --justfile {{justfile()}} example-android
 
 # Build the iOS example app
+# `pod install` re-extracts the *debug* Hermes into Pods/hermes-engine but leaves
+# RN's `.last_build_configuration` marker alone, so a later Release build skips
+# the "[Hermes] Replace Hermes for the right configuration" phase and links a
+# debugger-enabled Hermes into a Release app — a vtable mismatch that segfaults
+# in ReactInstance::initializeRuntime before any JS runs. Dropping the marker
+# makes the next build re-extract the matching tarball (already in Pods).
 example-ios:
-  cd {{repo}}/examples/react-native/ios && RCT_NEW_ARCH_ENABLED=1 pod install && cd {{repo}}/examples/react-native
+  cd {{repo}}/examples/react-native/ios && RCT_NEW_ARCH_ENABLED=1 pod install && rm -f Pods/.last_build_configuration && cd {{repo}}/examples/react-native
 
 # Build the Android example app
 example-android:
