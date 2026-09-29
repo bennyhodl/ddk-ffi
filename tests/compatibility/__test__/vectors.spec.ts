@@ -20,8 +20,8 @@ describe('committed compat vectors', () => {
     readFileSync(resolve(REPO_ROOT, 'tests', 'compatibility', 'vectors', 'compat-vectors.json'), 'utf8'),
   )
 
-  test('the current ddk core reproduces every committed artifact', () => {
-    const produced = runDdkReplay(ddk, vectors)
+  test('the current ddk core reproduces every committed artifact', async () => {
+    const produced = await runDdkReplay(ddk, vectors)
     expect(Object.keys(produced).sort()).toEqual(Object.keys(vectors.expected).sort())
     for (const [key, value] of Object.entries(vectors.expected)) {
       expect(produced[key], key).toBe(value)
@@ -33,7 +33,7 @@ describe('committed compat vectors', () => {
   // build's getrandom backend is exercised.
   test('the wasm binding reproduces every committed artifact', async () => {
     await ddkWasm.init()
-    const produced = runDdkReplay(ddkWasm, vectors)
+    const produced = await runDdkReplay(ddkWasm, vectors)
     expect(produced).toEqual(vectors.expected)
   })
 

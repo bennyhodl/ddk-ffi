@@ -14,7 +14,7 @@ const acceptor = new DdkParty(BAL_MNEMONIC)
 const OFFER_TEMP_ID = tempId(0x11)
 
 /** Deterministic offline dual-funded flow, entirely through the ddk API. */
-function runOfflineFlow(scenario = upDownScenario()) {
+async function runOfflineFlow(scenario = upDownScenario()) {
   const offererInput = syntheticFundedInput(offerer, 0, 2_000_000, 100n)
   const acceptorInput = syntheticFundedInput(acceptor, 0, 2_000_000, 200n)
 
@@ -46,22 +46,20 @@ function runOfflineFlow(scenario = upDownScenario()) {
       maxTimeoutInterval: MAX_TIMEOUT_INTERVAL,
       nowUnix: NOW_UNIX,
     },
-    acceptor.keys,
+    acceptor.signers,
   )
   const accept = acceptResult.accept
 
-  const offererSignedPsbt = offerer.signFundingPsbt(offer, accept, acceptResult.fundingPsbt, [offererInput])
-  const signResult = ddk.signAccept(offer, accept, offerer.keys, offererSignedPsbt)
-  const acceptorSignedPsbt = acceptor.signFundingPsbt(offer, accept, acceptResult.fundingPsbt, [acceptorInput])
-  const fundingTx = ddk.finalizeSign(offer, accept, signResult.sign, acceptorSignedPsbt, acceptor.keys)
+  const signResult = await ddk.signAccept(offer, accept, offerer.signers)
+  const fundingTx = await ddk.finalizeSign(offer, accept, signResult.sign, acceptor.signers)
 
   return { scenario, offer, accept, acceptResult, sign: signResult.sign, signResult, fundingTx }
 }
 
-const flow = runOfflineFlow()
+const flow = await runOfflineFlow()
 
 describe('offer serialization parity', () => {
-  test('ddk fundingInput encodes exactly like a node-dlc FundingInput body', () => {
+  test('ddk fundingInput encodes exactly like a node-dlc FundingInput body', async () => {
     const input = syntheticFundedInput(offerer, 0, 2_000_000, 100n)
     const reference = buildNodeDlcFundingInput({
       prevTxHex: input.prevTxHex,
@@ -71,7 +69,7 @@ describe('offer serialization parity', () => {
     expect(hex(input.fundingInput)).toBe(reference.serializeBody().toString('hex'))
   })
 
-  test('ddk createOffer is byte-identical to a field-by-field node-dlc DlcOffer', () => {
+  test('ddk createOffer is byte-identical to a field-by-field node-dlc DlcOffer', async () => {
     const scenario = upDownScenario()
     const input = syntheticFundedInput(offerer, 0, 2_000_000, 100n)
     const offer = makeDdkOffer({
@@ -109,7 +107,7 @@ describe('offer serialization parity', () => {
     expect(hex(offer)).toBe(reference.serialize().toString('hex'))
   })
 
-  test('lygos loan shape: six outcomes + REFUND_TO_ACCEPTER flag, byte-identical', () => {
+  test('lygos loan shape: six outcomes + REFUND_TO_ACCEPTER flag, byte-identical', async () => {
     const scenario = lygosLoanScenario()
     const flag = balTypes.CONTRACT_FLAG_REFUND_TO_ACCEPTER as number
     const input = syntheticFundedInput(offerer, 0, 2_000_000, 100n)
@@ -161,13 +159,13 @@ describe('offer serialization parity', () => {
     expect(() => ddk.validateOffer(offer, MIN_TIMEOUT_INTERVAL, MAX_TIMEOUT_INTERVAL, NOW_UNIX)).not.toThrow()
   })
 
-  test('node-dlc round-trips the ddk offer byte-stably and validates it', () => {
+  test('node-dlc round-trips the ddk offer byte-stably and validates it', async () => {
     const parsed = nodeDlc.DlcOffer.deserialize(bytes(flow.offer))
     expect(() => parsed.validate()).not.toThrow()
     expect(parsed.serialize().toString('hex')).toBe(hex(flow.offer))
   })
 
-  test('ddk validates a node-dlc-built offer', () => {
+  test('ddk validates a node-dlc-built offer', async () => {
     const parsed = nodeDlc.DlcOffer.deserialize(bytes(flow.offer))
     // Round-trip through node-dlc, then hand back to ddk.
     expect(() =>
@@ -177,13 +175,13 @@ describe('offer serialization parity', () => {
 })
 
 describe('accept / sign serialization parity', () => {
-  test('node-dlc round-trips the ddk accept byte-stably and validates it', () => {
+  test('node-dlc round-trips the ddk accept byte-stably and validates it', async () => {
     const parsed = nodeDlc.DlcAccept.deserialize(bytes(flow.accept))
     expect(() => parsed.validate()).not.toThrow()
     expect(parsed.serialize().toString('hex')).toBe(hex(flow.accept))
   })
 
-  test('accept adaptor signatures split into 65-byte encryptedSig + 97-byte dleqProof', () => {
+  test('accept adaptor signatures split into 65-byte encryptedSig + 97-byte dleqProof', async () => {
     const parsed = nodeDlc.DlcAccept.deserialize(bytes(flow.accept))
     const sigs = parsed.cetAdaptorSignatures.sigs
     expect(sigs.length).toBe(flow.acceptResult.transactions.cets.length)
@@ -194,7 +192,7 @@ describe('accept / sign serialization parity', () => {
     expect(parsed.refundSignature.length).toBe(64)
   })
 
-  test('lygos parseCets=false parsing is partial: leading fields OK, NEVER reserialize', () => {
+  test('lygos parseCets=false parsing is partial: leading fields OK, NEVER reserialize', async () => {
     // lygos-app deserializes accepts with DlcAccept.deserialize(buf, false).
     // That is a PARTIAL parse: node-dlc substitutes empty adaptor signatures
     // and then misreads the signature block, so everything from
@@ -218,14 +216,14 @@ describe('accept / sign serialization parity', () => {
     expect(partial.serialize().toString('hex')).not.toBe(hex(flow.accept))
   })
 
-  test('node-dlc round-trips the ddk sign byte-stably', () => {
+  test('node-dlc round-trips the ddk sign byte-stably', async () => {
     const parsed = nodeDlc.DlcSign.deserialize(bytes(flow.sign))
     expect(parsed.serialize().toString('hex')).toBe(hex(flow.sign))
     expect(parsed.cetAdaptorSignatures.sigs.length).toBe(flow.acceptResult.transactions.cets.length)
     expect(parsed.fundingSignatures.witnessElements.length).toBe(1) // one offerer input
   })
 
-  test('ddk accepts node-dlc round-tripped accept and sign bytes', () => {
+  test('ddk accepts node-dlc round-tripped accept and sign bytes', async () => {
     const accept = nodeDlc.DlcAccept.deserialize(bytes(flow.accept)).serialize()
     const sign = nodeDlc.DlcSign.deserialize(bytes(flow.sign)).serialize()
     expect(() => ddk.validateAccept(flow.offer, accept)).not.toThrow()
@@ -234,7 +232,7 @@ describe('accept / sign serialization parity', () => {
 })
 
 describe('contract id derivation', () => {
-  test('ddk, the reference XOR, and the DlcSign contract id all agree', () => {
+  test('ddk, the reference XOR, and the DlcSign contract id all agree', async () => {
     const ddkId = hex(ddk.computeContractId(flow.offer, flow.accept))
 
     const transactions = flow.acceptResult.transactions
@@ -250,7 +248,7 @@ describe('contract id derivation', () => {
 })
 
 describe('payout table parity', () => {
-  test('ddk contractInfoPayouts matches the node-dlc descriptor', () => {
+  test('ddk contractInfoPayouts matches the node-dlc descriptor', async () => {
     const scenario = lygosLoanScenario()
     const payouts = ddk.contractInfoPayouts(scenario.contractInfoBytes)
     expect(payouts.rows.length).toBe(scenario.outcomes.length)
@@ -266,19 +264,19 @@ describe('oracle message compatibility', () => {
   const scenario = flow.scenario
   const attestation = scenario.oracle.attestEnum(scenario.eventId, 'up')
 
-  test('the compat oracle satisfies node-dlc validation', () => {
+  test('the compat oracle satisfies node-dlc validation', async () => {
     const announcement = (scenario.contractInfo.oracleInfo as any).announcement
     expect(() => announcement.validate()).not.toThrow()
     expect(() => attestation.validate(announcement)).not.toThrow()
   })
 
-  test('attestation body bytes round-trip through node-dlc', () => {
+  test('attestation body bytes round-trip through node-dlc', async () => {
     const body = tlvBody(attestation.serialize())
     const reparsed = nodeDlc.OracleAttestation.deserialize(attestation.serialize())
     expect(tlvBody(reparsed.serialize()).toString('hex')).toBe(body.toString('hex'))
   })
 
-  test('ddk settles a CET from a node-dlc attestation', () => {
+  test('ddk settles a CET from a node-dlc attestation', async () => {
     const cet = ddk.contractCetTransaction(flow.offer, flow.accept, flow.sign, [
       { oracleIndex: 0, attestation: tlvBody(attestation.serialize()) },
     ])
@@ -288,12 +286,12 @@ describe('oracle message compatibility', () => {
     expect(txidOf(flow.fundingTx)).toBe(txidOf(flow.acceptResult.transactions.fund.rawBytes))
   })
 
-  test('ddk builds the refund transaction', () => {
+  test('ddk builds the refund transaction', async () => {
     const refund = ddk.contractRefundTransaction(flow.offer, flow.accept, flow.sign)
     expect(refund.length).toBeGreaterThan(0)
   })
 
-  test('an attestation for an outcome the contract lacks is NoMatchingOutcome', () => {
+  test('an attestation for an outcome the contract lacks is NoMatchingOutcome', async () => {
     const stray = scenario.oracle.attestEnum(scenario.eventId, 'sideways')
     try {
       ddk.contractCetTransaction(flow.offer, flow.accept, flow.sign, [
@@ -305,7 +303,7 @@ describe('oracle message compatibility', () => {
     }
   })
 
-  test('the legacy cfd attestation convention (sha256-first) is rejected everywhere', () => {
+  test('the legacy cfd attestation convention (sha256-first) is rejected everywhere', async () => {
     // BAL's old cfd oracle signed taggedHash(tag, sha256(outcome)); ddk and
     // @node-dlc 1.2.1 both expect taggedHash(tag, raw outcome bytes). This
     // pins down the migration fault line: a legacy-tagged attestation must

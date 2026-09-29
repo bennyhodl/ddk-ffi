@@ -28,7 +28,6 @@ export interface CompatPartyVectors {
   fundingPrevTxHex: string
   fundingVout: number
   fundingSerialId: string
-  derivationIndex: number
 }
 
 export interface CompatVectors {
@@ -162,7 +161,7 @@ export function buildAccept(
       maxTimeoutInterval: contract.maxTimeoutInterval,
       nowUnix: BigInt(contract.nowUnix),
     },
-    acceptorKeys,
+    new ddk.Signers(acceptorKeys),
   )
   return { accept: result.accept, fundingPsbt: result.fundingPsbt }
 }
@@ -224,7 +223,7 @@ export function buildSpliceAccept(
       maxTimeoutInterval: contract.maxTimeoutInterval,
       nowUnix: BigInt(contract.nowUnix),
     },
-    acceptorKeys,
+    new ddk.Signers(acceptorKeys),
   )
   return { accept2: result.accept, fundingPsbt2: result.fundingPsbt }
 }
@@ -234,12 +233,18 @@ export function buildSpliceAccept(
  * keyed like `expected`. Also regenerates a fresh accept/sign pair for both
  * contracts to prove the current build produces valid messages.
  */
-export function runDdkReplay(ddk: any, vectors: CompatVectors): Record<string, string> {
+export async function runDdkReplay(ddk: any, vectors: CompatVectors): Promise<Record<string, string>> {
   const { offerer, acceptor, contract, splice, transcript } = vectors
   const out: Record<string, string> = {}
 
-  const offererKeys = ddk.ContractKeyProvider.fromDescriptor(offerer.descriptor)
-  const acceptorKeys = ddk.ContractKeyProvider.fromDescriptor(acceptor.descriptor)
+  // Each party's signers: its contract keys and the descriptor wallet that
+  // signs its funding input, both from the one descriptor.
+  const offererSigners = new ddk.Signers(ddk.ContractKeyProvider.fromDescriptor(offerer.descriptor)).withWallet(
+    new ddk.DescriptorWallet(offerer.descriptor),
+  )
+  const acceptorSigners = new ddk.Signers(ddk.ContractKeyProvider.fromDescriptor(acceptor.descriptor)).withWallet(
+    new ddk.DescriptorWallet(acceptor.descriptor),
+  )
   // --- contract 1: the offer must reproduce byte-exactly ---
   out.offerHex = toHexString(buildOffer(ddk, vectors))
 
@@ -256,26 +261,12 @@ export function runDdkReplay(ddk: any, vectors: CompatVectors): Record<string, s
   const fresh = buildAccept(ddk, vectors, offer)
   ddk.validateAccept(offer, fresh.accept)
   out.freshAcceptPsbtHex = toHexString(fresh.fundingPsbt)
-  const freshSignedPsbt = ddk.signFundingPsbtWithDescriptor(
-    offer,
-    fresh.accept,
-    fresh.fundingPsbt,
-    offerer.descriptor,
-    [{ inputSerialId: BigInt(offerer.fundingSerialId), derivationIndex: offerer.derivationIndex }],
-  )
-  const freshSign = ddk.signAccept(offer, fresh.accept, offererKeys, freshSignedPsbt)
+  const freshSign = await ddk.signAccept(offer, fresh.accept, offererSigners)
   ddk.validateSign(offer, fresh.accept, freshSign.sign)
 
   // --- deterministic derivations from the committed transcript ---
   out.fundingPsbtHex = toHexString(ddk.createFundingPsbt(offer, accept))
-  const acceptorSignedPsbt = ddk.signFundingPsbtWithDescriptor(
-    offer,
-    accept,
-    fromHexString(out.fundingPsbtHex),
-    acceptor.descriptor,
-    [{ inputSerialId: BigInt(acceptor.fundingSerialId), derivationIndex: acceptor.derivationIndex }],
-  )
-  out.fundingTxHex = toHexString(ddk.finalizeSign(offer, accept, sign, acceptorSignedPsbt, acceptorKeys))
+  out.fundingTxHex = toHexString(await ddk.finalizeSign(offer, accept, sign, acceptorSigners))
   out.contractIdHex = toHexString(ddk.computeContractId(offer, accept))
   out.cetHex = toHexString(
     ddk.contractCetTransaction(offer, accept, sign, [
@@ -298,13 +289,11 @@ export function runDdkReplay(ddk: any, vectors: CompatVectors): Record<string, s
 
   const fresh2 = buildSpliceAccept(ddk, vectors, offer2Committed)
   ddk.validateAccept(offer2Committed, fresh2.accept2)
-  const freshSign2 = ddk.signAccept(offer2Committed, fresh2.accept2, offererKeys, fresh2.fundingPsbt2)
+  const freshSign2 = await ddk.signAccept(offer2Committed, fresh2.accept2, offererSigners)
   ddk.validateSign(offer2Committed, fresh2.accept2, freshSign2.sign)
 
   out.fundingPsbt2Hex = toHexString(ddk.createFundingPsbt(offer2Committed, accept2))
-  out.fundingTx2Hex = toHexString(
-    ddk.finalizeSign(offer2Committed, accept2, sign2, fromHexString(out.fundingPsbt2Hex), acceptorKeys),
-  )
+  out.fundingTx2Hex = toHexString(await ddk.finalizeSign(offer2Committed, accept2, sign2, acceptorSigners))
   out.contractId2Hex = toHexString(ddk.computeContractId(offer2Committed, accept2))
   out.cet2Hex = toHexString(
     ddk.contractCetTransaction(offer2Committed, accept2, sign2, [

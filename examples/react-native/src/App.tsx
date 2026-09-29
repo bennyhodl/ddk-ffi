@@ -4,10 +4,13 @@
  * Runs an entire two-party DLC through the ddk-rn (JSI → Rust) bindings, with NO
  * live oracle and NO network:
  *
- *   createOffer → validateOffer → acceptOffer → validateAccept →
- *   createFundingPsbt → signFundingPsbtWithDescriptor → signAccept →
+ *   createOffer → validateOffer → acceptOffer → validateAccept → signAccept →
  *   validateSign → finalizeSign → a fully-signed funding transaction, then
  *   contractCetTransaction / contractRefundTransaction → the two settlement transactions.
+ *
+ * Each party signs with one `Signers` object: its contract keys, and the wallet
+ * that signs its funding inputs (here a DescriptorWallet over the fixture
+ * descriptor; in an app, the bdk wallet).
  *
  * The wallet parts (a private descriptor + a funding UTXO) and the oracle
  * attestation are fixtures here, so the flow is deterministic and offline — this
@@ -28,14 +31,14 @@ import {
 import * as ddk from '@bennyblader/ddk-rn';
 import {
   ContractKeyProvider,
+  DescriptorWallet,
+  Signers,
   chainHashFromNetwork,
   fundingInput,
   createOffer,
   validateOffer,
   acceptOffer,
   validateAccept,
-  createFundingPsbt,
-  signFundingPsbtWithDescriptor,
   signAccept,
   validateSign,
   computeContractId,
@@ -135,7 +138,7 @@ export default function App() {
     setCompatError(null);
     setCompatResult(null);
     try {
-      const produced = runDdkReplay(ddk, compatVectors);
+      const produced = await runDdkReplay(ddk, compatVectors);
       const mismatches: string[] = [];
       for (const [key, expected] of Object.entries(compatVectors.expected)) {
         if (produced[key] !== expected) {
@@ -208,6 +211,13 @@ export default function App() {
       });
       validateOffer(offer, 100, 100_000, 100n);
 
+      // Each party's signers, built once per wallet: contract keys plus the
+      // wallet that signs its funding inputs. The acceptor funds nothing.
+      const offererSigners = new Signers(offererKeys).withWallet(
+        new DescriptorWallet(OFFERER_DESCRIPTOR)
+      );
+      const acceptorSigners = new Signers(acceptorKeys);
+
       // 2) Accept — the acceptor contributes nothing.
       const acceptResult = acceptOffer(
         offer,
@@ -227,21 +237,14 @@ export default function App() {
           // The fixture announcement matures at 750; the clock must be before it.
           nowUnix: 100n,
         },
-        acceptorKeys
+        acceptorSigners
       );
       const accept = acceptResult.accept;
       validateAccept(offer, accept);
 
-      // 3) Fund PSBT, offerer signs its input, produces the sign message.
-      const fundingPsbt = createFundingPsbt(offer, accept);
-      const signedPsbt = signFundingPsbtWithDescriptor(
-        offer,
-        accept,
-        fundingPsbt,
-        OFFERER_DESCRIPTOR,
-        [{ inputSerialId: FUNDING_INPUT_SERIAL_ID, derivationIndex: 0 }]
-      );
-      const signResult = signAccept(offer, accept, offererKeys, signedPsbt);
+      // 3) The offerer signs: its wallet signs its funding input, its contract
+      //    key signs the refund and CETs, and out comes the sign message.
+      const signResult = await signAccept(offer, accept, offererSigners);
       validateSign(offer, accept, signResult.sign);
 
       // 4) Inspect: contract id + payout table.
@@ -254,12 +257,11 @@ export default function App() {
       }));
 
       // 5) Accepter finalizes → signed funding transaction.
-      const fundingTx = finalizeSign(
+      const fundingTx = await finalizeSign(
         offer,
         accept,
         signResult.sign,
-        fundingPsbt,
-        acceptorKeys
+        acceptorSigners
       );
 
       // 6) Settle. Both paths are rebuilt from the three wire messages alone —

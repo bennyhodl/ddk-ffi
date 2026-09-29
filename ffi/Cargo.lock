@@ -431,14 +431,17 @@ dependencies = [
 name = "ddk_ffi"
 version = "1.0.0-rc6"
 dependencies = [
+ "async-trait",
  "bip39",
  "bitcoin",
  "ddk",
  "ddk-dlc",
  "ddk-messages",
  "ddk-trie",
+ "futures",
  "getrandom 0.2.17",
  "lightning",
+ "miniscript",
  "secp256k1-zkp",
  "thiserror",
  "uniffi",

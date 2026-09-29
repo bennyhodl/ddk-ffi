@@ -10,6 +10,9 @@ import {
   type UniffiForeignFutureDroppedCallbackStruct,
   type UniffiVTableCallbackInterfaceDdkFfiContractSigner,
   type UniffiVTableCallbackInterfaceDdkFfiContractSignerProvider,
+  type UniffiForeignFutureResultRustBuffer,
+  type UniffiForeignFutureCompleterustBuffer,
+  type UniffiVTableCallbackInterfaceDdkFfiFundingWallet,
 } from './ddk_ffi-ffi.js'
 import {
   type FfiConverter,
@@ -43,6 +46,8 @@ import {
   pointerLiteralSymbol,
   uniffiCreateFfiConverterString,
   uniffiCreateRecord,
+  uniffiRustCallAsync,
+  uniffiTraitInterfaceCallAsyncWithError,
   uniffiTraitInterfaceCallWithError,
   uniffiTypeNameSymbol,
   variantOrdinalSymbol,
@@ -59,13 +64,14 @@ const uniffiIsDebug =
 // Public interface members begin here.
 
 /**
- * Accept an offer using a consumer's signer provider. Key lookup and signing
- * are separate from preparing and completing the contract.
+ * Accept an offer. The accepting party signs nothing with its wallet yet;
+ * its wallet inputs are signed in [`finalize_sign`], once the offerer has
+ * signed.
  */
 export function acceptOffer(
   offer: Uint8Array,
   params: AcceptOfferParams,
-  signers: ContractSignerProvider,
+  signers: SignersLike,
 ): AcceptResult /*throws*/ {
   const __rb: Uint8Array = uniffiCaller.rustCallWithError(
     /*liftError:*/ FfiConverterTypeContractError.lift.bind(FfiConverterTypeContractError),
@@ -73,7 +79,7 @@ export function acceptOffer(
       return nativeModule().uniffi_ddk_ffi_fn_func_accept_offer(
         FfiConverterUint8Array.lower(offer, nativeModule().rustbuffer_alloc),
         FfiConverterTypeAcceptOfferParams.lower(params, nativeModule().rustbuffer_alloc),
-        FfiConverterTypeContractSignerProvider.lower(signers, nativeModule().rustbuffer_alloc),
+        FfiConverterTypeSigners.lower(signers, nativeModule().rustbuffer_alloc),
         callStatus,
       )
     },
@@ -633,7 +639,8 @@ export function createFundTxLockingScript(
 }
 
 /**
- * Rebuilds the BIP-174 funding PSBT from the offer and accept messages.
+ * Rebuilds the BIP-174 funding PSBT from the offer and accept messages, for
+ * a wallet that signs outside the lifecycle calls.
  */
 export function createFundingPsbt(offer: Uint8Array, accept: Uint8Array): Uint8Array /*throws*/ {
   const __rb: Uint8Array = uniffiCaller.rustCallWithError(
@@ -915,35 +922,50 @@ export function extractEcdsaSignatureFromOracleSignatures(
 }
 
 /**
- * Verify SignDlc and complete the funding transaction. Previous-contract
- * signers are resolved automatically when the offer contains DLC inputs.
+ * Verify SignDlc and complete the funding transaction: the wallet signs the
+ * accepting party's funding inputs, and the contract key its half of each
+ * spliced input.
  */
-export function finalizeSign(
+export async function finalizeSign(
   offer: Uint8Array,
   accept: Uint8Array,
   sign: Uint8Array,
-  signedFundingPsbt: Uint8Array,
-  signers: ContractSignerProvider,
-): Uint8Array /*throws*/ {
-  const __rb: Uint8Array = uniffiCaller.rustCallWithError(
-    /*liftError:*/ FfiConverterTypeContractError.lift.bind(FfiConverterTypeContractError),
-    /*caller:*/ (callStatus) => {
+  signers: SignersLike,
+  asyncOpts_?: { signal: AbortSignal },
+): Promise<Uint8Array> /*throws*/ {
+  return await uniffiRustCallAsync(
+    /*rustCaller:*/ uniffiCaller,
+    /*rustFutureFunc:*/ () => {
       return nativeModule().uniffi_ddk_ffi_fn_func_finalize_sign(
         FfiConverterUint8Array.lower(offer, nativeModule().rustbuffer_alloc),
         FfiConverterUint8Array.lower(accept, nativeModule().rustbuffer_alloc),
         FfiConverterUint8Array.lower(sign, nativeModule().rustbuffer_alloc),
-        FfiConverterUint8Array.lower(signedFundingPsbt, nativeModule().rustbuffer_alloc),
-        FfiConverterTypeContractSignerProvider.lower(signers, nativeModule().rustbuffer_alloc),
-        callStatus,
+        FfiConverterTypeSigners.lower(signers, nativeModule().rustbuffer_alloc),
       )
     },
+    /*pollFunc:*/ nativeModule().ffi_ddk_ffi_rust_future_poll_rust_buffer,
+    /*cancelFunc:*/ nativeModule().ffi_ddk_ffi_rust_future_cancel_rust_buffer,
+    /*completeFunc:*/ nativeModule().ffi_ddk_ffi_rust_future_complete_rust_buffer,
+    /*freeFunc:*/ nativeModule().ffi_ddk_ffi_rust_future_free_rust_buffer,
+    // Async returns always go through the JS-side converter: the
+    // FFI symbol returns the future handle (u64), and the user-level
+    // RustBuffer comes back via the shared `rust_future_complete_*`
+    // export. The bytes the runtime hands back must be deserialized
+    // here using the per-callable return-type converter.
+    // Borrowed view over foreign memory: the call site owns the free,
+    // as on the sync paths. Unconditional — a no-op where buffers are
+    // already JS-owned.
+    /*liftFunc:*/ (__rb) => {
+      try {
+        return FfiConverterUint8Array.lift(__rb)
+      } finally {
+        nativeModule().rustbuffer_free(__rb)
+      }
+    },
     /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+    /*asyncOpts:*/ asyncOpts_,
+    /*errorHandler:*/ FfiConverterTypeContractError.lift.bind(FfiConverterTypeContractError),
   )
-  try {
-    return FfiConverterUint8Array.lift(__rb)
-  } finally {
-    nativeModule().rustbuffer_free(__rb)
-  }
 }
 
 /**
@@ -1191,68 +1213,48 @@ export function prepareSignAccept(offer: Uint8Array, accept: Uint8Array): Prepar
 }
 
 /**
- * Verify the accept and produce SignDlc. DLC inputs automatically resolve
- * their previous funding keys through `signers`, using the offer's metadata.
+ * Verify the accept and produce SignDlc: the contract key signs the refund,
+ * the CETs and this party's half of each spliced input, and the wallet signs
+ * this party's funding inputs. Every key is found from the messages.
  */
-export function signAccept(
+export async function signAccept(
   offer: Uint8Array,
   accept: Uint8Array,
-  signers: ContractSignerProvider,
-  signedFundingPsbt: Uint8Array,
-): SignResult /*throws*/ {
-  const __rb: Uint8Array = uniffiCaller.rustCallWithError(
-    /*liftError:*/ FfiConverterTypeContractError.lift.bind(FfiConverterTypeContractError),
-    /*caller:*/ (callStatus) => {
+  signers: SignersLike,
+  asyncOpts_?: { signal: AbortSignal },
+): Promise<SignResult> /*throws*/ {
+  return await uniffiRustCallAsync(
+    /*rustCaller:*/ uniffiCaller,
+    /*rustFutureFunc:*/ () => {
       return nativeModule().uniffi_ddk_ffi_fn_func_sign_accept(
         FfiConverterUint8Array.lower(offer, nativeModule().rustbuffer_alloc),
         FfiConverterUint8Array.lower(accept, nativeModule().rustbuffer_alloc),
-        FfiConverterTypeContractSignerProvider.lower(signers, nativeModule().rustbuffer_alloc),
-        FfiConverterUint8Array.lower(signedFundingPsbt, nativeModule().rustbuffer_alloc),
-        callStatus,
+        FfiConverterTypeSigners.lower(signers, nativeModule().rustbuffer_alloc),
       )
     },
-    /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
-  )
-  try {
-    return FfiConverterTypeSignResult.lift(__rb)
-  } finally {
-    nativeModule().rustbuffer_free(__rb)
-  }
-}
-
-/**
- * Signs a party's own funding inputs on the funding PSBT using a private output
- * descriptor (e.g. bdk's `wpkh(...)` with an xprv), returning the updated PSBT.
- * Each entry in `inputs` names one of this party's funding inputs (by serial
- * id) and the descriptor wildcard index that derives its key. Supports `wpkh()`
- * and `sh(wpkh())`, with or without a wildcard.
- */
-export function signFundingPsbtWithDescriptor(
-  offer: Uint8Array,
-  accept: Uint8Array,
-  fundingPsbt: Uint8Array,
-  descriptor: string,
-  inputs: Array<DescriptorInput>,
-): Uint8Array /*throws*/ {
-  const __rb: Uint8Array = uniffiCaller.rustCallWithError(
-    /*liftError:*/ FfiConverterTypeContractError.lift.bind(FfiConverterTypeContractError),
-    /*caller:*/ (callStatus) => {
-      return nativeModule().uniffi_ddk_ffi_fn_func_sign_funding_psbt_with_descriptor(
-        FfiConverterUint8Array.lower(offer, nativeModule().rustbuffer_alloc),
-        FfiConverterUint8Array.lower(accept, nativeModule().rustbuffer_alloc),
-        FfiConverterUint8Array.lower(fundingPsbt, nativeModule().rustbuffer_alloc),
-        FfiConverterString.lower(descriptor, nativeModule().rustbuffer_alloc),
-        FfiConverterSequenceTypeDescriptorInput.lower(inputs, nativeModule().rustbuffer_alloc),
-        callStatus,
-      )
+    /*pollFunc:*/ nativeModule().ffi_ddk_ffi_rust_future_poll_rust_buffer,
+    /*cancelFunc:*/ nativeModule().ffi_ddk_ffi_rust_future_cancel_rust_buffer,
+    /*completeFunc:*/ nativeModule().ffi_ddk_ffi_rust_future_complete_rust_buffer,
+    /*freeFunc:*/ nativeModule().ffi_ddk_ffi_rust_future_free_rust_buffer,
+    // Async returns always go through the JS-side converter: the
+    // FFI symbol returns the future handle (u64), and the user-level
+    // RustBuffer comes back via the shared `rust_future_complete_*`
+    // export. The bytes the runtime hands back must be deserialized
+    // here using the per-callable return-type converter.
+    // Borrowed view over foreign memory: the call site owns the free,
+    // as on the sync paths. Unconditional — a no-op where buffers are
+    // already JS-owned.
+    /*liftFunc:*/ (__rb) => {
+      try {
+        return FfiConverterTypeSignResult.lift(__rb)
+      } finally {
+        nativeModule().rustbuffer_free(__rb)
+      }
     },
     /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+    /*asyncOpts:*/ asyncOpts_,
+    /*errorHandler:*/ FfiConverterTypeContractError.lift.bind(FfiConverterTypeContractError),
   )
-  try {
-    return FfiConverterUint8Array.lift(__rb)
-  } finally {
-    nativeModule().rustbuffer_free(__rb)
-  }
 }
 
 /**
@@ -2681,60 +2683,6 @@ const FfiConverterTypeCreateOfferParams = (() => {
         FfiConverterUInt32.allocationSize(value.cetLocktime) +
         FfiConverterUInt32.allocationSize(value.refundLocktime) +
         FfiConverterUInt8.allocationSize(value.contractFlags)
-      )
-    }
-  }
-  return new FFIConverter()
-})()
-
-/**
- * Identifies a funding input and the descriptor wildcard index that derives its
- * key, for [`sign_funding_psbt_with_descriptor`].
- */
-export type DescriptorInput = {
-  /**
-   * The serial id of the funding input to sign.
-   */
-  inputSerialId: bigint
-  /**
-   * The descriptor wildcard derivation index of the input's script (ignored
-   * for descriptors without a wildcard).
-   */
-  derivationIndex: number
-}
-
-/**
- * Generated factory for {@link DescriptorInput} record objects.
- */
-export const DescriptorInput = (() => {
-  const defaults = () => ({})
-  const create = (() => {
-    return uniffiCreateRecord<DescriptorInput, ReturnType<typeof defaults>>(defaults)
-  })()
-  return Object.freeze({
-    create,
-    new: create,
-    defaults: () => Object.freeze(defaults()) as Partial<DescriptorInput>,
-  })
-})()
-
-const FfiConverterTypeDescriptorInput = (() => {
-  type TypeName = DescriptorInput
-  class FFIConverter extends AbstractFfiConverterByteArray<TypeName> {
-    readFromCursor(c: Cursor): TypeName {
-      return {
-        inputSerialId: FfiConverterUInt64.readFromCursor(c),
-        derivationIndex: FfiConverterUInt32.readFromCursor(c),
-      }
-    }
-    writeIntoCursor(value: TypeName, c: Cursor): void {
-      FfiConverterUInt64.writeIntoCursor(value.inputSerialId, c)
-      FfiConverterUInt32.writeIntoCursor(value.derivationIndex, c)
-    }
-    allocationSize(value: TypeName): number {
-      return (
-        FfiConverterUInt64.allocationSize(value.inputSerialId) +
-        FfiConverterUInt32.allocationSize(value.derivationIndex)
       )
     }
   }
@@ -5708,6 +5656,372 @@ const uniffiCallbackInterfaceContractSignerProvider: { vtable: any; register: ()
 }
 
 /**
+ * A [`FundingWallet`] over a private `wpkh()` or `sh(wpkh())` output
+ * descriptor. It recognises its inputs by script, trying wildcard indexes
+ * `0..lookahead`, so nothing about a contract is registered with it.
+ */
+export interface DescriptorWalletLike {
+  /**
+   * Signs and finalizes every input whose script this descriptor derives,
+   * leaving the others as they are. Async only to match [`FundingWallet`];
+   * nothing in it waits.
+   */
+  signFundingPsbt(psbt: Uint8Array, asyncOpts_?: { signal: AbortSignal }) /*throws*/ : Promise<Uint8Array>
+}
+/**
+ * @deprecated Use `DescriptorWalletLike` instead.
+ */
+export type DescriptorWalletInterface = DescriptorWalletLike
+
+/**
+ * A [`FundingWallet`] over a private `wpkh()` or `sh(wpkh())` output
+ * descriptor. It recognises its inputs by script, trying wildcard indexes
+ * `0..lookahead`, so nothing about a contract is registered with it.
+ */
+export class DescriptorWallet extends UniffiAbstractObject implements DescriptorWalletLike {
+  readonly [uniffiTypeNameSymbol] = 'DescriptorWallet'
+  readonly [destructorGuardSymbol]: UniffiGcObject
+  readonly [pointerLiteralSymbol]: UniffiHandle
+  /**
+   * `lookahead` is how many wildcard indexes an input's script is looked
+   * up under; a descriptor without a wildcard has only one script.
+   */
+  constructor(descriptor: string, lookahead: number = 1000) /*throws*/ {
+    super()
+    const pointer = uniffiCaller.rustCallWithError(
+      /*liftError:*/ FfiConverterTypeContractError.lift.bind(FfiConverterTypeContractError),
+      /*caller:*/ (callStatus) => {
+        return nativeModule().uniffi_ddk_ffi_fn_constructor_descriptorwallet_new(
+          FfiConverterString.lower(descriptor, nativeModule().rustbuffer_alloc),
+          FfiConverterUInt32.lower(lookahead, nativeModule().rustbuffer_alloc),
+          callStatus,
+        )
+      },
+      /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+    )
+    this[pointerLiteralSymbol] = pointer
+    this[destructorGuardSymbol] = uniffiTypeDescriptorWalletObjectFactory.bless(pointer)
+  }
+
+  /**
+   * Signs and finalizes every input whose script this descriptor derives,
+   * leaving the others as they are. Async only to match [`FundingWallet`];
+   * nothing in it waits.
+   */
+  async signFundingPsbt(psbt: Uint8Array, asyncOpts_?: { signal: AbortSignal }): Promise<Uint8Array> /*throws*/ {
+    return await uniffiRustCallAsync(
+      /*rustCaller:*/ uniffiCaller,
+      /*rustFutureFunc:*/ () => {
+        return nativeModule().uniffi_ddk_ffi_fn_method_descriptorwallet_sign_funding_psbt(
+          uniffiTypeDescriptorWalletObjectFactory.clonePointer(this),
+          FfiConverterUint8Array.lower(psbt, nativeModule().rustbuffer_alloc),
+        )
+      },
+      /*pollFunc:*/ nativeModule().ffi_ddk_ffi_rust_future_poll_rust_buffer,
+      /*cancelFunc:*/ nativeModule().ffi_ddk_ffi_rust_future_cancel_rust_buffer,
+      /*completeFunc:*/ nativeModule().ffi_ddk_ffi_rust_future_complete_rust_buffer,
+      /*freeFunc:*/ nativeModule().ffi_ddk_ffi_rust_future_free_rust_buffer,
+      // Async returns always go through the JS-side converter: the
+      // FFI symbol returns the future handle (u64), and the user-level
+      // RustBuffer comes back via the shared `rust_future_complete_*`
+      // export. The bytes the runtime hands back must be deserialized
+      // here using the per-callable return-type converter.
+      // Borrowed view over foreign memory: the call site owns the free,
+      // as on the sync paths. Unconditional — a no-op where buffers are
+      // already JS-owned.
+      /*liftFunc:*/ (__rb) => {
+        try {
+          return FfiConverterUint8Array.lift(__rb)
+        } finally {
+          nativeModule().rustbuffer_free(__rb)
+        }
+      },
+      /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+      /*asyncOpts:*/ asyncOpts_,
+      /*errorHandler:*/ FfiConverterTypeContractError.lift.bind(FfiConverterTypeContractError),
+    )
+  }
+
+  uniffiDestroy(): void {
+    const ptr = (this as any)[destructorGuardSymbol]
+    if (ptr !== undefined) {
+      const pointer = uniffiTypeDescriptorWalletObjectFactory.pointer(this)
+      uniffiTypeDescriptorWalletObjectFactory.freePointer(pointer)
+      uniffiTypeDescriptorWalletObjectFactory.unbless(ptr)
+      delete (this as any)[destructorGuardSymbol]
+    }
+  }
+
+  static instanceOf(obj_: any): obj_ is DescriptorWallet {
+    return uniffiTypeDescriptorWalletObjectFactory.isConcreteType(obj_)
+  }
+}
+
+const uniffiTypeDescriptorWalletObjectFactory: UniffiObjectFactory<DescriptorWalletLike> = (() => {
+  /// <reference lib="es2021" />
+  const registry =
+    typeof FinalizationRegistry !== 'undefined'
+      ? new FinalizationRegistry<UniffiHandle>((heldValue: UniffiHandle) => {
+          uniffiTypeDescriptorWalletObjectFactory.freePointer(heldValue)
+        })
+      : null
+
+  return {
+    create(pointer: UniffiHandle): DescriptorWalletLike {
+      const instance = Object.create(DescriptorWallet.prototype)
+      instance[pointerLiteralSymbol] = pointer
+      instance[destructorGuardSymbol] = this.bless(pointer)
+      instance[uniffiTypeNameSymbol] = 'DescriptorWallet'
+      return instance
+    },
+
+    bless(p: UniffiHandle): UniffiGcObject {
+      const ptr = {
+        p, // make sure this object doesn't get optimized away.
+        markDestroyed: () => undefined,
+      }
+      if (registry) {
+        registry.register(ptr, p, ptr)
+      }
+      return ptr
+    },
+
+    unbless(ptr_: UniffiGcObject) {
+      if (registry) {
+        registry.unregister(ptr_)
+      }
+    },
+
+    pointer(obj_: DescriptorWalletLike): UniffiHandle {
+      if ((obj_ as any)[destructorGuardSymbol] === undefined) {
+        throw new UniffiInternalError.UnexpectedNullPointer()
+      }
+      return (obj_ as any)[pointerLiteralSymbol]
+    },
+
+    clonePointer(obj_: DescriptorWalletLike): UniffiHandle {
+      const pointer = this.pointer(obj_)
+      return uniffiCaller.rustCall(
+        /*caller:*/ (callStatus) => nativeModule().uniffi_ddk_ffi_fn_clone_descriptorwallet(pointer, callStatus),
+        /*liftString:*/ FfiConverterString.lift,
+      )
+    },
+
+    freePointer(pointer: UniffiHandle): void {
+      uniffiCaller.rustCall(
+        /*caller:*/ (callStatus) => nativeModule().uniffi_ddk_ffi_fn_free_descriptorwallet(pointer, callStatus),
+        /*liftString:*/ FfiConverterString.lift,
+      )
+    },
+
+    isConcreteType(obj_: any): obj_ is DescriptorWalletLike {
+      return obj_[destructorGuardSymbol] && obj_[uniffiTypeNameSymbol] === 'DescriptorWallet'
+    },
+  }
+})()
+const FfiConverterTypeDescriptorWallet = new FfiConverterObject(uniffiTypeDescriptorWalletObjectFactory)
+
+export interface FundingWallet {
+  /**
+   * Sign and finalize the inputs this wallet owns in a BIP-174 funding PSBT
+   * and return it. Inputs it does not own, including the 2-of-2 splice
+   * inputs, must be left as they are.
+   */
+  signFundingPsbt(psbt: Uint8Array, asyncOpts_?: { signal: AbortSignal }) /*throws*/ : Promise<Uint8Array>
+}
+
+export class FundingWalletImpl extends UniffiAbstractObject implements FundingWallet {
+  readonly [uniffiTypeNameSymbol] = 'FundingWalletImpl'
+  readonly [destructorGuardSymbol]: UniffiGcObject
+  readonly [pointerLiteralSymbol]: UniffiHandle
+  // No primary constructor declared for this class.
+  private constructor(pointer: UniffiHandle) {
+    super()
+    this[pointerLiteralSymbol] = pointer
+    this[destructorGuardSymbol] = uniffiTypeFundingWalletImplObjectFactory.bless(pointer)
+  }
+
+  /**
+   * Sign and finalize the inputs this wallet owns in a BIP-174 funding PSBT
+   * and return it. Inputs it does not own, including the 2-of-2 splice
+   * inputs, must be left as they are.
+   */
+  async signFundingPsbt(psbt: Uint8Array, asyncOpts_?: { signal: AbortSignal }): Promise<Uint8Array> /*throws*/ {
+    return await uniffiRustCallAsync(
+      /*rustCaller:*/ uniffiCaller,
+      /*rustFutureFunc:*/ () => {
+        return nativeModule().uniffi_ddk_ffi_fn_method_fundingwallet_sign_funding_psbt(
+          uniffiTypeFundingWalletImplObjectFactory.clonePointer(this),
+          FfiConverterUint8Array.lower(psbt, nativeModule().rustbuffer_alloc),
+        )
+      },
+      /*pollFunc:*/ nativeModule().ffi_ddk_ffi_rust_future_poll_rust_buffer,
+      /*cancelFunc:*/ nativeModule().ffi_ddk_ffi_rust_future_cancel_rust_buffer,
+      /*completeFunc:*/ nativeModule().ffi_ddk_ffi_rust_future_complete_rust_buffer,
+      /*freeFunc:*/ nativeModule().ffi_ddk_ffi_rust_future_free_rust_buffer,
+      // Async returns always go through the JS-side converter: the
+      // FFI symbol returns the future handle (u64), and the user-level
+      // RustBuffer comes back via the shared `rust_future_complete_*`
+      // export. The bytes the runtime hands back must be deserialized
+      // here using the per-callable return-type converter.
+      // Borrowed view over foreign memory: the call site owns the free,
+      // as on the sync paths. Unconditional — a no-op where buffers are
+      // already JS-owned.
+      /*liftFunc:*/ (__rb) => {
+        try {
+          return FfiConverterUint8Array.lift(__rb)
+        } finally {
+          nativeModule().rustbuffer_free(__rb)
+        }
+      },
+      /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+      /*asyncOpts:*/ asyncOpts_,
+      /*errorHandler:*/ FfiConverterTypeContractError.lift.bind(FfiConverterTypeContractError),
+    )
+  }
+
+  uniffiDestroy(): void {
+    const ptr = (this as any)[destructorGuardSymbol]
+    if (ptr !== undefined) {
+      const pointer = uniffiTypeFundingWalletImplObjectFactory.pointer(this)
+      uniffiTypeFundingWalletImplObjectFactory.freePointer(pointer)
+      uniffiTypeFundingWalletImplObjectFactory.unbless(ptr)
+      delete (this as any)[destructorGuardSymbol]
+    }
+  }
+
+  static instanceOf(obj_: any): obj_ is FundingWalletImpl {
+    return uniffiTypeFundingWalletImplObjectFactory.isConcreteType(obj_)
+  }
+}
+
+const uniffiTypeFundingWalletImplObjectFactory: UniffiObjectFactory<FundingWallet> = (() => {
+  /// <reference lib="es2021" />
+  const registry =
+    typeof FinalizationRegistry !== 'undefined'
+      ? new FinalizationRegistry<UniffiHandle>((heldValue: UniffiHandle) => {
+          uniffiTypeFundingWalletImplObjectFactory.freePointer(heldValue)
+        })
+      : null
+
+  return {
+    create(pointer: UniffiHandle): FundingWallet {
+      const instance = Object.create(FundingWalletImpl.prototype)
+      instance[pointerLiteralSymbol] = pointer
+      instance[destructorGuardSymbol] = this.bless(pointer)
+      instance[uniffiTypeNameSymbol] = 'FundingWalletImpl'
+      return instance
+    },
+
+    bless(p: UniffiHandle): UniffiGcObject {
+      const ptr = {
+        p, // make sure this object doesn't get optimized away.
+        markDestroyed: () => undefined,
+      }
+      if (registry) {
+        registry.register(ptr, p, ptr)
+      }
+      return ptr
+    },
+
+    unbless(ptr_: UniffiGcObject) {
+      if (registry) {
+        registry.unregister(ptr_)
+      }
+    },
+
+    pointer(obj_: FundingWallet): UniffiHandle {
+      if ((obj_ as any)[destructorGuardSymbol] === undefined) {
+        throw new UniffiInternalError.UnexpectedNullPointer()
+      }
+      return (obj_ as any)[pointerLiteralSymbol]
+    },
+
+    clonePointer(obj_: FundingWallet): UniffiHandle {
+      const pointer = this.pointer(obj_)
+      return uniffiCaller.rustCall(
+        /*caller:*/ (callStatus) => nativeModule().uniffi_ddk_ffi_fn_clone_fundingwallet(pointer, callStatus),
+        /*liftString:*/ FfiConverterString.lift,
+      )
+    },
+
+    freePointer(pointer: UniffiHandle): void {
+      uniffiCaller.rustCall(
+        /*caller:*/ (callStatus) => nativeModule().uniffi_ddk_ffi_fn_free_fundingwallet(pointer, callStatus),
+        /*liftString:*/ FfiConverterString.lift,
+      )
+    },
+
+    isConcreteType(obj_: any): obj_ is FundingWallet {
+      return obj_[destructorGuardSymbol] && obj_[uniffiTypeNameSymbol] === 'FundingWalletImpl'
+    },
+  }
+})()
+const FfiConverterTypeFundingWallet = new FfiConverterObjectWithCallbacks(uniffiTypeFundingWalletImplObjectFactory)
+
+// Add a vtable for the callbacks that go in FundingWallet.
+
+// Put the implementation in a struct so we don't pollute the top-level namespace
+const uniffiCallbackInterfaceFundingWallet: { vtable: any; register: () => void } = {
+  // Create the VTable using a series of closures.
+  // ts automatically converts these into C callback functions.
+  vtable: {
+    sign_funding_psbt: (
+      uniffiHandle: bigint,
+      psbt: Uint8Array,
+      uniffiFutureCallback: UniffiForeignFutureCompleterustBuffer,
+      uniffiCallbackData: bigint,
+    ) => {
+      const uniffiMakeCall = async (signal: AbortSignal): Promise<Uint8Array> => {
+        const jsCallback = FfiConverterTypeFundingWallet.lift(uniffiHandle)
+        return await jsCallback.signFundingPsbt(FfiConverterUint8Array.lift(psbt), { signal })
+      }
+      const uniffiHandleSuccess = (returnValue: Uint8Array) => {
+        uniffiFutureCallback.call(
+          uniffiFutureCallback,
+          uniffiCallbackData,
+          /* UniffiForeignFutureResultRustBuffer */ {
+            return_value: FfiConverterUint8Array.lower(returnValue, nativeModule().rustbuffer_alloc),
+            call_status: uniffiCaller.createCallStatus(),
+          },
+        )
+      }
+      const uniffiHandleError = (code: number, errorBuf: UniffiByteArray) => {
+        uniffiFutureCallback.call(
+          uniffiFutureCallback,
+          uniffiCallbackData,
+          /* UniffiForeignFutureResultRustBuffer */ {
+            return_value: /*empty*/ new Uint8Array(0),
+            // TODO create callstatus with error.
+            call_status: uniffiCaller.createErrorStatus(code, errorBuf),
+          },
+        )
+      }
+      const uniffiForeignFuture = uniffiTraitInterfaceCallAsyncWithError(
+        /*makeCall:*/ uniffiMakeCall,
+        /*handleSuccess:*/ uniffiHandleSuccess,
+        /*handleError:*/ uniffiHandleError,
+        /*isErrorType:*/ ContractError.instanceOf,
+        /*lowerError:*/ FfiConverterTypeContractError.lower.bind(FfiConverterTypeContractError),
+        /*lowerString:*/ FfiConverterString.lower.bind(FfiConverterString),
+        /*alloc:*/ nativeModule().rustbuffer_alloc,
+      )
+      return uniffiForeignFuture
+    },
+    uniffi_free: (uniffiHandle: UniffiHandle): void => {
+      // this will throw a stale handle error if the handle isn't found.
+      FfiConverterTypeFundingWallet.drop(uniffiHandle)
+    },
+    uniffi_clone: (uniffiHandle: UniffiHandle): UniffiHandle => {
+      return FfiConverterTypeFundingWallet.clone(uniffiHandle)
+    },
+  },
+  register: () => {
+    nativeModule().uniffi_ddk_ffi_fn_init_callback_vtable_fundingwallet(uniffiCallbackInterfaceFundingWallet.vtable)
+  },
+}
+
+/**
  * A local signer for a consumer-derived key, including legacy BIP84 keys.
  * The constructor imports a key; signing never exports it.
  */
@@ -5886,6 +6200,155 @@ const uniffiTypePrivateKeySignerObjectFactory: UniffiObjectFactory<PrivateKeySig
 })()
 const FfiConverterTypePrivateKeySigner = new FfiConverterObject(uniffiTypePrivateKeySignerObjectFactory)
 
+/**
+ * What one party signs with. Build it once per wallet, not per contract:
+ * nothing in it refers to a contract, and every lifecycle call finds the
+ * key and the inputs it needs in the messages.
+ *
+ * An object rather than a record because ubrn's runtime lowers a foreign
+ * trait object only as a direct argument, not as a record field.
+ */
+export interface SignersLike {
+  /**
+   * The same contract keys plus the wallet that signs this party's
+   * funding inputs.
+   */
+  withWallet(wallet: FundingWallet): SignersLike
+}
+/**
+ * @deprecated Use `SignersLike` instead.
+ */
+export type SignersInterface = SignersLike
+
+/**
+ * What one party signs with. Build it once per wallet, not per contract:
+ * nothing in it refers to a contract, and every lifecycle call finds the
+ * key and the inputs it needs in the messages.
+ *
+ * An object rather than a record because ubrn's runtime lowers a foreign
+ * trait object only as a direct argument, not as a record field.
+ */
+export class Signers extends UniffiAbstractObject implements SignersLike {
+  readonly [uniffiTypeNameSymbol] = 'Signers'
+  readonly [destructorGuardSymbol]: UniffiGcObject
+  readonly [pointerLiteralSymbol]: UniffiHandle
+  /**
+   * Signers for a party that funds nothing with its wallet, or one that
+   * adds its wallet with [`Signers::with_wallet`].
+   */
+  constructor(contractKeys: ContractSignerProvider) {
+    super()
+    const pointer = uniffiCaller.rustCall(
+      /*caller:*/ (callStatus) => {
+        return nativeModule().uniffi_ddk_ffi_fn_constructor_signers_new(
+          FfiConverterTypeContractSignerProvider.lower(contractKeys, nativeModule().rustbuffer_alloc),
+          callStatus,
+        )
+      },
+      /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+    )
+    this[pointerLiteralSymbol] = pointer
+    this[destructorGuardSymbol] = uniffiTypeSignersObjectFactory.bless(pointer)
+  }
+
+  /**
+   * The same contract keys plus the wallet that signs this party's
+   * funding inputs.
+   */
+  withWallet(wallet: FundingWallet): SignersLike {
+    return FfiConverterTypeSigners.lift(
+      uniffiCaller.rustCall(
+        /*caller:*/ (callStatus) => {
+          return nativeModule().uniffi_ddk_ffi_fn_method_signers_with_wallet(
+            uniffiTypeSignersObjectFactory.clonePointer(this),
+            FfiConverterTypeFundingWallet.lower(wallet, nativeModule().rustbuffer_alloc),
+            callStatus,
+          )
+        },
+        /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+      ),
+    )
+  }
+
+  uniffiDestroy(): void {
+    const ptr = (this as any)[destructorGuardSymbol]
+    if (ptr !== undefined) {
+      const pointer = uniffiTypeSignersObjectFactory.pointer(this)
+      uniffiTypeSignersObjectFactory.freePointer(pointer)
+      uniffiTypeSignersObjectFactory.unbless(ptr)
+      delete (this as any)[destructorGuardSymbol]
+    }
+  }
+
+  static instanceOf(obj_: any): obj_ is Signers {
+    return uniffiTypeSignersObjectFactory.isConcreteType(obj_)
+  }
+}
+
+const uniffiTypeSignersObjectFactory: UniffiObjectFactory<SignersLike> = (() => {
+  /// <reference lib="es2021" />
+  const registry =
+    typeof FinalizationRegistry !== 'undefined'
+      ? new FinalizationRegistry<UniffiHandle>((heldValue: UniffiHandle) => {
+          uniffiTypeSignersObjectFactory.freePointer(heldValue)
+        })
+      : null
+
+  return {
+    create(pointer: UniffiHandle): SignersLike {
+      const instance = Object.create(Signers.prototype)
+      instance[pointerLiteralSymbol] = pointer
+      instance[destructorGuardSymbol] = this.bless(pointer)
+      instance[uniffiTypeNameSymbol] = 'Signers'
+      return instance
+    },
+
+    bless(p: UniffiHandle): UniffiGcObject {
+      const ptr = {
+        p, // make sure this object doesn't get optimized away.
+        markDestroyed: () => undefined,
+      }
+      if (registry) {
+        registry.register(ptr, p, ptr)
+      }
+      return ptr
+    },
+
+    unbless(ptr_: UniffiGcObject) {
+      if (registry) {
+        registry.unregister(ptr_)
+      }
+    },
+
+    pointer(obj_: SignersLike): UniffiHandle {
+      if ((obj_ as any)[destructorGuardSymbol] === undefined) {
+        throw new UniffiInternalError.UnexpectedNullPointer()
+      }
+      return (obj_ as any)[pointerLiteralSymbol]
+    },
+
+    clonePointer(obj_: SignersLike): UniffiHandle {
+      const pointer = this.pointer(obj_)
+      return uniffiCaller.rustCall(
+        /*caller:*/ (callStatus) => nativeModule().uniffi_ddk_ffi_fn_clone_signers(pointer, callStatus),
+        /*liftString:*/ FfiConverterString.lift,
+      )
+    },
+
+    freePointer(pointer: UniffiHandle): void {
+      uniffiCaller.rustCall(
+        /*caller:*/ (callStatus) => nativeModule().uniffi_ddk_ffi_fn_free_signers(pointer, callStatus),
+        /*liftString:*/ FfiConverterString.lift,
+      )
+    },
+
+    isConcreteType(obj_: any): obj_ is SignersLike {
+      return obj_[destructorGuardSymbol] && obj_[uniffiTypeNameSymbol] === 'Signers'
+    },
+  }
+})()
+const FfiConverterTypeSigners = new FfiConverterObject(uniffiTypeSignersObjectFactory)
+
 // FfiConverter for Array<Uint8Array>
 const FfiConverterSequenceBytes = new FfiConverterArray(FfiConverterUint8Array)
 
@@ -5943,9 +6406,6 @@ const FfiConverterSequenceTypeAdaptorSignature = new FfiConverterArray(FfiConver
 // FfiConverter for Array<Payout>
 const FfiConverterSequenceTypePayout = new FfiConverterArray(FfiConverterTypePayout)
 
-// FfiConverter for Array<DescriptorInput>
-const FfiConverterSequenceTypeDescriptorInput = new FfiConverterArray(FfiConverterTypeDescriptorInput)
-
 /**
  * This should be called before anything else.
  *
@@ -5964,7 +6424,7 @@ function uniffiEnsureInitialized() {
   if (bindingsContractVersion !== scaffoldingContractVersion) {
     throw new UniffiInternalError.ContractVersionMismatch(scaffoldingContractVersion, bindingsContractVersion)
   }
-  if (nativeModule().uniffi_ddk_ffi_checksum_func_accept_offer() !== 18372) {
+  if (nativeModule().uniffi_ddk_ffi_checksum_func_accept_offer() !== 30056) {
     throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_accept_offer')
   }
   if (nativeModule().uniffi_ddk_ffi_checksum_func_chain_hash_from_network() !== 782) {
@@ -6032,7 +6492,7 @@ function uniffiEnsureInitialized() {
   if (nativeModule().uniffi_ddk_ffi_checksum_func_create_fund_tx_locking_script() !== 37235) {
     throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_create_fund_tx_locking_script')
   }
-  if (nativeModule().uniffi_ddk_ffi_checksum_func_create_funding_psbt() !== 39942) {
+  if (nativeModule().uniffi_ddk_ffi_checksum_func_create_funding_psbt() !== 30465) {
     throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_create_funding_psbt')
   }
   if (nativeModule().uniffi_ddk_ffi_checksum_func_create_offer() !== 39327) {
@@ -6068,7 +6528,7 @@ function uniffiEnsureInitialized() {
       'uniffi_ddk_ffi_checksum_func_extract_ecdsa_signature_from_oracle_signatures',
     )
   }
-  if (nativeModule().uniffi_ddk_ffi_checksum_func_finalize_sign() !== 23772) {
+  if (nativeModule().uniffi_ddk_ffi_checksum_func_finalize_sign() !== 20621) {
     throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_finalize_sign')
   }
   if (nativeModule().uniffi_ddk_ffi_checksum_func_finalize_sign_with_signatures() !== 57917) {
@@ -6098,11 +6558,8 @@ function uniffiEnsureInitialized() {
   if (nativeModule().uniffi_ddk_ffi_checksum_func_prepare_sign_accept() !== 27065) {
     throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_prepare_sign_accept')
   }
-  if (nativeModule().uniffi_ddk_ffi_checksum_func_sign_accept() !== 31962) {
+  if (nativeModule().uniffi_ddk_ffi_checksum_func_sign_accept() !== 38313) {
     throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_sign_accept')
-  }
-  if (nativeModule().uniffi_ddk_ffi_checksum_func_sign_funding_psbt_with_descriptor() !== 25961) {
-    throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_sign_funding_psbt_with_descriptor')
   }
   if (nativeModule().uniffi_ddk_ffi_checksum_func_spliced_contract_ids() !== 47845) {
     throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_spliced_contract_ids')
@@ -6163,6 +6620,17 @@ function uniffiEnsureInitialized() {
       'uniffi_ddk_ffi_checksum_method_contractsignerprovider_get_signer',
     )
   }
+  if (nativeModule().uniffi_ddk_ffi_checksum_constructor_descriptorwallet_new() !== 16320) {
+    throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_constructor_descriptorwallet_new')
+  }
+  if (nativeModule().uniffi_ddk_ffi_checksum_method_descriptorwallet_sign_funding_psbt() !== 24665) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      'uniffi_ddk_ffi_checksum_method_descriptorwallet_sign_funding_psbt',
+    )
+  }
+  if (nativeModule().uniffi_ddk_ffi_checksum_method_fundingwallet_sign_funding_psbt() !== 61817) {
+    throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_method_fundingwallet_sign_funding_psbt')
+  }
   if (nativeModule().uniffi_ddk_ffi_checksum_constructor_privatekeysigner_from_secret_key() !== 40969) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       'uniffi_ddk_ffi_checksum_constructor_privatekeysigner_from_secret_key',
@@ -6177,9 +6645,16 @@ function uniffiEnsureInitialized() {
   if (nativeModule().uniffi_ddk_ffi_checksum_method_privatekeysigner_sign_ecdsa() !== 52087) {
     throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_method_privatekeysigner_sign_ecdsa')
   }
+  if (nativeModule().uniffi_ddk_ffi_checksum_constructor_signers_new() !== 56442) {
+    throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_constructor_signers_new')
+  }
+  if (nativeModule().uniffi_ddk_ffi_checksum_method_signers_with_wallet() !== 34102) {
+    throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_method_signers_with_wallet')
+  }
 
   uniffiCallbackInterfaceContractSigner.register()
   uniffiCallbackInterfaceContractSignerProvider.register()
+  uniffiCallbackInterfaceFundingWallet.register()
 }
 
 export default Object.freeze({
@@ -6201,13 +6676,14 @@ export default Object.freeze({
     FfiConverterTypeContractSignerProvider,
     FfiConverterTypeCreateOfferParams,
     FfiConverterTypeDLCError,
-    FfiConverterTypeDescriptorInput,
+    FfiConverterTypeDescriptorWallet,
     FfiConverterTypeDlcInputInfo,
     FfiConverterTypeDlcInputSignature,
     FfiConverterTypeDlcInputSigningRequest,
     FfiConverterTypeDlcTransactions,
     FfiConverterTypeExtendedKey,
     FfiConverterTypeFeeRule,
+    FfiConverterTypeFundingWallet,
     FfiConverterTypeOracleAttestationRef,
     FfiConverterTypeOracleInfo,
     FfiConverterTypeParty,
@@ -6217,6 +6693,7 @@ export default Object.freeze({
     FfiConverterTypePreparedContract,
     FfiConverterTypePrivateKeySigner,
     FfiConverterTypeSignResult,
+    FfiConverterTypeSigners,
     FfiConverterTypeSigningContext,
     FfiConverterTypeSigningRequest,
     FfiConverterTypeSigningResponse,

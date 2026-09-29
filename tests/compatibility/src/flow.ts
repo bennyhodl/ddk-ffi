@@ -23,7 +23,6 @@ export function syntheticFundedInput(
   return {
     fundingInput: ddk.fundingInput(Buffer.from(prevTxHex, 'hex'), 0, inputSerialId, 0xffffffff, 108, Buffer.alloc(0)),
     inputSerialId,
-    derivationIndex: index,
     prevTxHex,
     vout: 0,
   }
