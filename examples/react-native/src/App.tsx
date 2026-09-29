@@ -7,7 +7,7 @@
  *   createOffer → validateOffer → acceptOffer → validateAccept →
  *   createFundingPsbt → signFundingPsbtWithDescriptor → signAccept →
  *   validateSign → finalizeSign → a fully-signed funding transaction, then
- *   signContractCet / signContractRefund → the two settlement transactions.
+ *   contractCetTransaction / contractRefundTransaction → the two settlement transactions.
  *
  * The wallet parts (a private descriptor + a funding UTXO) and the oracle
  * attestation are fixtures here, so the flow is deterministic and offline — this
@@ -28,7 +28,6 @@ import {
 import * as ddk from '@bennyblader/ddk-rn';
 import {
   ContractKeyProvider,
-  Party,
   chainHashFromNetwork,
   fundingInput,
   createOffer,
@@ -40,10 +39,11 @@ import {
   signAccept,
   validateSign,
   computeContractId,
+  offerTemporaryContractId,
   contractInfoPayouts,
   finalizeSign,
-  signContractCet,
-  signContractRefund,
+  contractCetTransaction,
+  contractRefundTransaction,
   version,
 } from '@bennyblader/ddk-rn';
 
@@ -174,7 +174,6 @@ export default function App() {
         'regtest'
       );
       const offerTempId = temporaryContractId(0x5c);
-      const acceptTempId = temporaryContractId(0xa1);
       const spk = hexToBytes(OFFERER_SPK_HEX);
 
       // 1) Offer — single-funded from the fixture UTXO.
@@ -214,7 +213,9 @@ export default function App() {
         offer,
         {
           party: {
-            fundingPubkey: acceptorKeys.fundingPubkey(acceptTempId),
+            fundingPubkey: acceptorKeys.fundingPubkey(
+              offerTemporaryContractId(offer)
+            ),
             fundingInputs: [],
             payoutSpk: spk,
             payoutSerialId: 4n,
@@ -266,21 +267,10 @@ export default function App() {
       // oracle's attestation selects; the acceptor signs the refund. Each side
       // settles on its own: the counterparty's half of the 2-of-2 comes from
       // the messages it already sent.
-      const cet = signContractCet(
-        offer,
-        accept,
-        signResult.sign,
-        offererKeys,
-        Party.Offer,
-        [{ oracleIndex: 0, attestation: hexToBytes(ATTESTATION_UP_HEX) }]
-      );
-      const refund = signContractRefund(
-        offer,
-        accept,
-        signResult.sign,
-        acceptorKeys,
-        Party.Accept
-      );
+      const cet = contractCetTransaction(offer, accept, signResult.sign, [
+        { oracleIndex: 0, attestation: hexToBytes(ATTESTATION_UP_HEX) },
+      ]);
+      const refund = contractRefundTransaction(offer, accept, signResult.sign);
 
       setResult({
         ddkVersion: version(),

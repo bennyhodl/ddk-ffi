@@ -77,7 +77,7 @@ import {
   acceptOffer,
   signAccept,
   finalizeSign,
-  signContractCet,
+  contractCetTransaction,
 } from '@bennyblader/ddk'
 
 const keys = ContractKeyProvider.fromMnemonic(MNEMONIC, undefined, 'regtest')
@@ -100,7 +100,7 @@ const offer = createOffer({
   contractFlags: 0,
 })
 // …acceptOffer → sign the funding PSBT → signAccept → finalizeSign →
-//   signContractCet / signContractRefund
+//   contractCetTransaction / contractRefundTransaction
 ```
 
 `../../examples/node/src/contract.ts` runs the complete flow — offer to settlement, offline

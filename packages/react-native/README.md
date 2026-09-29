@@ -48,7 +48,7 @@ import {
   acceptOffer,
   signAccept,
   finalizeSign,
-  signContractCet,
+  contractCetTransaction,
 } from '@bennyblader/ddk-rn';
 
 const keys = ContractKeyProvider.fromMnemonic(MNEMONIC, undefined, 'regtest');
@@ -71,7 +71,7 @@ const offer = createOffer({
   contractFlags: 0,
 });
 // …acceptOffer → sign the funding PSBT → signAccept → finalizeSign →
-//   signContractCet / signContractRefund
+//   contractCetTransaction / contractRefundTransaction
 ```
 
 Bytes cross the JSI boundary as `Uint8Array`, as they do in `@bennyblader/ddk`.

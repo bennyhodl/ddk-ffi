@@ -131,21 +131,21 @@ extern "C" {
     );
     typedef void
     (*UniffiCallbackInterfaceContractSignerMethod0)(
-    uint64_t uniffi_handle,
-    RustBuffer sighash,
+    uint64_t uniffi_handle, 
+    RustBuffer sighash, 
     RustBuffer * uniffi_out_return, RustCallStatus* rust_call_status
     );
     typedef void
     (*UniffiCallbackInterfaceContractSignerMethod1)(
-    uint64_t uniffi_handle,
-    RustBuffer sighash,
-    RustBuffer adaptor_point,
+    uint64_t uniffi_handle, 
+    RustBuffer sighash, 
+    RustBuffer adaptor_point, 
     RustBuffer * uniffi_out_return, RustCallStatus* rust_call_status
     );
     typedef void
     (*UniffiCallbackInterfaceContractSignerProviderMethod0)(
-    uint64_t uniffi_handle,
-    RustBuffer key,
+    uint64_t uniffi_handle, 
+    RustBuffer key, 
     /*handle*/ uint64_t * uniffi_out_return, RustCallStatus* rust_call_status
     );typedef struct UniffiVTableCallbackInterfaceContractSigner {
         UniffiCallbackInterfaceFree uniffi_free;
@@ -190,79 +190,73 @@ extern "C" {
         RustCallStatus *uniffi_out_err
     );
     /*handle*/ uint64_t uniffi_ddk_ffi_fn_method_contractkeyprovider_get_signer(
-        /*handle*/ uint64_t ptr,
-        RustBuffer key,
-        RustCallStatus *uniffi_out_err
-    );
-    /*handle*/ uint64_t uniffi_ddk_ffi_fn_method_contractkeyprovider_signer_for_contract(
-        /*handle*/ uint64_t ptr,
-        RustBuffer temporary_contract_id,
-        RustBuffer funding_pubkey,
+        /*handle*/ uint64_t ptr, 
+        RustBuffer key, 
         RustCallStatus *uniffi_out_err
     );
     /*handle*/ uint64_t uniffi_ddk_ffi_fn_clone_contractsigner(
-        /*handle*/ uint64_t handle,
+        /*handle*/ uint64_t handle, 
         RustCallStatus *uniffi_out_err
     );
     void uniffi_ddk_ffi_fn_free_contractsigner(
-        /*handle*/ uint64_t handle,
+        /*handle*/ uint64_t handle, 
         RustCallStatus *uniffi_out_err
     );
     void uniffi_ddk_ffi_fn_init_callback_vtable_contractsigner(
         UniffiVTableCallbackInterfaceContractSigner * vtable
     );
     RustBuffer uniffi_ddk_ffi_fn_method_contractsigner_sign_ecdsa(
-        /*handle*/ uint64_t ptr,
-        RustBuffer sighash,
+        /*handle*/ uint64_t ptr, 
+        RustBuffer sighash, 
         RustCallStatus *uniffi_out_err
     );
     RustBuffer uniffi_ddk_ffi_fn_method_contractsigner_sign_adaptor(
-        /*handle*/ uint64_t ptr,
-        RustBuffer sighash,
-        RustBuffer adaptor_point,
+        /*handle*/ uint64_t ptr, 
+        RustBuffer sighash, 
+        RustBuffer adaptor_point, 
         RustCallStatus *uniffi_out_err
     );
     /*handle*/ uint64_t uniffi_ddk_ffi_fn_clone_contractsignerprovider(
-        /*handle*/ uint64_t handle,
+        /*handle*/ uint64_t handle, 
         RustCallStatus *uniffi_out_err
     );
     void uniffi_ddk_ffi_fn_free_contractsignerprovider(
-        /*handle*/ uint64_t handle,
+        /*handle*/ uint64_t handle, 
         RustCallStatus *uniffi_out_err
     );
     void uniffi_ddk_ffi_fn_init_callback_vtable_contractsignerprovider(
         UniffiVTableCallbackInterfaceContractSignerProvider * vtable
     );
     /*handle*/ uint64_t uniffi_ddk_ffi_fn_method_contractsignerprovider_get_signer(
-        /*handle*/ uint64_t ptr,
-        RustBuffer key,
+        /*handle*/ uint64_t ptr, 
+        RustBuffer key, 
         RustCallStatus *uniffi_out_err
     );
     /*handle*/ uint64_t uniffi_ddk_ffi_fn_clone_privatekeysigner(
-        /*handle*/ uint64_t handle,
+        /*handle*/ uint64_t handle, 
         RustCallStatus *uniffi_out_err
     );
     void uniffi_ddk_ffi_fn_free_privatekeysigner(
-        /*handle*/ uint64_t handle,
+        /*handle*/ uint64_t handle, 
         RustCallStatus *uniffi_out_err
     );
     /*handle*/ uint64_t uniffi_ddk_ffi_fn_constructor_privatekeysigner_from_secret_key(
-        RustBuffer secret_key,
+        RustBuffer secret_key, 
         RustCallStatus *uniffi_out_err
     );
     RustBuffer uniffi_ddk_ffi_fn_method_privatekeysigner_public_key(
-        /*handle*/ uint64_t ptr,
+        /*handle*/ uint64_t ptr, 
         RustCallStatus *uniffi_out_err
     );
     RustBuffer uniffi_ddk_ffi_fn_method_privatekeysigner_sign_adaptor(
-        /*handle*/ uint64_t ptr,
-        RustBuffer sighash,
-        RustBuffer adaptor_point,
+        /*handle*/ uint64_t ptr, 
+        RustBuffer sighash, 
+        RustBuffer adaptor_point, 
         RustCallStatus *uniffi_out_err
     );
     RustBuffer uniffi_ddk_ffi_fn_method_privatekeysigner_sign_ecdsa(
-        /*handle*/ uint64_t ptr,
-        RustBuffer sighash,
+        /*handle*/ uint64_t ptr, 
+        RustBuffer sighash, 
         RustCallStatus *uniffi_out_err
     );
     int8_t uniffi_ddk_ffi_fn_method_adaptorsignature_verify_from_oracle_info(
@@ -520,7 +514,7 @@ extern "C" {
     RustBuffer uniffi_ddk_ffi_fn_func_accept_offer(
         RustBuffer offer, 
         RustBuffer params, 
-        /*handle*/ uint64_t signers,
+        /*handle*/ uint64_t signers, 
         RustCallStatus *uniffi_out_err
     );
     RustBuffer uniffi_ddk_ffi_fn_func_chain_hash_from_network(
@@ -571,7 +565,7 @@ extern "C" {
         RustBuffer accept, 
         RustBuffer sign, 
         RustBuffer signed_funding_psbt, 
-        /*handle*/ uint64_t signers,
+        /*handle*/ uint64_t signers, 
         RustCallStatus *uniffi_out_err
     );
     RustBuffer uniffi_ddk_ffi_fn_func_funding_input(
@@ -583,10 +577,14 @@ extern "C" {
         RustBuffer redeem_script, 
         RustCallStatus *uniffi_out_err
     );
+    RustBuffer uniffi_ddk_ffi_fn_func_offer_temporary_contract_id(
+        RustBuffer offer, 
+        RustCallStatus *uniffi_out_err
+    );
     RustBuffer uniffi_ddk_ffi_fn_func_sign_accept(
         RustBuffer offer, 
         RustBuffer accept, 
-        /*handle*/ uint64_t signers,
+        /*handle*/ uint64_t signers, 
         RustBuffer signed_funding_psbt, 
         RustCallStatus *uniffi_out_err
     );
@@ -621,12 +619,12 @@ extern "C" {
         RustCallStatus *uniffi_out_err
     );
     RustBuffer uniffi_ddk_ffi_fn_func_complete_accept_offer(
-        RustBuffer context,
-        RustBuffer signatures,
+        RustBuffer context, 
+        RustBuffer signatures, 
         RustCallStatus *uniffi_out_err
     );
     RustBuffer uniffi_ddk_ffi_fn_func_complete_sign_accept(
-        RustBuffer context,
+        RustBuffer context, 
         RustBuffer signatures, 
         RustCallStatus *uniffi_out_err
     );
@@ -639,8 +637,14 @@ extern "C" {
         RustCallStatus *uniffi_out_err
     );
     RustBuffer uniffi_ddk_ffi_fn_func_prepare_accept_offer(
-        RustBuffer offer,
-        RustBuffer params,
+        RustBuffer offer, 
+        RustBuffer params, 
+        RustCallStatus *uniffi_out_err
+    );
+    RustBuffer uniffi_ddk_ffi_fn_func_prepare_finalize_sign(
+        RustBuffer offer, 
+        RustBuffer accept, 
+        RustBuffer sign, 
         RustCallStatus *uniffi_out_err
     );
     RustBuffer uniffi_ddk_ffi_fn_func_prepare_sign_accept(
@@ -648,21 +652,17 @@ extern "C" {
         RustBuffer accept, 
         RustCallStatus *uniffi_out_err
     );
-    RustBuffer uniffi_ddk_ffi_fn_func_sign_contract_cet(
+    RustBuffer uniffi_ddk_ffi_fn_func_contract_cet_transaction(
         RustBuffer offer, 
         RustBuffer accept, 
-        RustBuffer sign,
-        /*handle*/ uint64_t signers,
-        RustBuffer party,
-        RustBuffer attestations,
+        RustBuffer sign, 
+        RustBuffer attestations, 
         RustCallStatus *uniffi_out_err
     );
-    RustBuffer uniffi_ddk_ffi_fn_func_sign_contract_refund(
-        RustBuffer offer,
-        RustBuffer accept,
-        RustBuffer sign,
-        /*handle*/ uint64_t signers,
-        RustBuffer party,
+    RustBuffer uniffi_ddk_ffi_fn_func_contract_refund_transaction(
+        RustBuffer offer, 
+        RustBuffer accept, 
+        RustBuffer sign, 
         RustCallStatus *uniffi_out_err
     );
     RustBuffer ffi_ddk_ffi_rustbuffer_alloc(
@@ -928,6 +928,8 @@ extern "C" {
     );
     uint16_t uniffi_ddk_ffi_checksum_func_funding_input(
     );
+    uint16_t uniffi_ddk_ffi_checksum_func_offer_temporary_contract_id(
+    );
     uint16_t uniffi_ddk_ffi_checksum_func_sign_accept(
     );
     uint16_t uniffi_ddk_ffi_checksum_func_sign_funding_psbt_with_descriptor(
@@ -948,17 +950,17 @@ extern "C" {
     );
     uint16_t uniffi_ddk_ffi_checksum_func_prepare_accept_offer(
     );
+    uint16_t uniffi_ddk_ffi_checksum_func_prepare_finalize_sign(
+    );
     uint16_t uniffi_ddk_ffi_checksum_func_prepare_sign_accept(
     );
-    uint16_t uniffi_ddk_ffi_checksum_func_sign_contract_cet(
+    uint16_t uniffi_ddk_ffi_checksum_func_contract_cet_transaction(
     );
-    uint16_t uniffi_ddk_ffi_checksum_func_sign_contract_refund(
+    uint16_t uniffi_ddk_ffi_checksum_func_contract_refund_transaction(
     );
     uint16_t uniffi_ddk_ffi_checksum_method_contractkeyprovider_funding_pubkey(
     );
     uint16_t uniffi_ddk_ffi_checksum_method_contractkeyprovider_get_signer(
-    );
-    uint16_t uniffi_ddk_ffi_checksum_method_contractkeyprovider_signer_for_contract(
     );
     uint16_t uniffi_ddk_ffi_checksum_method_contractsigner_sign_ecdsa(
     );
@@ -1541,9 +1543,9 @@ namespace uniffi::ddk_ffi::st::vtablecallbackinterfacecontractsigner::vtablecall
             auto uniffiResult = cb.call(rt, js_handle
             );
 
+            
 
-
-
+            
         } catch (const jsi::JSError &error) {
             std::cout << "Error in callback UniffiCallbackInterfaceFree: "
                     << error.what() << std::endl;
@@ -1602,7 +1604,7 @@ namespace uniffi::ddk_ffi::st::vtablecallbackinterfacecontractsigner::vtablecall
                 };
                 // We'll then call that lambda from the callInvoker which will
                 // look after calling it on the correct thread.
-
+                
                 callInvoker->invokeNonBlocking(rt, jsLambda);
         };
         return callback;
@@ -1656,9 +1658,9 @@ namespace uniffi::ddk_ffi::st::vtablecallbackinterfacecontractsignerprovider::vt
             auto uniffiResult = cb.call(rt, js_handle
             );
 
+            
 
-
-
+            
         } catch (const jsi::JSError &error) {
             std::cout << "Error in callback UniffiCallbackInterfaceFree: "
                     << error.what() << std::endl;
@@ -1717,7 +1719,7 @@ namespace uniffi::ddk_ffi::st::vtablecallbackinterfacecontractsignerprovider::vt
                 };
                 // We'll then call that lambda from the callInvoker which will
                 // look after calling it on the correct thread.
-
+                
                 callInvoker->invokeNonBlocking(rt, jsLambda);
         };
         return callback;
@@ -2644,7 +2646,7 @@ template <> struct Bridging<UniffiForeignFutureCompleteVoid> {
         func(uniffi_jsi::Bridging<uint64_t>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<UniffiForeignFutureResultVoid>::fromJs(rt, callInvoker, args[1])
         );
 
-
+        
         return jsi::Value::undefined();
   }
 };
@@ -2692,9 +2694,9 @@ namespace uniffi::ddk_ffi::cb::callbackinterfaceclone::vtablecallbackinterfaceco
             auto uniffiResult = cb.call(rt, js_handle
             );
 
+            
 
-
-
+            
             // Write the direct return value back to the caller.
             if (uniffi_direct_return != nullptr) {
                 *uniffi_direct_return = uniffi_jsi::Bridging<uint64_t>::fromJs(
@@ -2726,7 +2728,7 @@ namespace uniffi::ddk_ffi::cb::callbackinterfaceclone::vtablecallbackinterfaceco
         // The runtime, the actual callback jsi::funtion, and the callInvoker
         // are all in the lambda.
         rsLambda(
-            rs_handle,
+            rs_handle, 
             &uniffi_result);
         return uniffi_result;
     }
@@ -2828,7 +2830,7 @@ namespace uniffi::ddk_ffi::cb::callbackinterfacecontractsignermethod0::vtablecal
                 return;
             }
 
-
+            
             // return type is RustBuffer(None)
             // Finally, we need to copy the return value back into the Rust pointer.
             *rs_uniffiOutReturn =
@@ -2861,8 +2863,8 @@ namespace uniffi::ddk_ffi::cb::callbackinterfacecontractsignermethod0::vtablecal
         // The runtime, the actual callback jsi::funtion, and the callInvoker
         // are all in the lambda.
         rsLambda(
-            rs_uniffiHandle,
-            rs_sighash,
+            rs_uniffiHandle, 
+            rs_sighash, 
             rs_uniffiOutReturn, uniffi_call_status);
     }
 
@@ -2969,7 +2971,7 @@ namespace uniffi::ddk_ffi::cb::callbackinterfacecontractsignermethod1::vtablecal
                 return;
             }
 
-
+            
             // return type is RustBuffer(None)
             // Finally, we need to copy the return value back into the Rust pointer.
             *rs_uniffiOutReturn =
@@ -3002,9 +3004,9 @@ namespace uniffi::ddk_ffi::cb::callbackinterfacecontractsignermethod1::vtablecal
         // The runtime, the actual callback jsi::funtion, and the callInvoker
         // are all in the lambda.
         rsLambda(
-            rs_uniffiHandle,
-            rs_sighash,
-            rs_adaptorPoint,
+            rs_uniffiHandle, 
+            rs_sighash, 
+            rs_adaptorPoint, 
             rs_uniffiOutReturn, uniffi_call_status);
     }
 
@@ -3140,9 +3142,9 @@ namespace uniffi::ddk_ffi::cb::callbackinterfaceclone::vtablecallbackinterfaceco
             auto uniffiResult = cb.call(rt, js_handle
             );
 
+            
 
-
-
+            
             // Write the direct return value back to the caller.
             if (uniffi_direct_return != nullptr) {
                 *uniffi_direct_return = uniffi_jsi::Bridging<uint64_t>::fromJs(
@@ -3174,7 +3176,7 @@ namespace uniffi::ddk_ffi::cb::callbackinterfaceclone::vtablecallbackinterfaceco
         // The runtime, the actual callback jsi::funtion, and the callInvoker
         // are all in the lambda.
         rsLambda(
-            rs_handle,
+            rs_handle, 
             &uniffi_result);
         return uniffi_result;
     }
@@ -3276,7 +3278,7 @@ namespace uniffi::ddk_ffi::cb::callbackinterfacecontractsignerprovidermethod0::v
                 return;
             }
 
-
+            
             // return type is Handle
             // Finally, we need to copy the return value back into the Rust pointer.
             *rs_uniffiOutReturn =
@@ -3309,8 +3311,8 @@ namespace uniffi::ddk_ffi::cb::callbackinterfacecontractsignerprovidermethod0::v
         // The runtime, the actual callback jsi::funtion, and the callInvoker
         // are all in the lambda.
         rsLambda(
-            rs_uniffiHandle,
-            rs_key,
+            rs_uniffiHandle, 
+            rs_key, 
             rs_uniffiOutReturn, uniffi_call_status);
     }
 
@@ -3523,14 +3525,6 @@ NativeDdkFfi::NativeDdkFfi(
         2,
         [this](jsi::Runtime &rt, const jsi::Value &thisVal, const jsi::Value *args, size_t count) -> jsi::Value {
             return this->cpp_uniffi_ddk_ffi_fn_method_contractkeyprovider_get_signer(rt, thisVal, args, count);
-        }
-    );
-    props["ubrn_uniffi_ddk_ffi_fn_method_contractkeyprovider_signer_for_contract"] = jsi::Function::createFromHostFunction(
-        rt,
-        jsi::PropNameID::forAscii(rt, "ubrn_uniffi_ddk_ffi_fn_method_contractkeyprovider_signer_for_contract"),
-        3,
-        [this](jsi::Runtime &rt, const jsi::Value &thisVal, const jsi::Value *args, size_t count) -> jsi::Value {
-            return this->cpp_uniffi_ddk_ffi_fn_method_contractkeyprovider_signer_for_contract(rt, thisVal, args, count);
         }
     );
     props["ubrn_uniffi_ddk_ffi_fn_clone_contractsigner"] = jsi::Function::createFromHostFunction(
@@ -4013,6 +4007,14 @@ NativeDdkFfi::NativeDdkFfi(
             return this->cpp_uniffi_ddk_ffi_fn_func_funding_input(rt, thisVal, args, count);
         }
     );
+    props["ubrn_uniffi_ddk_ffi_fn_func_offer_temporary_contract_id"] = jsi::Function::createFromHostFunction(
+        rt,
+        jsi::PropNameID::forAscii(rt, "ubrn_uniffi_ddk_ffi_fn_func_offer_temporary_contract_id"),
+        1,
+        [this](jsi::Runtime &rt, const jsi::Value &thisVal, const jsi::Value *args, size_t count) -> jsi::Value {
+            return this->cpp_uniffi_ddk_ffi_fn_func_offer_temporary_contract_id(rt, thisVal, args, count);
+        }
+    );
     props["ubrn_uniffi_ddk_ffi_fn_func_sign_accept"] = jsi::Function::createFromHostFunction(
         rt,
         jsi::PropNameID::forAscii(rt, "ubrn_uniffi_ddk_ffi_fn_func_sign_accept"),
@@ -4093,6 +4095,14 @@ NativeDdkFfi::NativeDdkFfi(
             return this->cpp_uniffi_ddk_ffi_fn_func_prepare_accept_offer(rt, thisVal, args, count);
         }
     );
+    props["ubrn_uniffi_ddk_ffi_fn_func_prepare_finalize_sign"] = jsi::Function::createFromHostFunction(
+        rt,
+        jsi::PropNameID::forAscii(rt, "ubrn_uniffi_ddk_ffi_fn_func_prepare_finalize_sign"),
+        3,
+        [this](jsi::Runtime &rt, const jsi::Value &thisVal, const jsi::Value *args, size_t count) -> jsi::Value {
+            return this->cpp_uniffi_ddk_ffi_fn_func_prepare_finalize_sign(rt, thisVal, args, count);
+        }
+    );
     props["ubrn_uniffi_ddk_ffi_fn_func_prepare_sign_accept"] = jsi::Function::createFromHostFunction(
         rt,
         jsi::PropNameID::forAscii(rt, "ubrn_uniffi_ddk_ffi_fn_func_prepare_sign_accept"),
@@ -4101,20 +4111,20 @@ NativeDdkFfi::NativeDdkFfi(
             return this->cpp_uniffi_ddk_ffi_fn_func_prepare_sign_accept(rt, thisVal, args, count);
         }
     );
-    props["ubrn_uniffi_ddk_ffi_fn_func_sign_contract_cet"] = jsi::Function::createFromHostFunction(
+    props["ubrn_uniffi_ddk_ffi_fn_func_contract_cet_transaction"] = jsi::Function::createFromHostFunction(
         rt,
-        jsi::PropNameID::forAscii(rt, "ubrn_uniffi_ddk_ffi_fn_func_sign_contract_cet"),
-        6,
+        jsi::PropNameID::forAscii(rt, "ubrn_uniffi_ddk_ffi_fn_func_contract_cet_transaction"),
+        4,
         [this](jsi::Runtime &rt, const jsi::Value &thisVal, const jsi::Value *args, size_t count) -> jsi::Value {
-            return this->cpp_uniffi_ddk_ffi_fn_func_sign_contract_cet(rt, thisVal, args, count);
+            return this->cpp_uniffi_ddk_ffi_fn_func_contract_cet_transaction(rt, thisVal, args, count);
         }
     );
-    props["ubrn_uniffi_ddk_ffi_fn_func_sign_contract_refund"] = jsi::Function::createFromHostFunction(
+    props["ubrn_uniffi_ddk_ffi_fn_func_contract_refund_transaction"] = jsi::Function::createFromHostFunction(
         rt,
-        jsi::PropNameID::forAscii(rt, "ubrn_uniffi_ddk_ffi_fn_func_sign_contract_refund"),
-        5,
+        jsi::PropNameID::forAscii(rt, "ubrn_uniffi_ddk_ffi_fn_func_contract_refund_transaction"),
+        3,
         [this](jsi::Runtime &rt, const jsi::Value &thisVal, const jsi::Value *args, size_t count) -> jsi::Value {
-            return this->cpp_uniffi_ddk_ffi_fn_func_sign_contract_refund(rt, thisVal, args, count);
+            return this->cpp_uniffi_ddk_ffi_fn_func_contract_refund_transaction(rt, thisVal, args, count);
         }
     );
     props["ubrn_uniffi_ddk_ffi_checksum_func_convert_mnemonic_to_seed"] = jsi::Function::createFromHostFunction(
@@ -4381,6 +4391,14 @@ NativeDdkFfi::NativeDdkFfi(
             return this->cpp_uniffi_ddk_ffi_checksum_func_funding_input(rt, thisVal, args, count);
         }
     );
+    props["ubrn_uniffi_ddk_ffi_checksum_func_offer_temporary_contract_id"] = jsi::Function::createFromHostFunction(
+        rt,
+        jsi::PropNameID::forAscii(rt, "ubrn_uniffi_ddk_ffi_checksum_func_offer_temporary_contract_id"),
+        0,
+        [this](jsi::Runtime &rt, const jsi::Value &thisVal, const jsi::Value *args, size_t count) -> jsi::Value {
+            return this->cpp_uniffi_ddk_ffi_checksum_func_offer_temporary_contract_id(rt, thisVal, args, count);
+        }
+    );
     props["ubrn_uniffi_ddk_ffi_checksum_func_sign_accept"] = jsi::Function::createFromHostFunction(
         rt,
         jsi::PropNameID::forAscii(rt, "ubrn_uniffi_ddk_ffi_checksum_func_sign_accept"),
@@ -4461,6 +4479,14 @@ NativeDdkFfi::NativeDdkFfi(
             return this->cpp_uniffi_ddk_ffi_checksum_func_prepare_accept_offer(rt, thisVal, args, count);
         }
     );
+    props["ubrn_uniffi_ddk_ffi_checksum_func_prepare_finalize_sign"] = jsi::Function::createFromHostFunction(
+        rt,
+        jsi::PropNameID::forAscii(rt, "ubrn_uniffi_ddk_ffi_checksum_func_prepare_finalize_sign"),
+        0,
+        [this](jsi::Runtime &rt, const jsi::Value &thisVal, const jsi::Value *args, size_t count) -> jsi::Value {
+            return this->cpp_uniffi_ddk_ffi_checksum_func_prepare_finalize_sign(rt, thisVal, args, count);
+        }
+    );
     props["ubrn_uniffi_ddk_ffi_checksum_func_prepare_sign_accept"] = jsi::Function::createFromHostFunction(
         rt,
         jsi::PropNameID::forAscii(rt, "ubrn_uniffi_ddk_ffi_checksum_func_prepare_sign_accept"),
@@ -4469,20 +4495,20 @@ NativeDdkFfi::NativeDdkFfi(
             return this->cpp_uniffi_ddk_ffi_checksum_func_prepare_sign_accept(rt, thisVal, args, count);
         }
     );
-    props["ubrn_uniffi_ddk_ffi_checksum_func_sign_contract_cet"] = jsi::Function::createFromHostFunction(
+    props["ubrn_uniffi_ddk_ffi_checksum_func_contract_cet_transaction"] = jsi::Function::createFromHostFunction(
         rt,
-        jsi::PropNameID::forAscii(rt, "ubrn_uniffi_ddk_ffi_checksum_func_sign_contract_cet"),
+        jsi::PropNameID::forAscii(rt, "ubrn_uniffi_ddk_ffi_checksum_func_contract_cet_transaction"),
         0,
         [this](jsi::Runtime &rt, const jsi::Value &thisVal, const jsi::Value *args, size_t count) -> jsi::Value {
-            return this->cpp_uniffi_ddk_ffi_checksum_func_sign_contract_cet(rt, thisVal, args, count);
+            return this->cpp_uniffi_ddk_ffi_checksum_func_contract_cet_transaction(rt, thisVal, args, count);
         }
     );
-    props["ubrn_uniffi_ddk_ffi_checksum_func_sign_contract_refund"] = jsi::Function::createFromHostFunction(
+    props["ubrn_uniffi_ddk_ffi_checksum_func_contract_refund_transaction"] = jsi::Function::createFromHostFunction(
         rt,
-        jsi::PropNameID::forAscii(rt, "ubrn_uniffi_ddk_ffi_checksum_func_sign_contract_refund"),
+        jsi::PropNameID::forAscii(rt, "ubrn_uniffi_ddk_ffi_checksum_func_contract_refund_transaction"),
         0,
         [this](jsi::Runtime &rt, const jsi::Value &thisVal, const jsi::Value *args, size_t count) -> jsi::Value {
-            return this->cpp_uniffi_ddk_ffi_checksum_func_sign_contract_refund(rt, thisVal, args, count);
+            return this->cpp_uniffi_ddk_ffi_checksum_func_contract_refund_transaction(rt, thisVal, args, count);
         }
     );
     props["ubrn_uniffi_ddk_ffi_checksum_method_contractkeyprovider_funding_pubkey"] = jsi::Function::createFromHostFunction(
@@ -4499,14 +4525,6 @@ NativeDdkFfi::NativeDdkFfi(
         0,
         [this](jsi::Runtime &rt, const jsi::Value &thisVal, const jsi::Value *args, size_t count) -> jsi::Value {
             return this->cpp_uniffi_ddk_ffi_checksum_method_contractkeyprovider_get_signer(rt, thisVal, args, count);
-        }
-    );
-    props["ubrn_uniffi_ddk_ffi_checksum_method_contractkeyprovider_signer_for_contract"] = jsi::Function::createFromHostFunction(
-        rt,
-        jsi::PropNameID::forAscii(rt, "ubrn_uniffi_ddk_ffi_checksum_method_contractkeyprovider_signer_for_contract"),
-        0,
-        [this](jsi::Runtime &rt, const jsi::Value &thisVal, const jsi::Value *args, size_t count) -> jsi::Value {
-            return this->cpp_uniffi_ddk_ffi_checksum_method_contractkeyprovider_signer_for_contract(rt, thisVal, args, count);
         }
     );
     props["ubrn_uniffi_ddk_ffi_checksum_method_contractsigner_sign_ecdsa"] = jsi::Function::createFromHostFunction(
@@ -4901,47 +4919,37 @@ jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_method_contractkeyprovider_fundin
         );
         uniffi::ddk_ffi::Bridging<RustCallStatus>::copyIntoJs(rt, callInvoker, status, args[count - 1]);
 
-
+        
         return uniffi::ddk_ffi::Bridging<RustBuffer>::toJs(rt, callInvoker, value);
 }
 jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_method_contractkeyprovider_get_signer(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         RustCallStatus status = uniffi::ddk_ffi::Bridging<RustCallStatus>::rustSuccess(rt);
-        auto value = uniffi_ddk_ffi_fn_method_contractkeyprovider_get_signer(uniffi_jsi::Bridging</*handle*/ uint64_t>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[1]),
+        auto value = uniffi_ddk_ffi_fn_method_contractkeyprovider_get_signer(uniffi_jsi::Bridging</*handle*/ uint64_t>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[1]), 
             &status
         );
         uniffi::ddk_ffi::Bridging<RustCallStatus>::copyIntoJs(rt, callInvoker, status, args[count - 1]);
 
-
-        return uniffi_jsi::Bridging</*handle*/ uint64_t>::toJs(rt, callInvoker, value);
-}
-jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_method_contractkeyprovider_signer_for_contract(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
-        RustCallStatus status = uniffi::ddk_ffi::Bridging<RustCallStatus>::rustSuccess(rt);
-        auto value = uniffi_ddk_ffi_fn_method_contractkeyprovider_signer_for_contract(uniffi_jsi::Bridging</*handle*/ uint64_t>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[1]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[2]),
-            &status
-        );
-        uniffi::ddk_ffi::Bridging<RustCallStatus>::copyIntoJs(rt, callInvoker, status, args[count - 1]);
-
-
+        
         return uniffi_jsi::Bridging</*handle*/ uint64_t>::toJs(rt, callInvoker, value);
 }
 jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_clone_contractsigner(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         RustCallStatus status = uniffi::ddk_ffi::Bridging<RustCallStatus>::rustSuccess(rt);
-        auto value = uniffi_ddk_ffi_fn_clone_contractsigner(uniffi_jsi::Bridging</*handle*/ uint64_t>::fromJs(rt, callInvoker, args[0]),
+        auto value = uniffi_ddk_ffi_fn_clone_contractsigner(uniffi_jsi::Bridging</*handle*/ uint64_t>::fromJs(rt, callInvoker, args[0]), 
             &status
         );
         uniffi::ddk_ffi::Bridging<RustCallStatus>::copyIntoJs(rt, callInvoker, status, args[count - 1]);
 
-
+        
         return uniffi_jsi::Bridging</*handle*/ uint64_t>::toJs(rt, callInvoker, value);
 }
 jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_free_contractsigner(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         RustCallStatus status = uniffi::ddk_ffi::Bridging<RustCallStatus>::rustSuccess(rt);
-        uniffi_ddk_ffi_fn_free_contractsigner(uniffi_jsi::Bridging</*handle*/ uint64_t>::fromJs(rt, callInvoker, args[0]),
+        uniffi_ddk_ffi_fn_free_contractsigner(uniffi_jsi::Bridging</*handle*/ uint64_t>::fromJs(rt, callInvoker, args[0]), 
             &status
         );
         uniffi::ddk_ffi::Bridging<RustCallStatus>::copyIntoJs(rt, callInvoker, status, args[count - 1]);
 
-
+        
         return jsi::Value::undefined();
 }
 jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_init_callback_vtable_contractsigner(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
@@ -4963,42 +4971,42 @@ jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_init_callback_vtable_contractsign
 }
 jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_method_contractsigner_sign_ecdsa(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         RustCallStatus status = uniffi::ddk_ffi::Bridging<RustCallStatus>::rustSuccess(rt);
-        auto value = uniffi_ddk_ffi_fn_method_contractsigner_sign_ecdsa(uniffi_jsi::Bridging</*handle*/ uint64_t>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[1]),
+        auto value = uniffi_ddk_ffi_fn_method_contractsigner_sign_ecdsa(uniffi_jsi::Bridging</*handle*/ uint64_t>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[1]), 
             &status
         );
         uniffi::ddk_ffi::Bridging<RustCallStatus>::copyIntoJs(rt, callInvoker, status, args[count - 1]);
 
-
+        
         return uniffi::ddk_ffi::Bridging<RustBuffer>::toJs(rt, callInvoker, value);
 }
 jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_method_contractsigner_sign_adaptor(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         RustCallStatus status = uniffi::ddk_ffi::Bridging<RustCallStatus>::rustSuccess(rt);
-        auto value = uniffi_ddk_ffi_fn_method_contractsigner_sign_adaptor(uniffi_jsi::Bridging</*handle*/ uint64_t>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[1]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[2]),
+        auto value = uniffi_ddk_ffi_fn_method_contractsigner_sign_adaptor(uniffi_jsi::Bridging</*handle*/ uint64_t>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[1]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[2]), 
             &status
         );
         uniffi::ddk_ffi::Bridging<RustCallStatus>::copyIntoJs(rt, callInvoker, status, args[count - 1]);
 
-
+        
         return uniffi::ddk_ffi::Bridging<RustBuffer>::toJs(rt, callInvoker, value);
 }
 jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_clone_contractsignerprovider(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         RustCallStatus status = uniffi::ddk_ffi::Bridging<RustCallStatus>::rustSuccess(rt);
-        auto value = uniffi_ddk_ffi_fn_clone_contractsignerprovider(uniffi_jsi::Bridging</*handle*/ uint64_t>::fromJs(rt, callInvoker, args[0]),
+        auto value = uniffi_ddk_ffi_fn_clone_contractsignerprovider(uniffi_jsi::Bridging</*handle*/ uint64_t>::fromJs(rt, callInvoker, args[0]), 
             &status
         );
         uniffi::ddk_ffi::Bridging<RustCallStatus>::copyIntoJs(rt, callInvoker, status, args[count - 1]);
 
-
+        
         return uniffi_jsi::Bridging</*handle*/ uint64_t>::toJs(rt, callInvoker, value);
 }
 jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_free_contractsignerprovider(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         RustCallStatus status = uniffi::ddk_ffi::Bridging<RustCallStatus>::rustSuccess(rt);
-        uniffi_ddk_ffi_fn_free_contractsignerprovider(uniffi_jsi::Bridging</*handle*/ uint64_t>::fromJs(rt, callInvoker, args[0]),
+        uniffi_ddk_ffi_fn_free_contractsignerprovider(uniffi_jsi::Bridging</*handle*/ uint64_t>::fromJs(rt, callInvoker, args[0]), 
             &status
         );
         uniffi::ddk_ffi::Bridging<RustCallStatus>::copyIntoJs(rt, callInvoker, status, args[count - 1]);
 
-
+        
         return jsi::Value::undefined();
 }
 jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_init_callback_vtable_contractsignerprovider(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
@@ -5020,67 +5028,67 @@ jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_init_callback_vtable_contractsign
 }
 jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_method_contractsignerprovider_get_signer(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         RustCallStatus status = uniffi::ddk_ffi::Bridging<RustCallStatus>::rustSuccess(rt);
-        auto value = uniffi_ddk_ffi_fn_method_contractsignerprovider_get_signer(uniffi_jsi::Bridging</*handle*/ uint64_t>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[1]),
+        auto value = uniffi_ddk_ffi_fn_method_contractsignerprovider_get_signer(uniffi_jsi::Bridging</*handle*/ uint64_t>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[1]), 
             &status
         );
         uniffi::ddk_ffi::Bridging<RustCallStatus>::copyIntoJs(rt, callInvoker, status, args[count - 1]);
 
-
+        
         return uniffi_jsi::Bridging</*handle*/ uint64_t>::toJs(rt, callInvoker, value);
 }
 jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_clone_privatekeysigner(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         RustCallStatus status = uniffi::ddk_ffi::Bridging<RustCallStatus>::rustSuccess(rt);
-        auto value = uniffi_ddk_ffi_fn_clone_privatekeysigner(uniffi_jsi::Bridging</*handle*/ uint64_t>::fromJs(rt, callInvoker, args[0]),
+        auto value = uniffi_ddk_ffi_fn_clone_privatekeysigner(uniffi_jsi::Bridging</*handle*/ uint64_t>::fromJs(rt, callInvoker, args[0]), 
             &status
         );
         uniffi::ddk_ffi::Bridging<RustCallStatus>::copyIntoJs(rt, callInvoker, status, args[count - 1]);
 
-
+        
         return uniffi_jsi::Bridging</*handle*/ uint64_t>::toJs(rt, callInvoker, value);
 }
 jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_free_privatekeysigner(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         RustCallStatus status = uniffi::ddk_ffi::Bridging<RustCallStatus>::rustSuccess(rt);
-        uniffi_ddk_ffi_fn_free_privatekeysigner(uniffi_jsi::Bridging</*handle*/ uint64_t>::fromJs(rt, callInvoker, args[0]),
+        uniffi_ddk_ffi_fn_free_privatekeysigner(uniffi_jsi::Bridging</*handle*/ uint64_t>::fromJs(rt, callInvoker, args[0]), 
             &status
         );
         uniffi::ddk_ffi::Bridging<RustCallStatus>::copyIntoJs(rt, callInvoker, status, args[count - 1]);
 
-
+        
         return jsi::Value::undefined();
 }
 jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_constructor_privatekeysigner_from_secret_key(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         RustCallStatus status = uniffi::ddk_ffi::Bridging<RustCallStatus>::rustSuccess(rt);
-        auto value = uniffi_ddk_ffi_fn_constructor_privatekeysigner_from_secret_key(uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[0]),
+        auto value = uniffi_ddk_ffi_fn_constructor_privatekeysigner_from_secret_key(uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[0]), 
             &status
         );
         uniffi::ddk_ffi::Bridging<RustCallStatus>::copyIntoJs(rt, callInvoker, status, args[count - 1]);
 
-
+        
         return uniffi_jsi::Bridging</*handle*/ uint64_t>::toJs(rt, callInvoker, value);
 }
 jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_method_privatekeysigner_public_key(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         RustCallStatus status = uniffi::ddk_ffi::Bridging<RustCallStatus>::rustSuccess(rt);
-        auto value = uniffi_ddk_ffi_fn_method_privatekeysigner_public_key(uniffi_jsi::Bridging</*handle*/ uint64_t>::fromJs(rt, callInvoker, args[0]),
+        auto value = uniffi_ddk_ffi_fn_method_privatekeysigner_public_key(uniffi_jsi::Bridging</*handle*/ uint64_t>::fromJs(rt, callInvoker, args[0]), 
             &status
         );
         uniffi::ddk_ffi::Bridging<RustCallStatus>::copyIntoJs(rt, callInvoker, status, args[count - 1]);
 
-
+        
         return uniffi::ddk_ffi::Bridging<RustBuffer>::toJs(rt, callInvoker, value);
 }
 jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_method_privatekeysigner_sign_adaptor(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         RustCallStatus status = uniffi::ddk_ffi::Bridging<RustCallStatus>::rustSuccess(rt);
-        auto value = uniffi_ddk_ffi_fn_method_privatekeysigner_sign_adaptor(uniffi_jsi::Bridging</*handle*/ uint64_t>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[1]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[2]),
+        auto value = uniffi_ddk_ffi_fn_method_privatekeysigner_sign_adaptor(uniffi_jsi::Bridging</*handle*/ uint64_t>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[1]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[2]), 
             &status
         );
         uniffi::ddk_ffi::Bridging<RustCallStatus>::copyIntoJs(rt, callInvoker, status, args[count - 1]);
 
-
+        
         return uniffi::ddk_ffi::Bridging<RustBuffer>::toJs(rt, callInvoker, value);
 }
 jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_method_privatekeysigner_sign_ecdsa(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         RustCallStatus status = uniffi::ddk_ffi::Bridging<RustCallStatus>::rustSuccess(rt);
-        auto value = uniffi_ddk_ffi_fn_method_privatekeysigner_sign_ecdsa(uniffi_jsi::Bridging</*handle*/ uint64_t>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[1]),
+        auto value = uniffi_ddk_ffi_fn_method_privatekeysigner_sign_ecdsa(uniffi_jsi::Bridging</*handle*/ uint64_t>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[1]), 
             &status
         );
         uniffi::ddk_ffi::Bridging<RustCallStatus>::copyIntoJs(rt, callInvoker, status, args[count - 1]);
@@ -5419,7 +5427,7 @@ jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_func_version(jsi::Runtime& rt, co
 }
 jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_func_accept_offer(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         RustCallStatus status = uniffi::ddk_ffi::Bridging<RustCallStatus>::rustSuccess(rt);
-        auto value = uniffi_ddk_ffi_fn_func_accept_offer(uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[1]), uniffi_jsi::Bridging</*handle*/ uint64_t>::fromJs(rt, callInvoker, args[2]),
+        auto value = uniffi_ddk_ffi_fn_func_accept_offer(uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[1]), uniffi_jsi::Bridging</*handle*/ uint64_t>::fromJs(rt, callInvoker, args[2]), 
             &status
         );
         uniffi::ddk_ffi::Bridging<RustCallStatus>::copyIntoJs(rt, callInvoker, status, args[count - 1]);
@@ -5518,7 +5526,7 @@ jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_func_dlc_transactions_from_signed
 }
 jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_func_finalize_sign(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         RustCallStatus status = uniffi::ddk_ffi::Bridging<RustCallStatus>::rustSuccess(rt);
-        auto value = uniffi_ddk_ffi_fn_func_finalize_sign(uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[1]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[2]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[3]), uniffi_jsi::Bridging</*handle*/ uint64_t>::fromJs(rt, callInvoker, args[4]),
+        auto value = uniffi_ddk_ffi_fn_func_finalize_sign(uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[1]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[2]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[3]), uniffi_jsi::Bridging</*handle*/ uint64_t>::fromJs(rt, callInvoker, args[4]), 
             &status
         );
         uniffi::ddk_ffi::Bridging<RustCallStatus>::copyIntoJs(rt, callInvoker, status, args[count - 1]);
@@ -5536,9 +5544,19 @@ jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_func_funding_input(jsi::Runtime& 
         
         return uniffi::ddk_ffi::Bridging<RustBuffer>::toJs(rt, callInvoker, value);
 }
+jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_func_offer_temporary_contract_id(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
+        RustCallStatus status = uniffi::ddk_ffi::Bridging<RustCallStatus>::rustSuccess(rt);
+        auto value = uniffi_ddk_ffi_fn_func_offer_temporary_contract_id(uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[0]), 
+            &status
+        );
+        uniffi::ddk_ffi::Bridging<RustCallStatus>::copyIntoJs(rt, callInvoker, status, args[count - 1]);
+
+        
+        return uniffi::ddk_ffi::Bridging<RustBuffer>::toJs(rt, callInvoker, value);
+}
 jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_func_sign_accept(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         RustCallStatus status = uniffi::ddk_ffi::Bridging<RustCallStatus>::rustSuccess(rt);
-        auto value = uniffi_ddk_ffi_fn_func_sign_accept(uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[1]), uniffi_jsi::Bridging</*handle*/ uint64_t>::fromJs(rt, callInvoker, args[2]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[3]),
+        auto value = uniffi_ddk_ffi_fn_func_sign_accept(uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[1]), uniffi_jsi::Bridging</*handle*/ uint64_t>::fromJs(rt, callInvoker, args[2]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[3]), 
             &status
         );
         uniffi::ddk_ffi::Bridging<RustCallStatus>::copyIntoJs(rt, callInvoker, status, args[count - 1]);
@@ -5598,7 +5616,7 @@ jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_func_validate_sign(jsi::Runtime& 
 }
 jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_func_complete_accept_offer(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         RustCallStatus status = uniffi::ddk_ffi::Bridging<RustCallStatus>::rustSuccess(rt);
-        auto value = uniffi_ddk_ffi_fn_func_complete_accept_offer(uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[1]),
+        auto value = uniffi_ddk_ffi_fn_func_complete_accept_offer(uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[1]), 
             &status
         );
         uniffi::ddk_ffi::Bridging<RustCallStatus>::copyIntoJs(rt, callInvoker, status, args[count - 1]);
@@ -5608,7 +5626,7 @@ jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_func_complete_accept_offer(jsi::R
 }
 jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_func_complete_sign_accept(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         RustCallStatus status = uniffi::ddk_ffi::Bridging<RustCallStatus>::rustSuccess(rt);
-        auto value = uniffi_ddk_ffi_fn_func_complete_sign_accept(uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[1]),
+        auto value = uniffi_ddk_ffi_fn_func_complete_sign_accept(uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[1]), 
             &status
         );
         uniffi::ddk_ffi::Bridging<RustCallStatus>::copyIntoJs(rt, callInvoker, status, args[count - 1]);
@@ -5628,7 +5646,17 @@ jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_func_finalize_sign_with_signature
 }
 jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_func_prepare_accept_offer(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         RustCallStatus status = uniffi::ddk_ffi::Bridging<RustCallStatus>::rustSuccess(rt);
-        auto value = uniffi_ddk_ffi_fn_func_prepare_accept_offer(uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[1]),
+        auto value = uniffi_ddk_ffi_fn_func_prepare_accept_offer(uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[1]), 
+            &status
+        );
+        uniffi::ddk_ffi::Bridging<RustCallStatus>::copyIntoJs(rt, callInvoker, status, args[count - 1]);
+
+        
+        return uniffi::ddk_ffi::Bridging<RustBuffer>::toJs(rt, callInvoker, value);
+}
+jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_func_prepare_finalize_sign(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
+        RustCallStatus status = uniffi::ddk_ffi::Bridging<RustCallStatus>::rustSuccess(rt);
+        auto value = uniffi_ddk_ffi_fn_func_prepare_finalize_sign(uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[1]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[2]), 
             &status
         );
         uniffi::ddk_ffi::Bridging<RustCallStatus>::copyIntoJs(rt, callInvoker, status, args[count - 1]);
@@ -5638,27 +5666,27 @@ jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_func_prepare_accept_offer(jsi::Ru
 }
 jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_func_prepare_sign_accept(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         RustCallStatus status = uniffi::ddk_ffi::Bridging<RustCallStatus>::rustSuccess(rt);
-        auto value = uniffi_ddk_ffi_fn_func_prepare_sign_accept(uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[1]),
+        auto value = uniffi_ddk_ffi_fn_func_prepare_sign_accept(uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[1]), 
             &status
         );
         uniffi::ddk_ffi::Bridging<RustCallStatus>::copyIntoJs(rt, callInvoker, status, args[count - 1]);
 
-
+        
         return uniffi::ddk_ffi::Bridging<RustBuffer>::toJs(rt, callInvoker, value);
 }
-jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_func_sign_contract_cet(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
+jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_func_contract_cet_transaction(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         RustCallStatus status = uniffi::ddk_ffi::Bridging<RustCallStatus>::rustSuccess(rt);
-        auto value = uniffi_ddk_ffi_fn_func_sign_contract_cet(uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[1]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[2]), uniffi_jsi::Bridging</*handle*/ uint64_t>::fromJs(rt, callInvoker, args[3]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[4]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[5]),
+        auto value = uniffi_ddk_ffi_fn_func_contract_cet_transaction(uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[1]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[2]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[3]), 
             &status
         );
         uniffi::ddk_ffi::Bridging<RustCallStatus>::copyIntoJs(rt, callInvoker, status, args[count - 1]);
 
-
+        
         return uniffi::ddk_ffi::Bridging<RustBuffer>::toJs(rt, callInvoker, value);
 }
-jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_func_sign_contract_refund(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
+jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_fn_func_contract_refund_transaction(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         RustCallStatus status = uniffi::ddk_ffi::Bridging<RustCallStatus>::rustSuccess(rt);
-        auto value = uniffi_ddk_ffi_fn_func_sign_contract_refund(uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[1]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[2]), uniffi_jsi::Bridging</*handle*/ uint64_t>::fromJs(rt, callInvoker, args[3]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[4]),
+        auto value = uniffi_ddk_ffi_fn_func_contract_refund_transaction(uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[0]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[1]), uniffi::ddk_ffi::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[2]), 
             &status
         );
         uniffi::ddk_ffi::Bridging<RustCallStatus>::copyIntoJs(rt, callInvoker, status, args[count - 1]);
@@ -5897,6 +5925,13 @@ jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_checksum_func_funding_input(jsi::Run
         
         return uniffi_jsi::Bridging<uint16_t>::toJs(rt, callInvoker, value);
 }
+jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_checksum_func_offer_temporary_contract_id(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
+        auto value = uniffi_ddk_ffi_checksum_func_offer_temporary_contract_id(
+        );
+
+        
+        return uniffi_jsi::Bridging<uint16_t>::toJs(rt, callInvoker, value);
+}
 jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_checksum_func_sign_accept(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         auto value = uniffi_ddk_ffi_checksum_func_sign_accept(
         );
@@ -5967,22 +6002,29 @@ jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_checksum_func_prepare_accept_offer(j
         
         return uniffi_jsi::Bridging<uint16_t>::toJs(rt, callInvoker, value);
 }
+jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_checksum_func_prepare_finalize_sign(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
+        auto value = uniffi_ddk_ffi_checksum_func_prepare_finalize_sign(
+        );
+
+        
+        return uniffi_jsi::Bridging<uint16_t>::toJs(rt, callInvoker, value);
+}
 jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_checksum_func_prepare_sign_accept(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         auto value = uniffi_ddk_ffi_checksum_func_prepare_sign_accept(
         );
 
-
+        
         return uniffi_jsi::Bridging<uint16_t>::toJs(rt, callInvoker, value);
 }
-jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_checksum_func_sign_contract_cet(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
-        auto value = uniffi_ddk_ffi_checksum_func_sign_contract_cet(
+jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_checksum_func_contract_cet_transaction(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
+        auto value = uniffi_ddk_ffi_checksum_func_contract_cet_transaction(
         );
 
-
+        
         return uniffi_jsi::Bridging<uint16_t>::toJs(rt, callInvoker, value);
 }
-jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_checksum_func_sign_contract_refund(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
-        auto value = uniffi_ddk_ffi_checksum_func_sign_contract_refund(
+jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_checksum_func_contract_refund_transaction(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
+        auto value = uniffi_ddk_ffi_checksum_func_contract_refund_transaction(
         );
 
         
@@ -5992,56 +6034,49 @@ jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_checksum_method_contractkeyprovider_
         auto value = uniffi_ddk_ffi_checksum_method_contractkeyprovider_funding_pubkey(
         );
 
-
+        
         return uniffi_jsi::Bridging<uint16_t>::toJs(rt, callInvoker, value);
 }
 jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_checksum_method_contractkeyprovider_get_signer(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         auto value = uniffi_ddk_ffi_checksum_method_contractkeyprovider_get_signer(
         );
 
-
-        return uniffi_jsi::Bridging<uint16_t>::toJs(rt, callInvoker, value);
-}
-jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_checksum_method_contractkeyprovider_signer_for_contract(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
-        auto value = uniffi_ddk_ffi_checksum_method_contractkeyprovider_signer_for_contract(
-        );
-
-
+        
         return uniffi_jsi::Bridging<uint16_t>::toJs(rt, callInvoker, value);
 }
 jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_checksum_method_contractsigner_sign_ecdsa(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         auto value = uniffi_ddk_ffi_checksum_method_contractsigner_sign_ecdsa(
         );
 
-
+        
         return uniffi_jsi::Bridging<uint16_t>::toJs(rt, callInvoker, value);
 }
 jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_checksum_method_contractsigner_sign_adaptor(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         auto value = uniffi_ddk_ffi_checksum_method_contractsigner_sign_adaptor(
         );
 
-
+        
         return uniffi_jsi::Bridging<uint16_t>::toJs(rt, callInvoker, value);
 }
 jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_checksum_method_contractsignerprovider_get_signer(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         auto value = uniffi_ddk_ffi_checksum_method_contractsignerprovider_get_signer(
         );
 
-
+        
         return uniffi_jsi::Bridging<uint16_t>::toJs(rt, callInvoker, value);
 }
 jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_checksum_method_privatekeysigner_public_key(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         auto value = uniffi_ddk_ffi_checksum_method_privatekeysigner_public_key(
         );
 
-
+        
         return uniffi_jsi::Bridging<uint16_t>::toJs(rt, callInvoker, value);
 }
 jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_checksum_method_privatekeysigner_sign_adaptor(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         auto value = uniffi_ddk_ffi_checksum_method_privatekeysigner_sign_adaptor(
         );
 
-
+        
         return uniffi_jsi::Bridging<uint16_t>::toJs(rt, callInvoker, value);
 }
 jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_checksum_method_privatekeysigner_sign_ecdsa(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
@@ -6083,7 +6118,7 @@ jsi::Value NativeDdkFfi::cpp_uniffi_ddk_ffi_checksum_constructor_privatekeysigne
         auto value = uniffi_ddk_ffi_checksum_constructor_privatekeysigner_from_secret_key(
         );
 
-
+        
         return uniffi_jsi::Bridging<uint16_t>::toJs(rt, callInvoker, value);
 }
 jsi::Value NativeDdkFfi::cpp_ffi_ddk_ffi_uniffi_contract_version(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {

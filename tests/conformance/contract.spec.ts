@@ -49,11 +49,14 @@ const tempId = (marker: number) => Buffer.alloc(32, marker)
 const FUNDING_SERIAL = 100n
 
 // Builds and signs a complete single-funded contract, returning every artifact.
-function runFullFlow(identity?: { fundingPubkey: Uint8Array; signers: ddk.ContractSignerProvider }) {
+function runFullFlow(options?: {
+  fundingPubkey?: Uint8Array
+  signers?: ddk.ContractSignerProvider
+  offerTempId?: Uint8Array
+}) {
   const offererKeys = ddk.ContractKeyProvider.fromDescriptor(OFFERER_DESCRIPTOR)
   const acceptorKeys = ddk.ContractKeyProvider.fromMnemonic(ACCEPTOR_MNEMONIC, undefined, 'regtest')
-  const offerTempId = tempId(0x5c)
-  const acceptTempId = tempId(0xa1)
+  const offerTempId = options?.offerTempId ?? tempId(0x5c)
   const spk = buf(OFFERER_SPK_HEX)
 
   const funding = ddk.fundingInput(buf(PREV_TX_HEX), 0, FUNDING_SERIAL, 0xffffffff, 108, Buffer.alloc(0))
@@ -64,7 +67,7 @@ function runFullFlow(identity?: { fundingPubkey: Uint8Array; signers: ddk.Contra
     contractInfo: buf(CONTRACT_INFO_HEX),
     offerCollateralSats: 100_000n,
     party: {
-      fundingPubkey: identity?.fundingPubkey ?? offererKeys.fundingPubkey(offerTempId),
+      fundingPubkey: options?.fundingPubkey ?? offererKeys.fundingPubkey(offerTempId),
       fundingInputs: [funding],
       payoutSpk: spk,
       payoutSerialId: 1n,
@@ -84,7 +87,8 @@ function runFullFlow(identity?: { fundingPubkey: Uint8Array; signers: ddk.Contra
     offer,
     {
       party: {
-        fundingPubkey: acceptorKeys.fundingPubkey(acceptTempId),
+        // The acceptor derives its key from the offer's temporary id.
+        fundingPubkey: acceptorKeys.fundingPubkey(ddk.offerTemporaryContractId(offer)),
         fundingInputs: [],
         payoutSpk: spk,
         payoutSerialId: 4n,
@@ -103,14 +107,13 @@ function runFullFlow(identity?: { fundingPubkey: Uint8Array; signers: ddk.Contra
   const signedPsbt = ddk.signFundingPsbtWithDescriptor(offer, accept, fundingPsbt, OFFERER_DESCRIPTOR, [
     { inputSerialId: FUNDING_SERIAL, derivationIndex: 0 },
   ])
-  const signResult = ddk.signAccept(offer, accept, identity?.signers ?? offererKeys, signedPsbt)
+  const signResult = ddk.signAccept(offer, accept, options?.signers ?? offererKeys, signedPsbt)
   const fundingTx = ddk.finalizeSign(offer, accept, signResult.sign, fundingPsbt, acceptorKeys)
 
   return {
     offererKeys,
     acceptorKeys,
     offerTempId,
-    acceptTempId,
     offer,
     acceptResult,
     accept,
@@ -133,6 +136,7 @@ describe('binding surface', () => {
       'validateAccept',
       'validateSign',
       'computeContractId',
+      'offerTemporaryContractId',
       'contractInfoPayouts',
       'acceptOffer',
       'createFundingPsbt',
@@ -140,8 +144,8 @@ describe('binding surface', () => {
       'signFundingPsbtWithDescriptor',
       'signAccept',
       'finalizeSign',
-      'signContractCet',
-      'signContractRefund',
+      'contractCetTransaction',
+      'contractRefundTransaction',
       'createDlcSpliceInput',
       'splicedContractIds',
       'prepareAcceptOffer',
@@ -149,6 +153,7 @@ describe('binding surface', () => {
       'prepareSignAccept',
       'completeSignAccept',
       'finalizeSignWithSignatures',
+      'prepareFinalizeSign',
     ]
     for (const name of fns) {
       expect(typeof (ddk as Record<string, unknown>)[name], name).toBe('function')
@@ -362,39 +367,23 @@ describe('settlement', () => {
   const flow = runFullFlow()
   const up = [{ oracleIndex: 0, attestation: buf(ATTESTATION_UP_HEX) }]
 
-  test('signContractCet signs the CET for the attested outcome', () => {
-    const cet = ddk.signContractCet(
-      flow.offer,
-      flow.accept,
-      flow.signResult.sign,
-      flow.offererKeys,
-      ddk.Party.Offer,
-      up,
-    )
+  test('contractCetTransaction builds the CET for the attested outcome from the messages alone', () => {
+    const cet = ddk.contractCetTransaction(flow.offer, flow.accept, flow.signResult.sign, up)
     expect(cet instanceof Uint8Array).toBe(true)
-    expect(cet.length).toBeGreaterThan(0)
+    // Both halves of the 2-of-2 are present: the signed CET is larger than the
+    // unsigned one rebuilt from the messages.
+    const unsigned = ddk.dlcTransactionsFromSignedMessages(flow.offer, flow.accept, flow.signResult.sign)
+    expect(cet.length).toBeGreaterThan(unsigned.cets[0]!.rawBytes.length)
     // The other outcome resolves to a different CET.
-    const down = ddk.signContractCet(flow.offer, flow.accept, flow.signResult.sign, flow.offererKeys, ddk.Party.Offer, [
+    const down = ddk.contractCetTransaction(flow.offer, flow.accept, flow.signResult.sign, [
       { oracleIndex: 0, attestation: buf(ATTESTATION_DOWN_HEX) },
     ])
     expect(bytes(down).equals(cet)).toBe(false)
   })
 
-  test('either party can settle on its own', () => {
-    const byAcceptor = ddk.signContractCet(
-      flow.offer,
-      flow.accept,
-      flow.signResult.sign,
-      flow.acceptorKeys,
-      ddk.Party.Accept,
-      up,
-    )
-    expect(byAcceptor.length).toBeGreaterThan(0)
-  })
-
   test('an outcome the contract does not have throws NoMatchingOutcome', () => {
     try {
-      ddk.signContractCet(flow.offer, flow.accept, flow.signResult.sign, flow.offererKeys, ddk.Party.Offer, [
+      ddk.contractCetTransaction(flow.offer, flow.accept, flow.signResult.sign, [
         { oracleIndex: 0, attestation: buf(ATTESTATION_SIDEWAYS_HEX) },
       ])
       throw new Error('should have thrown')
@@ -405,7 +394,7 @@ describe('settlement', () => {
 
   test('an out-of-range oracle index throws InvalidAttestation', () => {
     try {
-      ddk.signContractCet(flow.offer, flow.accept, flow.signResult.sign, flow.offererKeys, ddk.Party.Offer, [
+      ddk.contractCetTransaction(flow.offer, flow.accept, flow.signResult.sign, [
         { oracleIndex: 5, attestation: buf(ATTESTATION_UP_HEX) },
       ])
       throw new Error('should have thrown')
@@ -414,33 +403,19 @@ describe('settlement', () => {
     }
   })
 
-  test('signContractRefund signs the refund for either party', () => {
-    const byOfferer = ddk.signContractRefund(
-      flow.offer,
-      flow.accept,
-      flow.signResult.sign,
-      flow.offererKeys,
-      ddk.Party.Offer,
-    )
-    const byAcceptor = ddk.signContractRefund(
-      flow.offer,
-      flow.accept,
-      flow.signResult.sign,
-      flow.acceptorKeys,
-      ddk.Party.Accept,
-    )
-    expect(byOfferer.length).toBeGreaterThan(0)
-    expect(bytes(byAcceptor).equals(byOfferer)).toBe(true)
+  test('contractRefundTransaction builds the refund from the two refund signatures', () => {
+    const refund = ddk.contractRefundTransaction(flow.offer, flow.accept, flow.signResult.sign)
+    const unsigned = ddk.dlcTransactionsFromSignedMessages(flow.offer, flow.accept, flow.signResult.sign)
+    expect(refund.length).toBeGreaterThan(unsigned.refund.rawBytes.length)
   })
 
-  test('a provider that is neither party throws Key', () => {
-    const stranger = ddk.ContractKeyProvider.fromMnemonic(MNEMONIC, undefined, 'regtest')
-    try {
-      ddk.signContractRefund(flow.offer, flow.accept, flow.signResult.sign, stranger, ddk.Party.Offer)
-      throw new Error('should have thrown')
-    } catch (e) {
-      expect((e as { tag?: string }).tag).toBe('Key')
-    }
+  test('a message whose signatures belong to another contract is rejected', () => {
+    // The same flow under another temporary id: a different contract, with
+    // different keys on both sides, whose messages are individually well formed.
+    const other = runFullFlow({ offerTempId: tempId(0x77) })
+    expect(bytes(other.signResult.sign).equals(flow.signResult.sign)).toBe(false)
+    expect(() => ddk.contractRefundTransaction(flow.offer, flow.accept, other.signResult.sign)).toThrow()
+    expect(() => ddk.contractCetTransaction(flow.offer, other.accept, flow.signResult.sign, up)).toThrow()
   })
 })
 
@@ -456,12 +431,10 @@ describe('splicing', () => {
   // A splice-out rollover: contract B is funded entirely by spending contract
   // A's 2-of-2 output, taking 40 000 sats out on the way (100 000 -> 60 000).
   // This is the only path where each party must re-derive a PRIOR contract's
-  // funding key. Both find contract A by the contract id the offer's DLC input
-  // carries, but each supplies its OWN temporary id for A, because each
-  // derives its own half of A's 2-of-2.
+  // funding key. The offer's DLC input carries A's contract id and funding
+  // transaction, from which A's temporary id, and so each party's key, derive.
   const SPLICE_SERIAL = 900n
   const offerTempIdB = tempId(0xbb)
-  const acceptTempIdB = tempId(0xbc)
   const contractIdA = ddk.computeContractId(flow.offer, flow.accept)
 
   function runSpliceOut() {
@@ -500,7 +473,7 @@ describe('splicing', () => {
       offerB,
       {
         party: {
-          fundingPubkey: flow.acceptorKeys.fundingPubkey(acceptTempIdB),
+          fundingPubkey: flow.acceptorKeys.fundingPubkey(offerTempIdB),
           fundingInputs: [],
           payoutSpk: spk,
           payoutSerialId: 4n,
@@ -527,6 +500,22 @@ describe('splicing', () => {
 
   const splice = runSpliceOut()
 
+  test('prepareFinalizeSign lists the acceptor half of the spliced contract once the sign verifies', () => {
+    const request = ddk.prepareFinalizeSign(splice.offerB, splice.acceptB, splice.signB)
+    expect(request.dlcInputs.length).toBe(1)
+    expect(bytes(request.dlcInputs[0]!.key.contractId)).toEqual(bytes(ddk.computeContractId(flow.offer, flow.accept)))
+    // A's temporary id is recovered from the splice input, not supplied.
+    expect(bytes(request.dlcInputs[0]!.key.temporaryContractId)).toEqual(flow.offerTempId)
+    expect(bytes(request.dlcInputs[0]!.key.fundingPubkey)).toEqual(
+      bytes(flow.acceptorKeys.fundingPubkey(flow.offerTempId)),
+    )
+    expect(request.fundingPsbt.length).toBeGreaterThan(0)
+    // Nothing to sign for a contract that splices nothing.
+    expect(ddk.prepareFinalizeSign(flow.offer, flow.accept, flow.signResult.sign).dlcInputs).toEqual([])
+    // Another contract's sign message is rejected before any request is built.
+    expect(() => ddk.prepareFinalizeSign(splice.offerB, splice.acceptB, flow.signResult.sign)).toThrow()
+  })
+
   test('splicedContractIds names the spliced contract', () => {
     const ids = ddk.splicedContractIds(splice.offerB)
     expect(ids.length).toBe(1)
@@ -545,26 +534,27 @@ describe('splicing', () => {
     expect(unsigned.fund.inputs.length).toBe(1)
   })
 
-  test('a provider cannot restore the previous key using the other party temporary id', () => {
-    const fresh = ddk.ContractKeyProvider.fromMnemonic(ACCEPTOR_MNEMONIC, undefined, 'regtest')
-    const oldPubkey = flow.acceptorKeys.fundingPubkey(flow.acceptTempId)
-    expect(() => fresh.signerForContract(flow.offerTempId, oldPubkey)).toThrow()
+  test('providers built from the seeds sign the splice with nothing registered', () => {
+    // Fresh instances, as after a restart: no fundingPubkey call, no restore.
     const psbt = ddk.createFundingPsbt(splice.offerB, splice.acceptB)
-    expect(() => ddk.finalizeSign(splice.offerB, splice.acceptB, splice.signB, psbt, fresh)).toThrow()
-    fresh.signerForContract(flow.acceptTempId, oldPubkey)
-    expect(bytes(ddk.finalizeSign(splice.offerB, splice.acceptB, splice.signB, psbt, fresh))).toEqual(
+    const freshOfferer = ddk.ContractKeyProvider.fromDescriptor(OFFERER_DESCRIPTOR)
+    const signed = ddk.signAccept(splice.offerB, splice.acceptB, freshOfferer, psbt)
+    expect(() => ddk.validateSign(splice.offerB, splice.acceptB, signed.sign)).not.toThrow()
+    const freshAcceptor = ddk.ContractKeyProvider.fromMnemonic(ACCEPTOR_MNEMONIC, undefined, 'regtest')
+    expect(bytes(ddk.finalizeSign(splice.offerB, splice.acceptB, splice.signB, psbt, freshAcceptor))).toEqual(
       bytes(splice.fundingTx),
     )
   })
 
-  test('a splice cannot be signed when its previous key is unknown', () => {
-    const fresh = ddk.ContractKeyProvider.fromDescriptor(OFFERER_DESCRIPTOR)
-    fresh.fundingPubkey(offerTempIdB)
+  test('a provider from another seed cannot sign the splice', () => {
+    const stranger = ddk.ContractKeyProvider.fromMnemonic(MNEMONIC, undefined, 'regtest')
     const psbt = ddk.createFundingPsbt(splice.offerB, splice.acceptB)
-    expect(() => ddk.signAccept(splice.offerB, splice.acceptB, fresh, psbt)).toThrow()
-    fresh.signerForContract(flow.offerTempId, flow.offererKeys.fundingPubkey(flow.offerTempId))
-    const signed = ddk.signAccept(splice.offerB, splice.acceptB, fresh, psbt)
-    expect(() => ddk.validateSign(splice.offerB, splice.acceptB, signed.sign)).not.toThrow()
+    try {
+      ddk.finalizeSign(splice.offerB, splice.acceptB, splice.signB, psbt, stranger)
+      throw new Error('should have thrown')
+    } catch (e) {
+      expect((e as { tag?: string }).tag).toBe('Key')
+    }
   })
 
   test('the spliced contract carries the reduced collateral', () => {
@@ -577,17 +567,11 @@ describe('splicing', () => {
   })
 
   test('the spliced contract settles like any other', () => {
-    const cet = ddk.signContractCet(splice.offerB, splice.acceptB, splice.signB, flow.offererKeys, ddk.Party.Offer, [
+    const cet = ddk.contractCetTransaction(splice.offerB, splice.acceptB, splice.signB, [
       { oracleIndex: 0, attestation: buf(ATTESTATION_UP_HEX) },
     ])
     expect(cet.length).toBeGreaterThan(0)
-    const refund = ddk.signContractRefund(
-      splice.offerB,
-      splice.acceptB,
-      splice.signB,
-      flow.acceptorKeys,
-      ddk.Party.Accept,
-    )
+    const refund = ddk.contractRefundTransaction(splice.offerB, splice.acceptB, splice.signB)
     expect(refund.length).toBeGreaterThan(0)
     expect(bytes(refund).equals(cet)).toBe(false)
   })
@@ -599,7 +583,7 @@ describe('external signing', () => {
   const flow = runFullFlow()
   const acceptParams = {
     party: {
-      fundingPubkey: flow.acceptorKeys.fundingPubkey(flow.acceptTempId),
+      fundingPubkey: flow.acceptorKeys.fundingPubkey(flow.offerTempId),
       fundingInputs: [],
       payoutSpk: buf(OFFERER_SPK_HEX),
       payoutSerialId: 4n,
@@ -613,19 +597,21 @@ describe('external signing', () => {
 
   test('prepareAcceptOffer names the key, the refund and one PSBT per CET', () => {
     const request = ddk.prepareAcceptOffer(flow.offer, acceptParams).request
-    expect(bytes(request.fundingPubkey).equals(acceptParams.party.fundingPubkey)).toBe(true)
+    expect(bytes(request.key.fundingPubkey).equals(acceptParams.party.fundingPubkey)).toBe(true)
+    expect(bytes(request.key.temporaryContractId)).toEqual(flow.offerTempId)
+    expect(bytes(request.key.contractId)).toEqual(bytes(ddk.computeContractId(flow.offer, flow.accept)))
     expect(request.refundPsbt.length).toBeGreaterThan(0)
     expect(request.cets.length).toBe(2)
     for (const cet of request.cets) {
       expect(cet.psbt.length).toBeGreaterThan(0)
       expect(cet.adaptorPoint.length).toBe(33)
     }
-    expect(request.dlcInputs).toEqual([])
+    expect(request.splice.dlcInputs).toEqual([])
   })
 
   test('prepareSignAccept is for the offering party', () => {
     const request = ddk.prepareSignAccept(flow.offer, flow.accept).request
-    expect(bytes(request.fundingPubkey).equals(flow.offererKeys.fundingPubkey(flow.offerTempId))).toBe(true)
+    expect(bytes(request.key.fundingPubkey).equals(flow.offererKeys.fundingPubkey(flow.offerTempId))).toBe(true)
   })
 
   test('a malformed signature is rejected before anything is built', () => {
@@ -712,7 +698,7 @@ describe('consumer contract signer provider', () => {
       offer,
       {
         party: {
-          fundingPubkey: previous.acceptorKeys.fundingPubkey(tempId(0xb2)),
+          fundingPubkey: previous.acceptorKeys.fundingPubkey(tempId(0xb1)),
           fundingInputs: [],
           payoutSpk: spk,
           payoutSerialId: 4n,
@@ -729,10 +715,10 @@ describe('consumer contract signer provider', () => {
       { inputSerialId: 50n, derivationIndex: 0 },
     ])
     const prepared = ddk.prepareSignAccept(offer, accepted.accept)
-    expect(prepared.request.dlcInputs.length).toBe(1)
-    expect(prepared.request.dlcInputs[0]!.inputIndex).toBe(1)
-    expect(bytes(prepared.request.dlcInputs[0]!.key.fundingPubkey)).toEqual(bytes(legacyPubkey))
-    expect(bytes(prepared.request.dlcInputs[0]!.key.contractId!)).toEqual(bytes(previousId))
+    expect(prepared.request.splice.dlcInputs.length).toBe(1)
+    expect(prepared.request.splice.dlcInputs[0]!.inputIndex).toBe(1)
+    expect(bytes(prepared.request.splice.dlcInputs[0]!.key.fundingPubkey)).toEqual(bytes(legacyPubkey))
+    expect(bytes(prepared.request.splice.dlcInputs[0]!.key.contractId)).toEqual(bytes(previousId))
     const signed = ddk.signAccept(offer, accepted.accept, provider, psbt)
     const transaction = ddk.finalizeSign(
       offer,
@@ -753,16 +739,11 @@ describe('consumer contract signer provider', () => {
     ).toBe(true)
     expect(ecdsaCalls).toBe(3) // two refunds and the old contract's splice input
     expect(adaptorCalls).toBe(4) // two outcomes for each contract
-    // The same provider can settle either the stored legacy contract or its successor.
-    const oldCet = ddk.signContractCet(
-      previous.offer,
-      previous.accept,
-      previous.signResult.sign,
-      provider,
-      ddk.Party.Offer,
-      [{ oracleIndex: 0, attestation: buf(ATTESTATION_UP_HEX) }],
-    )
-    const newCet = ddk.signContractCet(offer, accepted.accept, signed.sign, provider, ddk.Party.Offer, [
+    // Both the legacy contract and its successor settle from their messages.
+    const oldCet = ddk.contractCetTransaction(previous.offer, previous.accept, previous.signResult.sign, [
+      { oracleIndex: 0, attestation: buf(ATTESTATION_UP_HEX) },
+    ])
+    const newCet = ddk.contractCetTransaction(offer, accepted.accept, signed.sign, [
       { oracleIndex: 0, attestation: buf(ATTESTATION_UP_HEX) },
     ])
     expect(bytes(oldCet)).not.toEqual(bytes(newCet))

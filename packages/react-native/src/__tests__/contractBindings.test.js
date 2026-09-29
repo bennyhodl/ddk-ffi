@@ -32,6 +32,7 @@ const FUNCTIONS = [
   'validateAccept',
   'validateSign',
   'computeContractId',
+  'offerTemporaryContractId',
   'contractInfoPayouts',
   'acceptOffer',
   'createFundingPsbt',
@@ -39,8 +40,8 @@ const FUNCTIONS = [
   'signFundingPsbtWithDescriptor',
   'signAccept',
   'finalizeSign',
-  'signContractCet',
-  'signContractRefund',
+  'contractCetTransaction',
+  'contractRefundTransaction',
   'createDlcSpliceInput',
   'splicedContractIds',
   'prepareAcceptOffer',
@@ -48,6 +49,7 @@ const FUNCTIONS = [
   'prepareSignAccept',
   'completeSignAccept',
   'finalizeSignWithSignatures',
+  'prepareFinalizeSign',
 ];
 
 const RECORD_TYPES = [
@@ -62,6 +64,7 @@ const RECORD_TYPES = [
   'PreparedContract',
   'SigningResponse',
   'SigningRequest',
+  'SpliceSigningRequest',
   'CetSigningRequest',
   'ContractSignatures',
   'DlcInputSignature',

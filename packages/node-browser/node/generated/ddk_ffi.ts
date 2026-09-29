@@ -177,6 +177,39 @@ export function computeContractId(offer: Uint8Array, accept: Uint8Array): Uint8A
 }
 
 /**
+ * The signed CET the attestations select, consensus serialized and ready to
+ * broadcast. Validates the attestations against the contract's announcements
+ * and both parties' adaptor signatures against their funding keys; either
+ * party builds the same transaction. Rebuilds a contract created before
+ * ddk-dlc 2.0.0-rc.4 using the sign message.
+ */
+export function contractCetTransaction(
+  offer: Uint8Array,
+  accept: Uint8Array,
+  sign: Uint8Array,
+  attestations: Array<OracleAttestationRef>,
+): Uint8Array /*throws*/ {
+  const __rb: Uint8Array = uniffiCaller.rustCallWithError(
+    /*liftError:*/ FfiConverterTypeContractError.lift.bind(FfiConverterTypeContractError),
+    /*caller:*/ (callStatus) => {
+      return nativeModule().uniffi_ddk_ffi_fn_func_contract_cet_transaction(
+        FfiConverterUint8Array.lower(offer, nativeModule().rustbuffer_alloc),
+        FfiConverterUint8Array.lower(accept, nativeModule().rustbuffer_alloc),
+        FfiConverterUint8Array.lower(sign, nativeModule().rustbuffer_alloc),
+        FfiConverterSequenceTypeOracleAttestationRef.lower(attestations, nativeModule().rustbuffer_alloc),
+        callStatus,
+      )
+    },
+    /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+  )
+  try {
+    return FfiConverterUint8Array.lift(__rb)
+  } finally {
+    nativeModule().rustbuffer_free(__rb)
+  }
+}
+
+/**
  * Derives the offer/accept payouts for every outcome of a contract from its
  * wire-encoded `ContractInfo`, for building a payout table to show users.
  *
@@ -198,6 +231,34 @@ export function contractInfoPayouts(contractInfo: Uint8Array): ContractPayouts /
   )
   try {
     return FfiConverterTypeContractPayouts.lift(__rb)
+  } finally {
+    nativeModule().rustbuffer_free(__rb)
+  }
+}
+
+/**
+ * The signed refund, consensus serialized and ready to broadcast once its
+ * locktime passes, from the refund signatures in the accept and sign messages.
+ */
+export function contractRefundTransaction(
+  offer: Uint8Array,
+  accept: Uint8Array,
+  sign: Uint8Array,
+): Uint8Array /*throws*/ {
+  const __rb: Uint8Array = uniffiCaller.rustCallWithError(
+    /*liftError:*/ FfiConverterTypeContractError.lift.bind(FfiConverterTypeContractError),
+    /*caller:*/ (callStatus) => {
+      return nativeModule().uniffi_ddk_ffi_fn_func_contract_refund_transaction(
+        FfiConverterUint8Array.lower(offer, nativeModule().rustbuffer_alloc),
+        FfiConverterUint8Array.lower(accept, nativeModule().rustbuffer_alloc),
+        FfiConverterUint8Array.lower(sign, nativeModule().rustbuffer_alloc),
+        callStatus,
+      )
+    },
+    /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+  )
+  try {
+    return FfiConverterUint8Array.lift(__rb)
   } finally {
     nativeModule().rustbuffer_free(__rb)
   }
@@ -804,7 +865,7 @@ export function dlcTransactionsFromMessages(offer: Uint8Array, accept: Uint8Arra
  * Unlike [`dlc_transactions_from_messages`], this also rebuilds a contract
  * created before ddk-dlc 2.0.0-rc.4, whose single-funded funding transaction
  * was priced under the old fee rule: the rule is chosen by which rebuild
- * reproduces `sign`'s contract id. `sign_contract_cet`, `sign_contract_refund`
+ * reproduces `sign`'s contract id. `contract_cet_transaction`, `contract_refund_transaction`
  * and `create_dlc_splice_input` rebuild the same way.
  */
 export function dlcTransactionsFromSignedMessages(
@@ -888,8 +949,8 @@ export function finalizeSign(
 /**
  * Completes the funding transaction for an accepting party whose contract key
  * is held externally: the same result as `finalize_sign`, with this party's
- * half of each splice input taken from `dlc_input_signatures` (the
- * accept step's request lists their indexes) rather than derived from keys.
+ * half of each splice input taken from `dlc_input_signatures`
+ * (`prepare_finalize_sign` lists them) rather than derived from keys.
  *
  * `signed_funding_psbt` carries finalized witnesses for the accepting party's
  * wallet inputs; with none, the unsigned funding PSBT is enough.
@@ -1030,6 +1091,29 @@ export function getXpubFromXpriv(xpriv: Uint8Array, network: string): Uint8Array
 }
 
 /**
+ * The 32-byte temporary contract id an offer carries. The accepting party
+ * passes it to `ContractKeyProvider::funding_pubkey` to derive its key for
+ * the contract, as the offering party did when it chose the id.
+ */
+export function offerTemporaryContractId(offer: Uint8Array): Uint8Array /*throws*/ {
+  const __rb: Uint8Array = uniffiCaller.rustCallWithError(
+    /*liftError:*/ FfiConverterTypeContractError.lift.bind(FfiConverterTypeContractError),
+    /*caller:*/ (callStatus) => {
+      return nativeModule().uniffi_ddk_ffi_fn_func_offer_temporary_contract_id(
+        FfiConverterUint8Array.lower(offer, nativeModule().rustbuffer_alloc),
+        callStatus,
+      )
+    },
+    /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+  )
+  try {
+    return FfiConverterUint8Array.lift(__rb)
+  } finally {
+    nativeModule().rustbuffer_free(__rb)
+  }
+}
+
+/**
  * Prepare an accept, choosing omitted serial ids once. Persist `context`
  * while waiting for external approval; no key material is retained in it.
  */
@@ -1047,6 +1131,38 @@ export function prepareAcceptOffer(offer: Uint8Array, params: AcceptOfferParams)
   )
   try {
     return FfiConverterTypePreparedContract.lift(__rb)
+  } finally {
+    nativeModule().rustbuffer_free(__rb)
+  }
+}
+
+/**
+ * Verify the offerer's sign message, then return the accepting party's half
+ * of each splice input to sign; `finalize_sign_with_signatures` takes the
+ * signatures. With no `dlc_inputs`, the unsigned funding PSBT is enough.
+ *
+ * The accept step's request lists the same inputs, so a signer may produce
+ * its halves then instead; this lets one wait until the peer has signed.
+ */
+export function prepareFinalizeSign(
+  offer: Uint8Array,
+  accept: Uint8Array,
+  sign: Uint8Array,
+): SpliceSigningRequest /*throws*/ {
+  const __rb: Uint8Array = uniffiCaller.rustCallWithError(
+    /*liftError:*/ FfiConverterTypeContractError.lift.bind(FfiConverterTypeContractError),
+    /*caller:*/ (callStatus) => {
+      return nativeModule().uniffi_ddk_ffi_fn_func_prepare_finalize_sign(
+        FfiConverterUint8Array.lower(offer, nativeModule().rustbuffer_alloc),
+        FfiConverterUint8Array.lower(accept, nativeModule().rustbuffer_alloc),
+        FfiConverterUint8Array.lower(sign, nativeModule().rustbuffer_alloc),
+        callStatus,
+      )
+    },
+    /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+  )
+  try {
+    return FfiConverterTypeSpliceSigningRequest.lift(__rb)
   } finally {
     nativeModule().rustbuffer_free(__rb)
   }
@@ -1099,72 +1215,6 @@ export function signAccept(
   )
   try {
     return FfiConverterTypeSignResult.lift(__rb)
-  } finally {
-    nativeModule().rustbuffer_free(__rb)
-  }
-}
-
-/**
- * Resolve and validate oracle attestations, decrypt the peer's adaptor
- * signature, and request the local signature from the provider.
- */
-export function signContractCet(
-  offer: Uint8Array,
-  accept: Uint8Array,
-  sign: Uint8Array,
-  signers: ContractSignerProvider,
-  party: Party,
-  attestations: Array<OracleAttestationRef>,
-): Uint8Array /*throws*/ {
-  const __rb: Uint8Array = uniffiCaller.rustCallWithError(
-    /*liftError:*/ FfiConverterTypeContractError.lift.bind(FfiConverterTypeContractError),
-    /*caller:*/ (callStatus) => {
-      return nativeModule().uniffi_ddk_ffi_fn_func_sign_contract_cet(
-        FfiConverterUint8Array.lower(offer, nativeModule().rustbuffer_alloc),
-        FfiConverterUint8Array.lower(accept, nativeModule().rustbuffer_alloc),
-        FfiConverterUint8Array.lower(sign, nativeModule().rustbuffer_alloc),
-        FfiConverterTypeContractSignerProvider.lower(signers, nativeModule().rustbuffer_alloc),
-        FfiConverterTypeParty.lower(party, nativeModule().rustbuffer_alloc),
-        FfiConverterSequenceTypeOracleAttestationRef.lower(attestations, nativeModule().rustbuffer_alloc),
-        callStatus,
-      )
-    },
-    /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
-  )
-  try {
-    return FfiConverterUint8Array.lift(__rb)
-  } finally {
-    nativeModule().rustbuffer_free(__rb)
-  }
-}
-
-/**
- * Sign the refund with the local party's provider. Rebuilds old fee-rule
- * contracts using the sign message and verifies the peer's stored signature.
- */
-export function signContractRefund(
-  offer: Uint8Array,
-  accept: Uint8Array,
-  sign: Uint8Array,
-  signers: ContractSignerProvider,
-  party: Party,
-): Uint8Array /*throws*/ {
-  const __rb: Uint8Array = uniffiCaller.rustCallWithError(
-    /*liftError:*/ FfiConverterTypeContractError.lift.bind(FfiConverterTypeContractError),
-    /*caller:*/ (callStatus) => {
-      return nativeModule().uniffi_ddk_ffi_fn_func_sign_contract_refund(
-        FfiConverterUint8Array.lower(offer, nativeModule().rustbuffer_alloc),
-        FfiConverterUint8Array.lower(accept, nativeModule().rustbuffer_alloc),
-        FfiConverterUint8Array.lower(sign, nativeModule().rustbuffer_alloc),
-        FfiConverterTypeContractSignerProvider.lower(signers, nativeModule().rustbuffer_alloc),
-        FfiConverterTypeParty.lower(party, nativeModule().rustbuffer_alloc),
-        callStatus,
-      )
-    },
-    /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
-  )
-  try {
-    return FfiConverterUint8Array.lift(__rb)
   } finally {
     nativeModule().rustbuffer_free(__rb)
   }
@@ -2278,12 +2328,26 @@ const FfiConverterTypeChangeOutputAndFees = (() => {
 })()
 
 /**
- * Identifies the key required by a message. A splice supplies the previous
- * contract id; a new contract is resolved by its published funding public key.
+ * Identifies the key a message needs. Every field is read from the messages,
+ * so a provider can resolve it from stored contracts or derive it directly.
  */
 export type ContractKeyRequest = {
+  /**
+   * The 33-byte funding public key that must sign, as published in the
+   * offer or accept.
+   */
   fundingPubkey: Uint8Array
-  contractId?: Uint8Array
+  /**
+   * The contract's 32-byte temporary id: the offer's, from which both
+   * parties derive their keys. For a splice input, the previous contract's,
+   * recovered from the input.
+   */
+  temporaryContractId: Uint8Array
+  /**
+   * The contract's 32-byte id: the funding txid combined with the temporary
+   * id and the funding output index.
+   */
+  contractId: Uint8Array
 }
 
 /**
@@ -2307,17 +2371,20 @@ const FfiConverterTypeContractKeyRequest = (() => {
     readFromCursor(c: Cursor): TypeName {
       return {
         fundingPubkey: FfiConverterUint8Array.readFromCursor(c),
-        contractId: FfiConverterOptionalBytes.readFromCursor(c),
+        temporaryContractId: FfiConverterUint8Array.readFromCursor(c),
+        contractId: FfiConverterUint8Array.readFromCursor(c),
       }
     }
     writeIntoCursor(value: TypeName, c: Cursor): void {
       FfiConverterUint8Array.writeIntoCursor(value.fundingPubkey, c)
-      FfiConverterOptionalBytes.writeIntoCursor(value.contractId, c)
+      FfiConverterUint8Array.writeIntoCursor(value.temporaryContractId, c)
+      FfiConverterUint8Array.writeIntoCursor(value.contractId, c)
     }
     allocationSize(value: TypeName): number {
       return (
         FfiConverterUint8Array.allocationSize(value.fundingPubkey) +
-        FfiConverterOptionalBytes.allocationSize(value.contractId)
+        FfiConverterUint8Array.allocationSize(value.temporaryContractId) +
+        FfiConverterUint8Array.allocationSize(value.contractId)
       )
     }
   }
@@ -2842,7 +2909,7 @@ const FfiConverterTypeDlcInputSigningRequest = (() => {
 
 /**
  * An oracle attestation paired with the position of the oracle that produced it
- * in the contract's announcements, for [`sign_contract_cet`].
+ * in the contract's announcements, for [`contract_cet_transaction`].
  */
 export type OracleAttestationRef = {
   /**
@@ -3163,23 +3230,11 @@ const FfiConverterTypeSigningContext = (() => {
 })()
 
 /**
- * Everything one party signs with its contract key in one step.
+ * This party's half of every splice (DLC) input: part of each
+ * [`SigningRequest`], and what [`prepare_finalize_sign`] returns to the
+ * accepting party once the offerer's sign message has been verified.
  */
-export type SigningRequest = {
-  /**
-   * The 33-byte funding public key every refund and CET signature must
-   * verify against: this party's, from the messages.
-   */
-  fundingPubkey: Uint8Array
-  /**
-   * The refund transaction as a PSBT spending the 2-of-2 funding output,
-   * with its `witness_utxo` and `witness_script` set.
-   */
-  refundPsbt: Uint8Array
-  /**
-   * One entry per adaptor signature, in the order they are returned.
-   */
-  cets: Array<CetSigningRequest>
+export type SpliceSigningRequest = {
   /**
    * The funding transaction as a PSBT. Splice (DLC) inputs carry their
    * `witness_utxo` and 2-of-2 `witness_script` here, unlike in
@@ -3191,6 +3246,70 @@ export type SigningRequest = {
    * party signs a half of. Empty unless the offer splices a contract.
    */
   dlcInputs: Array<DlcInputSigningRequest>
+}
+
+/**
+ * Generated factory for {@link SpliceSigningRequest} record objects.
+ */
+export const SpliceSigningRequest = (() => {
+  const defaults = () => ({})
+  const create = (() => {
+    return uniffiCreateRecord<SpliceSigningRequest, ReturnType<typeof defaults>>(defaults)
+  })()
+  return Object.freeze({
+    create,
+    new: create,
+    defaults: () => Object.freeze(defaults()) as Partial<SpliceSigningRequest>,
+  })
+})()
+
+const FfiConverterTypeSpliceSigningRequest = (() => {
+  type TypeName = SpliceSigningRequest
+  class FFIConverter extends AbstractFfiConverterByteArray<TypeName> {
+    readFromCursor(c: Cursor): TypeName {
+      return {
+        fundingPsbt: FfiConverterUint8Array.readFromCursor(c),
+        dlcInputs: FfiConverterSequenceTypeDlcInputSigningRequest.readFromCursor(c),
+      }
+    }
+    writeIntoCursor(value: TypeName, c: Cursor): void {
+      FfiConverterUint8Array.writeIntoCursor(value.fundingPsbt, c)
+      FfiConverterSequenceTypeDlcInputSigningRequest.writeIntoCursor(value.dlcInputs, c)
+    }
+    allocationSize(value: TypeName): number {
+      return (
+        FfiConverterUint8Array.allocationSize(value.fundingPsbt) +
+        FfiConverterSequenceTypeDlcInputSigningRequest.allocationSize(value.dlcInputs)
+      )
+    }
+  }
+  return new FFIConverter()
+})()
+
+/**
+ * Everything one party signs with its contract key in one step.
+ */
+export type SigningRequest = {
+  /**
+   * The key every refund and CET signature must verify against: this
+   * party's funding public key, with the offer's temporary id and the
+   * contract id, all from the messages.
+   */
+  key: ContractKeyRequest
+  /**
+   * The refund transaction as a PSBT spending the 2-of-2 funding output,
+   * with its `witness_utxo` and `witness_script` set.
+   */
+  refundPsbt: Uint8Array
+  /**
+   * One entry per adaptor signature, in the order they are returned.
+   */
+  cets: Array<CetSigningRequest>
+  /**
+   * This party's halves of the splice (DLC) inputs. Nothing to sign unless
+   * the offer splices a contract.
+   */
+  splice: SpliceSigningRequest
 }
 
 /**
@@ -3213,27 +3332,24 @@ const FfiConverterTypeSigningRequest = (() => {
   class FFIConverter extends AbstractFfiConverterByteArray<TypeName> {
     readFromCursor(c: Cursor): TypeName {
       return {
-        fundingPubkey: FfiConverterUint8Array.readFromCursor(c),
+        key: FfiConverterTypeContractKeyRequest.readFromCursor(c),
         refundPsbt: FfiConverterUint8Array.readFromCursor(c),
         cets: FfiConverterSequenceTypeCetSigningRequest.readFromCursor(c),
-        fundingPsbt: FfiConverterUint8Array.readFromCursor(c),
-        dlcInputs: FfiConverterSequenceTypeDlcInputSigningRequest.readFromCursor(c),
+        splice: FfiConverterTypeSpliceSigningRequest.readFromCursor(c),
       }
     }
     writeIntoCursor(value: TypeName, c: Cursor): void {
-      FfiConverterUint8Array.writeIntoCursor(value.fundingPubkey, c)
+      FfiConverterTypeContractKeyRequest.writeIntoCursor(value.key, c)
       FfiConverterUint8Array.writeIntoCursor(value.refundPsbt, c)
       FfiConverterSequenceTypeCetSigningRequest.writeIntoCursor(value.cets, c)
-      FfiConverterUint8Array.writeIntoCursor(value.fundingPsbt, c)
-      FfiConverterSequenceTypeDlcInputSigningRequest.writeIntoCursor(value.dlcInputs, c)
+      FfiConverterTypeSpliceSigningRequest.writeIntoCursor(value.splice, c)
     }
     allocationSize(value: TypeName): number {
       return (
-        FfiConverterUint8Array.allocationSize(value.fundingPubkey) +
+        FfiConverterTypeContractKeyRequest.allocationSize(value.key) +
         FfiConverterUint8Array.allocationSize(value.refundPsbt) +
         FfiConverterSequenceTypeCetSigningRequest.allocationSize(value.cets) +
-        FfiConverterUint8Array.allocationSize(value.fundingPsbt) +
-        FfiConverterSequenceTypeDlcInputSigningRequest.allocationSize(value.dlcInputs)
+        FfiConverterTypeSpliceSigningRequest.allocationSize(value.splice)
       )
     }
   }
@@ -5173,20 +5289,20 @@ const uniffiCallbackInterfaceContractSigner: { vtable: any; register: () => void
  */
 export interface ContractKeyProviderLike {
   /**
-   * The 33-byte compressed funding public key for a contract, from its
-   * 32-byte temporary id. Publish this in the offer or accept message.
+   * The 33-byte compressed funding public key for a contract, from the
+   * offer's 32-byte temporary id. The offering party chooses that id and
+   * publishes this key in the offer; the accepting party reads the id from
+   * the offer ([`offer_temporary_contract_id`]) and publishes this key in
+   * the accept.
    */
   fundingPubkey(temporaryContractId: Uint8Array) /*throws*/ : Uint8Array
   /**
-   * Resolve a key created or restored on this provider.
+   * Derive the key a request names: from its temporary contract id, under
+   * the current scheme or the legacy one, whichever reproduces the
+   * published funding public key. Nothing is stored, so a provider built
+   * from the seed in any process can sign.
    */
   getSigner(key: ContractKeyRequest) /*throws*/ : ContractSigner
-  /**
-   * Restore a stored contract's key and return its signer. The expected
-   * public key selects the current or legacy DDK derivation. Call again
-   * after constructing a provider on restart; the registry is in memory.
-   */
-  signerForContract(temporaryContractId: Uint8Array, fundingPubkey: Uint8Array) /*throws*/ : ContractSigner
 }
 /**
  * @deprecated Use `ContractKeyProviderLike` instead.
@@ -5297,8 +5413,11 @@ export class ContractKeyProvider extends UniffiAbstractObject implements Contrac
   }
 
   /**
-   * The 33-byte compressed funding public key for a contract, from its
-   * 32-byte temporary id. Publish this in the offer or accept message.
+   * The 33-byte compressed funding public key for a contract, from the
+   * offer's 32-byte temporary id. The offering party chooses that id and
+   * publishes this key in the offer; the accepting party reads the id from
+   * the offer ([`offer_temporary_contract_id`]) and publishes this key in
+   * the accept.
    */
   fundingPubkey(temporaryContractId: Uint8Array): Uint8Array /*throws*/ {
     const __rb: Uint8Array = uniffiCaller.rustCallWithError(
@@ -5320,7 +5439,10 @@ export class ContractKeyProvider extends UniffiAbstractObject implements Contrac
   }
 
   /**
-   * Resolve a key created or restored on this provider.
+   * Derive the key a request names: from its temporary contract id, under
+   * the current scheme or the legacy one, whichever reproduces the
+   * published funding public key. Nothing is stored, so a provider built
+   * from the seed in any process can sign.
    */
   getSigner(key: ContractKeyRequest): ContractSigner /*throws*/ {
     return FfiConverterTypeContractSigner.lift(
@@ -5330,28 +5452,6 @@ export class ContractKeyProvider extends UniffiAbstractObject implements Contrac
           return nativeModule().uniffi_ddk_ffi_fn_method_contractkeyprovider_get_signer(
             uniffiTypeContractKeyProviderObjectFactory.clonePointer(this),
             FfiConverterTypeContractKeyRequest.lower(key, nativeModule().rustbuffer_alloc),
-            callStatus,
-          )
-        },
-        /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
-      ),
-    )
-  }
-
-  /**
-   * Restore a stored contract's key and return its signer. The expected
-   * public key selects the current or legacy DDK derivation. Call again
-   * after constructing a provider on restart; the registry is in memory.
-   */
-  signerForContract(temporaryContractId: Uint8Array, fundingPubkey: Uint8Array): ContractSigner /*throws*/ {
-    return FfiConverterTypeContractSigner.lift(
-      uniffiCaller.rustCallWithError(
-        /*liftError:*/ FfiConverterTypeContractError.lift.bind(FfiConverterTypeContractError),
-        /*caller:*/ (callStatus) => {
-          return nativeModule().uniffi_ddk_ffi_fn_method_contractkeyprovider_signer_for_contract(
-            uniffiTypeContractKeyProviderObjectFactory.clonePointer(this),
-            FfiConverterUint8Array.lower(temporaryContractId, nativeModule().rustbuffer_alloc),
-            FfiConverterUint8Array.lower(fundingPubkey, nativeModule().rustbuffer_alloc),
             callStatus,
           )
         },
@@ -5801,14 +5901,14 @@ const FfiConverterSequenceTypeTxOutput = new FfiConverterArray(FfiConverterTypeT
 // FfiConverter for Array<Transaction>
 const FfiConverterSequenceTypeTransaction = new FfiConverterArray(FfiConverterTypeTransaction)
 
-// FfiConverter for Uint8Array | undefined
-const FfiConverterOptionalBytes = new FfiConverterOptional(FfiConverterUint8Array)
-
 // FfiConverter for string | undefined
 const FfiConverterOptionalString = new FfiConverterOptional(FfiConverterString)
 
 // FfiConverter for Array<PayoutRow>
 const FfiConverterSequenceTypePayoutRow = new FfiConverterArray(FfiConverterTypePayoutRow)
+
+// FfiConverter for Uint8Array | undefined
+const FfiConverterOptionalBytes = new FfiConverterOptional(FfiConverterUint8Array)
 
 // FfiConverter for Array<TxInputInfo>
 const FfiConverterSequenceTypeTxInputInfo = new FfiConverterArray(FfiConverterTypeTxInputInfo)
@@ -5825,6 +5925,9 @@ const FfiConverterSequenceTypeDlcInputSigningRequest = new FfiConverterArray(Ffi
 // FfiConverter for Array<DlcInputSignature>
 const FfiConverterSequenceTypeDlcInputSignature = new FfiConverterArray(FfiConverterTypeDlcInputSignature)
 
+// FfiConverter for Array<OracleAttestationRef>
+const FfiConverterSequenceTypeOracleAttestationRef = new FfiConverterArray(FfiConverterTypeOracleAttestationRef)
+
 // FfiConverter for Array<OracleInfo>
 const FfiConverterSequenceTypeOracleInfo = new FfiConverterArray(FfiConverterTypeOracleInfo)
 
@@ -5839,9 +5942,6 @@ const FfiConverterSequenceTypeAdaptorSignature = new FfiConverterArray(FfiConver
 
 // FfiConverter for Array<Payout>
 const FfiConverterSequenceTypePayout = new FfiConverterArray(FfiConverterTypePayout)
-
-// FfiConverter for Array<OracleAttestationRef>
-const FfiConverterSequenceTypeOracleAttestationRef = new FfiConverterArray(FfiConverterTypeOracleAttestationRef)
 
 // FfiConverter for Array<DescriptorInput>
 const FfiConverterSequenceTypeDescriptorInput = new FfiConverterArray(FfiConverterTypeDescriptorInput)
@@ -5879,8 +5979,14 @@ function uniffiEnsureInitialized() {
   if (nativeModule().uniffi_ddk_ffi_checksum_func_compute_contract_id() !== 7849) {
     throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_compute_contract_id')
   }
+  if (nativeModule().uniffi_ddk_ffi_checksum_func_contract_cet_transaction() !== 49373) {
+    throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_contract_cet_transaction')
+  }
   if (nativeModule().uniffi_ddk_ffi_checksum_func_contract_info_payouts() !== 5148) {
     throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_contract_info_payouts')
+  }
+  if (nativeModule().uniffi_ddk_ffi_checksum_func_contract_refund_transaction() !== 1019) {
+    throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_contract_refund_transaction')
   }
   if (nativeModule().uniffi_ddk_ffi_checksum_func_convert_mnemonic_to_seed() !== 29793) {
     throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_convert_mnemonic_to_seed')
@@ -5952,7 +6058,7 @@ function uniffiEnsureInitialized() {
   if (nativeModule().uniffi_ddk_ffi_checksum_func_dlc_transactions_from_messages() !== 56492) {
     throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_dlc_transactions_from_messages')
   }
-  if (nativeModule().uniffi_ddk_ffi_checksum_func_dlc_transactions_from_signed_messages() !== 16865) {
+  if (nativeModule().uniffi_ddk_ffi_checksum_func_dlc_transactions_from_signed_messages() !== 1794) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       'uniffi_ddk_ffi_checksum_func_dlc_transactions_from_signed_messages',
     )
@@ -5965,7 +6071,7 @@ function uniffiEnsureInitialized() {
   if (nativeModule().uniffi_ddk_ffi_checksum_func_finalize_sign() !== 23772) {
     throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_finalize_sign')
   }
-  if (nativeModule().uniffi_ddk_ffi_checksum_func_finalize_sign_with_signatures() !== 49937) {
+  if (nativeModule().uniffi_ddk_ffi_checksum_func_finalize_sign_with_signatures() !== 57917) {
     throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_finalize_sign_with_signatures')
   }
   if (nativeModule().uniffi_ddk_ffi_checksum_func_funding_input() !== 64911) {
@@ -5980,20 +6086,20 @@ function uniffiEnsureInitialized() {
   if (nativeModule().uniffi_ddk_ffi_checksum_func_get_xpub_from_xpriv() !== 8843) {
     throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_get_xpub_from_xpriv')
   }
+  if (nativeModule().uniffi_ddk_ffi_checksum_func_offer_temporary_contract_id() !== 26687) {
+    throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_offer_temporary_contract_id')
+  }
   if (nativeModule().uniffi_ddk_ffi_checksum_func_prepare_accept_offer() !== 6591) {
     throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_prepare_accept_offer')
+  }
+  if (nativeModule().uniffi_ddk_ffi_checksum_func_prepare_finalize_sign() !== 34574) {
+    throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_prepare_finalize_sign')
   }
   if (nativeModule().uniffi_ddk_ffi_checksum_func_prepare_sign_accept() !== 27065) {
     throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_prepare_sign_accept')
   }
   if (nativeModule().uniffi_ddk_ffi_checksum_func_sign_accept() !== 31962) {
     throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_sign_accept')
-  }
-  if (nativeModule().uniffi_ddk_ffi_checksum_func_sign_contract_cet() !== 6549) {
-    throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_sign_contract_cet')
-  }
-  if (nativeModule().uniffi_ddk_ffi_checksum_func_sign_contract_refund() !== 44377) {
-    throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_sign_contract_refund')
   }
   if (nativeModule().uniffi_ddk_ffi_checksum_func_sign_funding_psbt_with_descriptor() !== 25961) {
     throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_func_sign_funding_psbt_with_descriptor')
@@ -6038,18 +6144,13 @@ function uniffiEnsureInitialized() {
       'uniffi_ddk_ffi_checksum_constructor_contractkeyprovider_from_xprv',
     )
   }
-  if (nativeModule().uniffi_ddk_ffi_checksum_method_contractkeyprovider_funding_pubkey() !== 58577) {
+  if (nativeModule().uniffi_ddk_ffi_checksum_method_contractkeyprovider_funding_pubkey() !== 27722) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       'uniffi_ddk_ffi_checksum_method_contractkeyprovider_funding_pubkey',
     )
   }
-  if (nativeModule().uniffi_ddk_ffi_checksum_method_contractkeyprovider_get_signer() !== 52172) {
+  if (nativeModule().uniffi_ddk_ffi_checksum_method_contractkeyprovider_get_signer() !== 12380) {
     throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_method_contractkeyprovider_get_signer')
-  }
-  if (nativeModule().uniffi_ddk_ffi_checksum_method_contractkeyprovider_signer_for_contract() !== 2756) {
-    throw new UniffiInternalError.ApiChecksumMismatch(
-      'uniffi_ddk_ffi_checksum_method_contractkeyprovider_signer_for_contract',
-    )
   }
   if (nativeModule().uniffi_ddk_ffi_checksum_method_contractsigner_sign_ecdsa() !== 10248) {
     throw new UniffiInternalError.ApiChecksumMismatch('uniffi_ddk_ffi_checksum_method_contractsigner_sign_ecdsa')
@@ -6119,6 +6220,7 @@ export default Object.freeze({
     FfiConverterTypeSigningContext,
     FfiConverterTypeSigningRequest,
     FfiConverterTypeSigningResponse,
+    FfiConverterTypeSpliceSigningRequest,
     FfiConverterTypeTransaction,
     FfiConverterTypeTxInput,
     FfiConverterTypeTxInputInfo,

@@ -4,12 +4,20 @@ use crate::contract::{to_array_32, ContractError};
 use secp256k1_zkp::{EcdsaAdaptorSignature, Message, PublicKey, Secp256k1, SecretKey};
 use std::sync::Arc;
 
-/// Identifies the key required by a message. A splice supplies the previous
-/// contract id; a new contract is resolved by its published funding public key.
-#[derive(Clone, uniffi::Record)]
+/// Identifies the key a message needs. Every field is read from the messages,
+/// so a provider can resolve it from stored contracts or derive it directly.
+#[derive(Clone, Debug, PartialEq, Eq, uniffi::Record)]
 pub struct ContractKeyRequest {
+    /// The 33-byte funding public key that must sign, as published in the
+    /// offer or accept.
     pub funding_pubkey: Vec<u8>,
-    pub contract_id: Option<Vec<u8>>,
+    /// The contract's 32-byte temporary id: the offer's, from which both
+    /// parties derive their keys. For a splice input, the previous contract's,
+    /// recovered from the input.
+    pub temporary_contract_id: Vec<u8>,
+    /// The contract's 32-byte id: the funding txid combined with the temporary
+    /// id and the funding output index.
+    pub contract_id: Vec<u8>,
 }
 
 /// Implement in the consumer to resolve stored contracts, legacy derivation

@@ -45,7 +45,6 @@ export interface CompatVectors {
     totalCollateralSats: string
     offerCollateralSats: string
     offerTempIdHex: string
-    acceptTempIdHex: string
     feeRatePerVb: string
     cetLocktime: number
     refundLocktime: number
@@ -63,7 +62,6 @@ export interface CompatVectors {
     totalCollateralSats: string
     spliceSerialId: string
     offerTempIdHex: string
-    acceptTempIdHex: string
     attestationHex: string
     attestedOutcome: string
   }
@@ -141,7 +139,6 @@ export function buildAccept(
 ): { accept: Uint8Array; fundingPsbt: Uint8Array } {
   const { acceptor, contract } = vectors
   const acceptorKeys = ddk.ContractKeyProvider.fromDescriptor(acceptor.descriptor)
-  const acceptTempId = fromHexString(contract.acceptTempIdHex)
   const acceptorInput = ddk.fundingInput(
     fromHexString(acceptor.fundingPrevTxHex),
     acceptor.fundingVout,
@@ -154,7 +151,7 @@ export function buildAccept(
     offer,
     {
       party: {
-        fundingPubkey: acceptorKeys.fundingPubkey(acceptTempId),
+        fundingPubkey: acceptorKeys.fundingPubkey(ddk.offerTemporaryContractId(offer)),
         fundingInputs: [acceptorInput],
         payoutSpk: fromHexString(acceptor.payoutSpkHex),
         payoutSerialId: 4n,
@@ -212,12 +209,11 @@ export function buildSpliceAccept(
 ): { accept2: Uint8Array; fundingPsbt2: Uint8Array } {
   const { acceptor, contract, splice } = vectors
   const acceptorKeys = ddk.ContractKeyProvider.fromDescriptor(acceptor.descriptor)
-  const accept2TempId = fromHexString(splice.acceptTempIdHex)
   const result = ddk.acceptOffer(
     offer2,
     {
       party: {
-        fundingPubkey: acceptorKeys.fundingPubkey(accept2TempId),
+        fundingPubkey: acceptorKeys.fundingPubkey(ddk.offerTemporaryContractId(offer2)),
         fundingInputs: [],
         payoutSpk: fromHexString(acceptor.payoutSpkHex),
         payoutSerialId: 4n,
@@ -244,15 +240,6 @@ export function runDdkReplay(ddk: any, vectors: CompatVectors): Record<string, s
 
   const offererKeys = ddk.ContractKeyProvider.fromDescriptor(offerer.descriptor)
   const acceptorKeys = ddk.ContractKeyProvider.fromDescriptor(acceptor.descriptor)
-  const offerTempId = fromHexString(contract.offerTempIdHex)
-  const acceptTempId = fromHexString(contract.acceptTempIdHex)
-
-  // Restore the deterministic keys used by this committed current-scheme fixture.
-  offererKeys.fundingPubkey(offerTempId)
-  acceptorKeys.fundingPubkey(acceptTempId)
-  offererKeys.fundingPubkey(fromHexString(splice.offerTempIdHex))
-  acceptorKeys.fundingPubkey(fromHexString(splice.acceptTempIdHex))
-
   // --- contract 1: the offer must reproduce byte-exactly ---
   out.offerHex = toHexString(buildOffer(ddk, vectors))
 
@@ -291,11 +278,11 @@ export function runDdkReplay(ddk: any, vectors: CompatVectors): Record<string, s
   out.fundingTxHex = toHexString(ddk.finalizeSign(offer, accept, sign, acceptorSignedPsbt, acceptorKeys))
   out.contractIdHex = toHexString(ddk.computeContractId(offer, accept))
   out.cetHex = toHexString(
-    ddk.signContractCet(offer, accept, sign, offererKeys, ddk.Party.Offer, [
+    ddk.contractCetTransaction(offer, accept, sign, [
       { oracleIndex: 0, attestation: fromHexString(contract.attestationHex) },
     ]),
   )
-  out.refundHex = toHexString(ddk.signContractRefund(offer, accept, sign, acceptorKeys, ddk.Party.Accept))
+  out.refundHex = toHexString(ddk.contractRefundTransaction(offer, accept, sign))
 
   // --- contract 2: splice successor ---
   const { spliceInput, offer2 } = buildSpliceOffer(ddk, vectors, offer, accept, sign)
@@ -320,7 +307,7 @@ export function runDdkReplay(ddk: any, vectors: CompatVectors): Record<string, s
   )
   out.contractId2Hex = toHexString(ddk.computeContractId(offer2Committed, accept2))
   out.cet2Hex = toHexString(
-    ddk.signContractCet(offer2Committed, accept2, sign2, acceptorKeys, ddk.Party.Accept, [
+    ddk.contractCetTransaction(offer2Committed, accept2, sign2, [
       { oracleIndex: 0, attestation: fromHexString(splice.attestationHex) },
     ]),
   )
