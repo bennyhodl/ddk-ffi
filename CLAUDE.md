@@ -623,6 +623,34 @@ Gotchas hit doing the 0.75 → 0.80 bump, all likely to recur:
   linkage is correct either way; the failure is on the Java side. Only launching
   the app finds it, which is what `just native e2e-android` is for.
 
+**`pod install` can die with `ArgumentError - pathname contains null byte`**
+(CocoaPods/CocoaPods#12798), intermittently, on the macOS runners and on any
+Ruby that shows the bug. pnpm installs `react-native` as a symlink into
+`node_modules/.pnpm`, every React pod is a `:path` pod under it, and CocoaPods
+resolves each pod's base path with Ruby's `realdirpath`, which corrupts the
+long symlink target now and then. `examples/react-native/react-native.config.js`
+therefore sets `reactNativePath` to the real directory — the same fix Expo's
+autolinking carries (expo/expo#34203) — so CocoaPods never walks the symlink.
+Consequences to expect: the committed `Podfile.lock` and the `REACT_NATIVE_PATH`
+in `project.pbxproj` embed the pnpm store path, hash included, so a change to
+react-native's peer set rewrites them on the next `pod install`. Commit that
+churn; don't hand-edit the paths back to `../node_modules/react-native`, and
+don't replace the fix with a retry.
+
+**A Release example app that segfaults on launch, in
+`ReactInstance::initializeRuntime` with no ddk frames, is a Hermes variant
+mismatch, not a bindings bug.** `pod install` re-extracts the *debug* Hermes
+into `Pods/hermes-engine` but leaves RN's `Pods/.last_build_configuration`
+marker alone; a later Release build reads "Release" there, skips the
+"[Hermes] Replace Hermes for the right configuration" phase, and links a
+debugger-enabled Hermes into a Release app. `hermes.h` declares
+`debugJavaScript` under `HERMES_ENABLE_DEBUGGER` right before
+`registerForProfiling`, so the vtable shifts by one slot and the first virtual
+call lands on the wrong method (`KERN_INVALID_ADDRESS at 0x17`). CI never sees
+it because Pods is fresh there. The `build:ios` script and `just native example-ios`
+delete the marker after `pod install`; if you run `pod install` by hand, delete
+`Pods/.last_build_configuration` before building Release.
+
 ## Code Generation
 
 All TypeScript, C++, iOS, and Android code is automatically generated from the Rust code and UDL definitions. Do not manually edit generated files as they will be overwritten on the next build.

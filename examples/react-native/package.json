@@ -8,7 +8,7 @@
     "start": "react-native start",
     "typecheck": "tsc --noEmit",
     "build:android": "cd android && ./gradlew assembleRelease --no-daemon --console=plain",
-    "build:ios": "cd ios && pod install && xcodebuild -workspace DdkRnExample.xcworkspace -scheme DdkRnExample -configuration Release -sdk iphonesimulator -destination \"generic/platform=iOS Simulator\" -derivedDataPath build CODE_SIGNING_ALLOWED=NO ARCHS=arm64 ONLY_ACTIVE_ARCH=YES build",
+    "build:ios": "cd ios && pod install && rm -f Pods/.last_build_configuration && xcodebuild -workspace DdkRnExample.xcworkspace -scheme DdkRnExample -configuration Release -sdk iphonesimulator -destination \"generic/platform=iOS Simulator\" -derivedDataPath build CODE_SIGNING_ALLOWED=NO ARCHS=arm64 ONLY_ACTIVE_ARCH=YES build",
     "check": "pnpm typecheck"
   },
   "dependencies": {
