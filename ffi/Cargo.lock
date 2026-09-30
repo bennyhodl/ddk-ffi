@@ -429,7 +429,7 @@ dependencies = [
 
 [[package]]
 name = "ddk_ffi"
-version = "1.0.0-rc6"
+version = "1.0.0-rc7"
 dependencies = [
  "async-trait",
  "bip39",
