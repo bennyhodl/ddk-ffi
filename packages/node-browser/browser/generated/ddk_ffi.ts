@@ -2614,7 +2614,9 @@ export type CreateOfferParams = {
    */
   feeRatePerVb: bigint
   /**
-   * The earliest time CETs can be broadcast.
+   * The earliest time CETs can be broadcast; not after the closest oracle
+   * event maturity. The offer's creation time lets a CET settle as soon as
+   * the oracles attest.
    */
   cetLocktime: number
   /**
