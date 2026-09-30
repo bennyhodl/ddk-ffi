@@ -326,7 +326,9 @@ pub struct CreateOfferParams {
     pub fund_output_serial_id: Option<u64>,
     /// The fee rate, in satoshis per virtual byte.
     pub fee_rate_per_vb: u64,
-    /// The earliest time CETs can be broadcast.
+    /// The earliest time CETs can be broadcast; not after the closest oracle
+    /// event maturity. The offer's creation time lets a CET settle as soon as
+    /// the oracles attest.
     pub cet_locktime: u32,
     /// The time after which the refund transaction can be broadcast.
     pub refund_locktime: u32,
@@ -350,7 +352,7 @@ impl CreateOfferParams {
             party: self.party.into_rust()?,
             fund_output_serial_id: self.fund_output_serial_id,
             fee_rate_per_vb: self.fee_rate_per_vb,
-            cet_locktime: self.cet_locktime,
+            cet_locktime: Some(self.cet_locktime),
             refund_locktime: self.refund_locktime,
             contract_flags: self.contract_flags,
         })
@@ -959,8 +961,8 @@ pub(crate) mod tests {
     const ORACLE_SECRET: [u8; 32] = [88; 32];
     const ORACLE_NONCE_SECRET: [u8; 32] = [90; 32];
     const EVENT_ID: &str = "ddk-ffi-test";
-    /// The fixture announcement's maturity. `validate_offer` pins an offer's
-    /// `cet_locktime` to the closest maturity date, so the two must stay equal.
+    /// The fixture announcement's maturity. `validate_offer` rejects an offer
+    /// whose `cet_locktime` is after the closest maturity date.
     const EVENT_MATURITY_EPOCH: u32 = 750;
     /// Far enough past the maturity to sit inside the 100..=100_000 timeout
     /// interval the tests accept offers with.
@@ -1146,7 +1148,7 @@ pub(crate) mod tests {
             party: offerer.rust.clone(),
             fund_output_serial_id: Some(500),
             fee_rate_per_vb: 2,
-            cet_locktime: EVENT_MATURITY_EPOCH,
+            cet_locktime: Some(EVENT_MATURITY_EPOCH),
             refund_locktime: REFUND_LOCKTIME,
             contract_flags: 0,
         };
@@ -1185,7 +1187,7 @@ pub(crate) mod tests {
             party: offerer.rust,
             fund_output_serial_id: Some(500),
             fee_rate_per_vb: 2,
-            cet_locktime: EVENT_MATURITY_EPOCH,
+            cet_locktime: Some(EVENT_MATURITY_EPOCH),
             refund_locktime: REFUND_LOCKTIME,
             contract_flags: 0,
         })

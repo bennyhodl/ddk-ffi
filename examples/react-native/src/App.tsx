@@ -203,8 +203,8 @@ export default function App() {
         },
         fundOutputSerialId: 3n,
         feeRatePerVb: 2n,
-        // Must equal the maturity epoch of the announcement in CONTRACT_INFO_HEX:
-        // acceptOffer pins the CET locktime to the closest maturity date.
+        // At most the maturity epoch of the announcement in CONTRACT_INFO_HEX:
+        // acceptOffer rejects a CET locktime after the closest maturity date.
         cetLocktime: 750,
         refundLocktime: 1_000,
         contractFlags: 0,
