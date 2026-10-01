@@ -12,16 +12,16 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@atomicfinance/bitcoin-ddk-provider": "4.3.6",
-    "@atomicfinance/bitcoin-js-wallet-provider": "4.3.6",
-    "@atomicfinance/bitcoin-rpc-provider": "4.3.6",
-    "@atomicfinance/client": "4.3.6",
-    "@atomicfinance/types": "4.3.6",
+    "@atomicfinance/bitcoin-ddk-provider": "5.0.0",
+    "@atomicfinance/bitcoin-js-wallet-provider": "5.0.0",
+    "@atomicfinance/bitcoin-rpc-provider": "5.0.0",
+    "@atomicfinance/client": "5.0.0",
+    "@atomicfinance/types": "5.0.0",
     "@bennyblader/ddk": "workspace:*",
     "@node-dlc/bitcoin": "1.2.1",
     "@node-dlc/messaging": "1.2.1",
     "@noble/curves": "^1.6.0",
-    "bal-ddk-ts": "npm:@bennyblader/ddk-ts@0.3.42",
+    "bal-ddk": "npm:@bennyblader/ddk@1.0.0-rc7",
     "bitcoin-network": "0.1.0",
     "bitcoinjs-lib": "6.1.7",
     "bs58check": "^2.1.2"

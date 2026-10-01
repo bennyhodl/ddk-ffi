@@ -392,13 +392,11 @@ that bite:
 `tests/compatibility/README.md`; the parts that bite:
 
 - Everything installs from npm: the BAL party is the **latest published
-  release** (`@atomicfinance/* 4.3.6`) paired with `@bennyblader/ddk-ts@0.3.42`
-  as its engine — the exact combination production ships. Only a current
-  `just build node` is needed locally. Two wiring details: 0.3.42 is installed
-  under the **`bal-ddk-ts` alias** (it must coexist with `link:../packages/node-browser`),
-  and it carries a **pnpm patch** (`tests/compatibility/patches/`, wired in
-  the root `pnpm-workspace.yaml`) removing its mislabeled `"type": "module"` —
-  its dist is CJS; same patch orange-grove ships. `@node-dlc` is pinned to
+  release** (`@atomicfinance/* 5.0.0`) on a published ddk engine
+  (`@bennyblader/ddk@1.0.0-rc7`; BAL 5 requires rc7 or later and checks it at
+  construction). Only a current `just build node` is needed locally. The
+  engine is installed under the **`bal-ddk` alias** so it coexists with the
+  workspace ddk the ddk party tests. `@node-dlc` is pinned to
   exactly `1.2.1` (what all BAL packages pin) so message-class identity is
   shared with BAL's internals — do not loosen those pins.
 - `just test compatibility` runs everything (message byte-parity, cross-party
@@ -414,14 +412,12 @@ that bite:
   two together and keep them on the version you run locally. Same reasoning as
   the NDK and Maestro pins, with one extra edge: an unpinned consensus node
   means CI proves compatibility against whatever Core released last.
-- **Temporarily, CI runs only `test:messages`.** The regtest half creates
-  contracts with released BAL 4.3.6 on its 0.3.42 engine, which uses the fee
-  rule before ddk-dlc 2.0.0-rc.4, so 5 single-funded and splice creation tests
-  fail against this ddk. Switch the `BAL compatibility suite` step back to
-  `pnpm test` once compat's BAL party is a BAL release on this engine
-  (AtomicFinance/bitcoin-abstraction-layer#217). Run the full suite locally
-  with `just test compatibility` until then. The Bitcoin Core install step stays so
-  that the switch back is one line.
+- **Every spec file runs in its own fork** (`vitest.config.ts` has no
+  `singleFork`). The generated bindings cannot be evaluated twice in one
+  process: vitest re-evaluates them per file, Rust still holds the previous
+  instance's foreign handles (`Signers`), and the next callback segfaults —
+  every file passes alone and the full run dies with `Channel closed`.
+  `fileParallelism: false` still runs files one at a time on the shared chain.
 - **Vectors couple three files.** `just compat-vectors` rewrites
   `tests/compatibility/vectors/compat-vectors.json` AND the generated
   `examples/react-native/src/compatVectors.ts` + `compatReplay.ts` (a verbatim copy

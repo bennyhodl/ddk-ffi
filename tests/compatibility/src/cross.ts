@@ -68,7 +68,7 @@ export function spliceWitnessShimNeeded(): boolean {
  * puts a single-element witness [signature] in the sign message's funding
  * signatures, while BAL's finalizeDlcSign indexes witnessElement[1] expecting
  * [signature, publicKey] and crashes on ddk's form (published
- * @atomicfinance/bitcoin-ddk-provider@4.3.6, dist/BitcoinDdkProvider.js:1029). ddk itself only reads the
+ * @atomicfinance/bitcoin-ddk-provider@5.0.0, dist/BitcoinDdkProvider.js:1137). ddk itself only reads the
  * first element, so the two-element form is accepted by both. This shim
  * appends the DLC input's localFundPubkey (the key the splice offerer signed
  * with) so BAL can finalize. Nothing signs over the sign message, so the
@@ -132,7 +132,7 @@ export async function enterDdkOfferBalAccept(
   const balTransactions = acceptResponse.dlcTransactions
 
   // KNOWN BAL BUG (BitcoinDdkProvider.acceptDlcOffer — in the published
-  // @atomicfinance/bitcoin-ddk-provider@4.3.6, dist/BitcoinDdkProvider.js:1968):
+  // @atomicfinance/bitcoin-ddk-provider@5.0.0, dist/BitcoinDdkProvider.js:2174):
   // it sets accept.temporaryContractId = sha256(offer.serialize()) instead of
   // echoing the offer's temporary contract id as the DLC spec requires. BAL
   // never notices (it derives everything from the offer side), but any

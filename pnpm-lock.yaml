@@ -4,11 +4,6 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
-patchedDependencies:
-  '@bennyblader/ddk-ts@0.3.42':
-    hash: a1c676b82694cb414c0b990e51e846186e83a93b98f7444d0d2f356bd34671ac
-    path: tests/compatibility/patches/@bennyblader__ddk-ts@0.3.42.patch
-
 importers:
 
   .:
@@ -202,20 +197,20 @@ importers:
   tests/compatibility:
     dependencies:
       '@atomicfinance/bitcoin-ddk-provider':
-        specifier: 4.3.6
-        version: 4.3.6
+        specifier: 5.0.0
+        version: 5.0.0
       '@atomicfinance/bitcoin-js-wallet-provider':
-        specifier: 4.3.6
-        version: 4.3.6
+        specifier: 5.0.0
+        version: 5.0.0
       '@atomicfinance/bitcoin-rpc-provider':
-        specifier: 4.3.6
-        version: 4.3.6(@bitcoin-js/tiny-secp256k1-asmjs@2.2.4)(ecpair@2.1.0)
+        specifier: 5.0.0
+        version: 5.0.0(@bitcoin-js/tiny-secp256k1-asmjs@2.2.4)(ecpair@2.1.0)
       '@atomicfinance/client':
-        specifier: 4.3.6
-        version: 4.3.6(@bitcoin-js/tiny-secp256k1-asmjs@2.2.4)(ecpair@2.1.0)
+        specifier: 5.0.0
+        version: 5.0.0(@bitcoin-js/tiny-secp256k1-asmjs@2.2.4)(ecpair@2.1.0)
       '@atomicfinance/types':
-        specifier: 4.3.6
-        version: 4.3.6
+        specifier: 5.0.0
+        version: 5.0.0
       '@bennyblader/ddk':
         specifier: workspace:*
         version: link:../../packages/node-browser
@@ -228,9 +223,9 @@ importers:
       '@node-dlc/messaging':
         specifier: 1.2.1
         version: 1.2.1
-      bal-ddk-ts:
-        specifier: npm:@bennyblader/ddk-ts@0.3.42
-        version: '@bennyblader/ddk-ts@0.3.42(patch_hash=a1c676b82694cb414c0b990e51e846186e83a93b98f7444d0d2f356bd34671ac)'
+      bal-ddk:
+        specifier: npm:@bennyblader/ddk@1.0.0-rc7
+        version: '@bennyblader/ddk@1.0.0-rc7'
       bitcoin-network:
         specifier: 0.1.0
         version: 0.1.0
@@ -271,51 +266,51 @@ packages:
   '@ark/util@0.56.0':
     resolution: {integrity: sha512-BghfRC8b9pNs3vBoDJhcta0/c1J1rsoS1+HgVUreMFPdhz/CRAKReAu57YEllNaSy98rWAdY1gE+gFup7OXpgA==}
 
-  '@atomicfinance/bitcoin-ddk-provider@4.3.6':
-    resolution: {integrity: sha512-K6/IuaoCXcD/J/YSmKMI65UfwXBnQR32hfnTQe6xsvHkjlZQXJjVOb/qVB+/ohzyoIgvgVjION8sAYZc1rTAQw==}
+  '@atomicfinance/bitcoin-ddk-provider@5.0.0':
+    resolution: {integrity: sha512-vahMxbRWaKSyG0d7DoZbGgKalDpADp4e2j8eS/cCX2Q9RpXdaUIQ7Gn7N1ir6xB6YwpTgA8l7fIBs+YnipTRyQ==}
 
-  '@atomicfinance/bitcoin-js-wallet-provider@4.3.6':
-    resolution: {integrity: sha512-yLpHd3wHmhtStlOrvPX6hx4I78ejnigxI5+uNRPNfPSwjqcL50I1LAkpV3ddkr1BGAW92hZf0Om5kJuyVhV3RA==}
+  '@atomicfinance/bitcoin-js-wallet-provider@5.0.0':
+    resolution: {integrity: sha512-sQErpsRZD6pRUVgKmrPUubWYaJX/IF0HEtn6PVZAin6NbnP2awyUQzdIellU3AgoNUxIirLYRbgdO8CClq8QrQ==}
     engines: {node: '>=14'}
 
-  '@atomicfinance/bitcoin-rpc-provider@4.3.6':
-    resolution: {integrity: sha512-tTSycH4Ich3GSesvN4n0D4ADJP6dgK4gttxSW/ldZgMWRO6iFa7Amjq8yMgZyh+7dVoigR5YgK7D+gozL5nI5A==}
+  '@atomicfinance/bitcoin-rpc-provider@5.0.0':
+    resolution: {integrity: sha512-3ZozjgTJ4E6KiyyAyOg9cfmKuv9ZnD6VN2c8cAEQtTW3ZY31wBn54n/E6NXRQWK3EI73yyVOPiHp8cU7ulWOug==}
     engines: {node: '>=14'}
 
-  '@atomicfinance/bitcoin-utils@4.3.6':
-    resolution: {integrity: sha512-uvk5JulpA04j7ok2Ho2u7FW69/ihP4+I/vNTbRG/roD0PPB8L7ZzJS2YLJ32KYujPbE0Zh/I2tj1sQo66vuPxg==}
+  '@atomicfinance/bitcoin-utils@5.0.0':
+    resolution: {integrity: sha512-seWlVOMrY3Pk905wBSQOCM0pJtkhQqoFwzDkOHS8JJgOfaftV2Yp/s+mZhySDdcJXt3zJZu25o4XsWwJpUY3MQ==}
     engines: {node: '>=14'}
 
-  '@atomicfinance/bitcoin-wallet-provider@4.3.6':
-    resolution: {integrity: sha512-GX3GHFWpXZB8LXUSgrswm8J7jomp/bqL34Vlczo+afJaqJHzP3NQosFjtaudsj11ZE22u4OmJAoPl7sfuVA+Mg==}
+  '@atomicfinance/bitcoin-wallet-provider@5.0.0':
+    resolution: {integrity: sha512-fk9oFlIa/LoVjaFknhp/4iklV09kmjBwwFmRPL+uDkGdCcsmJUZ73+QP9r+5oqv+4OBG9r36sXg0kRPXxi1LxQ==}
 
-  '@atomicfinance/client@4.3.6':
-    resolution: {integrity: sha512-G4rfbaP7HnpxrJSRy9gxxvGMH7ppcJWPHTZwiqH/cMIgdFhlvkoYNNkIfNGfZD1im7Ilz+oLNpdUPbXpdl2r4A==}
+  '@atomicfinance/client@5.0.0':
+    resolution: {integrity: sha512-rRNvmimjjH2a1E69X+tmGhRa6KwKJrH3tx/d6JTXKmSDAa7YsBuEsrLIPlgmReFUyMXaihNEUTV7bbZTmiZXjw==}
 
-  '@atomicfinance/crypto@4.3.6':
-    resolution: {integrity: sha512-Y/thNaUQ716Us8Xupbk+STVvOQWU8WgZHyrUn+Vac1zzhaZlh3yRYjUZVJ+NaaVh87lh3yvEVDWZluBmiNPzOQ==}
+  '@atomicfinance/crypto@5.0.0':
+    resolution: {integrity: sha512-5u7SoXHp7IeJ4ju83MO2MT+Vj3JEkW79xoGPZ7idtM7AxTYRv/qJepiIMrUPaJFb8UH4ojLPqrphL+gE24GQ6A==}
     engines: {node: '>=14'}
 
-  '@atomicfinance/errors@4.3.6':
-    resolution: {integrity: sha512-q9Q1CDREPPUkLi3UTZBkIDSukTMdjmVLdS1e+je0YweKOg3GBi8xwMzKMXjy9BdOluJTcos/Grp9q+A3aFj/bA==}
+  '@atomicfinance/errors@5.0.0':
+    resolution: {integrity: sha512-l3Ytqo5tm6ZK9L8oYONxOXWXxaFs2GVe3bUHY18W2wRPh1+/naHjhlWr9JGls000+dgEpxwyLtzhufX699kRrA==}
     engines: {node: '>=14'}
 
-  '@atomicfinance/jsonrpc-provider@4.3.6':
-    resolution: {integrity: sha512-zVZlq4n9s6ASmmpugst/rACgQu/f+g5M3V02N/Yhs26eAD/vnsyP42eR0GMftxj/7C+0NwgHc8ADGySJbbTCdg==}
+  '@atomicfinance/jsonrpc-provider@5.0.0':
+    resolution: {integrity: sha512-JmbDamSZJNniNbggxQkUBa3cwuXi9LYe8W0Mvg9uqRZlB2jK9vQ+3EpBLemYKREzSogHfDBty8e8rgKv6LnFUA==}
     engines: {node: '>=14'}
 
-  '@atomicfinance/node-provider@4.3.6':
-    resolution: {integrity: sha512-WrsOEZpQLc+D67jwtV0peQszW3X6kY5G+8h9+LH0o9PwSQwDduwxzFrMw6PXpi/TJS3+FfhV+ZtYIVOA+Byh1Q==}
+  '@atomicfinance/node-provider@5.0.0':
+    resolution: {integrity: sha512-y3/Pm1iB6mucmNuGn9vopdVGa9GxIe/UIw/mKqmkJTmpJ8+/XTHCvIUjhOvcWsQJXQ3uHeOkWYouX7FeKS/C5A==}
     engines: {node: '>=14'}
 
-  '@atomicfinance/provider@4.3.6':
-    resolution: {integrity: sha512-N89ymj+qMXj410tAAQzaaRe9/WxwjceflkXaq/CVpaZiKX52xH7RFzIx/bH3EJeLIF89e4cjiutrpe4F95Hytw==}
+  '@atomicfinance/provider@5.0.0':
+    resolution: {integrity: sha512-Vr8RC7cEn6E+FR7C02G7kyV4Nex5cvgN0iRYEwqp1cGdcLLEgfwfpOdD7xJaeNDGTh6PpEqVW3iZsybxbXNP6A==}
 
-  '@atomicfinance/types@4.3.6':
-    resolution: {integrity: sha512-OaxG5RHOby98jcdwZ7YymCpjP6L3oEu5FxN4EW+dGuFOxVqdUSc7qv66VZ16/rsX16ybfELUXfTPrgvUYyEITg==}
+  '@atomicfinance/types@5.0.0':
+    resolution: {integrity: sha512-augGPQk5XzPaseMMqDNLvKZWp+rQruesGERoA46a/rrObhjXEXeC38sglA4gYWXrKY1dXw48dILwq9njorSXGg==}
 
-  '@atomicfinance/utils@4.3.6':
-    resolution: {integrity: sha512-DxugfWF/PAWVf4EjjXS15Mj0Ebt9IgM3TOvJexfa+s8o9jYaDxoxAx4L+e52NQ4rOvOofBUxPxM3R6mScI6u8A==}
+  '@atomicfinance/utils@5.0.0':
+    resolution: {integrity: sha512-3SRgYDxU2xPKxZ9kPp+rshH3mMSwsR6b4GUVPGPaRa2rP2c2+DnSHBti92KtwHu6U/HZd8wkPypVSorbSHNAXg==}
     engines: {node: '>=14'}
     peerDependencies:
       '@bitcoin-js/tiny-secp256k1-asmjs': ^2.2.0
@@ -1023,21 +1018,19 @@ packages:
   '@bcoe/v8-coverage@0.2.3':
     resolution: {integrity: sha512-0hYQ8SB4Db5zvZB4axdMHGwEaQjkZzFjQiN9LVYvIFB2nSUHW9tYpxWriPrWDASIxiaXax83REcLxuSdnGPZtw==}
 
-  '@bennyblader/ddk-ts-darwin-arm64@0.3.42':
-    resolution: {integrity: sha512-6AXhl8UmU42cfSTyu6aSQTwm3EPhJiHjHE0zTWDv+P1aPZiUsNbFZOY81fnz1t5w0KE9t06IaEYY3Mf0Q0ne9Q==}
-    engines: {node: '>= 6.14.2 < 7 || >= 8.11.2 < 9 || >= 9.11.0 < 10 || >= 10.0.0'}
+  '@bennyblader/ddk-darwin-arm64@1.0.0-rc7':
+    resolution: {integrity: sha512-TE5y8mfTaF4QN3f8prNmJ4imMEVSxukW29JfTBf2pFpTj312S4yOIcysARvUVANtSHEwbjY//cWP6KZnz67FzQ==}
     cpu: [arm64]
     os: [darwin]
 
-  '@bennyblader/ddk-ts-linux-x64-gnu@0.3.42':
-    resolution: {integrity: sha512-Q/ZmjiXj3IWDfI4QXyEha9S6b9ZZ+T4NRDhvaY6ShhixdStT6mR43hkFw+5WRWxoWMT2HALjkct54L3VyWUjig==}
-    engines: {node: '>= 6.14.2 < 7 || >= 8.11.2 < 9 || >= 9.11.0 < 10 || >= 10.0.0'}
+  '@bennyblader/ddk-linux-x64-gnu@1.0.0-rc7':
+    resolution: {integrity: sha512-cyHE1w9NjlHjcekOPR8i57tWgKGqbwNHSByhPTWM9qabJQ+tPeTN7r2jN1I41Yz3G1oaqV1PQ5ieP7JjtFonYQ==}
     cpu: [x64]
     os: [linux]
 
-  '@bennyblader/ddk-ts@0.3.42':
-    resolution: {integrity: sha512-fTifJ0bUCQSMxBJGpefTx6VciLdCL1tNWiW9P+gR7295d+2N35VySJhaMupLG+ctU50oNzP8u/YhvwIHMURYUQ==}
-    engines: {node: '>= 6.14.2 < 7 || >= 8.11.2 < 9 || >= 9.11.0 < 10 || >= 10.0.0'}
+  '@bennyblader/ddk@1.0.0-rc7':
+    resolution: {integrity: sha512-1GtFyLv5VguMwpmlmsEHNsvBcWl3JHtS+fGs9RZXpLiulh1RHjec9baBo9U/QMpHWszMYS8VLDzc4AN3I0/E9A==}
+    engines: {node: '>= 18'}
 
   '@bitcoin-js/tiny-secp256k1-asmjs@2.2.4':
     resolution: {integrity: sha512-Lo62disBIDwPrYAmMsSjEmqak41yb0OFGQVLdktXmcQLgtC1BI5Sd1eHSxNREKZmxMUXevtsgEhGB1DvvatRmQ==}
@@ -6037,12 +6030,12 @@ snapshots:
 
   '@ark/util@0.56.0': {}
 
-  '@atomicfinance/bitcoin-ddk-provider@4.3.6':
+  '@atomicfinance/bitcoin-ddk-provider@5.0.0':
     dependencies:
-      '@atomicfinance/bitcoin-utils': 4.3.6(@bitcoin-js/tiny-secp256k1-asmjs@2.2.4)(ecpair@2.1.0)
-      '@atomicfinance/provider': 4.3.6
-      '@atomicfinance/types': 4.3.6
-      '@atomicfinance/utils': 4.3.6(@bitcoin-js/tiny-secp256k1-asmjs@2.2.4)(ecpair@2.1.0)
+      '@atomicfinance/bitcoin-utils': 5.0.0(@bitcoin-js/tiny-secp256k1-asmjs@2.2.4)(ecpair@2.1.0)
+      '@atomicfinance/provider': 5.0.0
+      '@atomicfinance/types': 5.0.0
+      '@atomicfinance/utils': 5.0.0(@bitcoin-js/tiny-secp256k1-asmjs@2.2.4)(ecpair@2.1.0)
       '@bitcoin-js/tiny-secp256k1-asmjs': 2.2.4
       bignumber.js: 9.3.1
       bip66: 1.1.5
@@ -6050,13 +6043,13 @@ snapshots:
       bitcoinjs-lib: 6.1.7
       ecpair: 2.1.0
 
-  '@atomicfinance/bitcoin-js-wallet-provider@4.3.6':
+  '@atomicfinance/bitcoin-js-wallet-provider@5.0.0':
     dependencies:
-      '@atomicfinance/bitcoin-utils': 4.3.6(@bitcoin-js/tiny-secp256k1-asmjs@2.2.4)(ecpair@2.1.0)
-      '@atomicfinance/bitcoin-wallet-provider': 4.3.6(@bitcoin-js/tiny-secp256k1-asmjs@2.2.4)(ecpair@2.1.0)
-      '@atomicfinance/provider': 4.3.6
-      '@atomicfinance/types': 4.3.6
-      '@atomicfinance/utils': 4.3.6(@bitcoin-js/tiny-secp256k1-asmjs@2.2.4)(ecpair@2.1.0)
+      '@atomicfinance/bitcoin-utils': 5.0.0(@bitcoin-js/tiny-secp256k1-asmjs@2.2.4)(ecpair@2.1.0)
+      '@atomicfinance/bitcoin-wallet-provider': 5.0.0(@bitcoin-js/tiny-secp256k1-asmjs@2.2.4)(ecpair@2.1.0)
+      '@atomicfinance/provider': 5.0.0
+      '@atomicfinance/types': 5.0.0
+      '@atomicfinance/utils': 5.0.0(@bitcoin-js/tiny-secp256k1-asmjs@2.2.4)(ecpair@2.1.0)
       '@babel/runtime': 7.29.7
       '@bitcoin-js/tiny-secp256k1-asmjs': 2.2.4
       '@node-dlc/core': 1.2.1
@@ -6067,13 +6060,13 @@ snapshots:
       bitcoinjs-message: 2.2.0
       ecpair: 2.1.0
 
-  '@atomicfinance/bitcoin-rpc-provider@4.3.6(@bitcoin-js/tiny-secp256k1-asmjs@2.2.4)(ecpair@2.1.0)':
+  '@atomicfinance/bitcoin-rpc-provider@5.0.0(@bitcoin-js/tiny-secp256k1-asmjs@2.2.4)(ecpair@2.1.0)':
     dependencies:
-      '@atomicfinance/bitcoin-utils': 4.3.6(@bitcoin-js/tiny-secp256k1-asmjs@2.2.4)(ecpair@2.1.0)
-      '@atomicfinance/errors': 4.3.6
-      '@atomicfinance/jsonrpc-provider': 4.3.6
-      '@atomicfinance/types': 4.3.6
-      '@atomicfinance/utils': 4.3.6(@bitcoin-js/tiny-secp256k1-asmjs@2.2.4)(ecpair@2.1.0)
+      '@atomicfinance/bitcoin-utils': 5.0.0(@bitcoin-js/tiny-secp256k1-asmjs@2.2.4)(ecpair@2.1.0)
+      '@atomicfinance/errors': 5.0.0
+      '@atomicfinance/jsonrpc-provider': 5.0.0
+      '@atomicfinance/types': 5.0.0
+      '@atomicfinance/utils': 5.0.0(@bitcoin-js/tiny-secp256k1-asmjs@2.2.4)(ecpair@2.1.0)
       '@babel/runtime': 7.29.7
       bignumber.js: 9.3.1
       bitcoin-network: 0.1.0
@@ -6083,12 +6076,12 @@ snapshots:
       - debug
       - ecpair
 
-  '@atomicfinance/bitcoin-utils@4.3.6(@bitcoin-js/tiny-secp256k1-asmjs@2.2.4)(ecpair@2.1.0)':
+  '@atomicfinance/bitcoin-utils@5.0.0(@bitcoin-js/tiny-secp256k1-asmjs@2.2.4)(ecpair@2.1.0)':
     dependencies:
-      '@atomicfinance/crypto': 4.3.6
-      '@atomicfinance/errors': 4.3.6
-      '@atomicfinance/types': 4.3.6
-      '@atomicfinance/utils': 4.3.6(@bitcoin-js/tiny-secp256k1-asmjs@2.2.4)(ecpair@2.1.0)
+      '@atomicfinance/crypto': 5.0.0
+      '@atomicfinance/errors': 5.0.0
+      '@atomicfinance/types': 5.0.0
+      '@atomicfinance/utils': 5.0.0(@bitcoin-js/tiny-secp256k1-asmjs@2.2.4)(ecpair@2.1.0)
       '@babel/runtime': 7.29.7
       bignumber.js: 9.3.1
       bip174: 2.1.1
@@ -6100,13 +6093,13 @@ snapshots:
       - '@bitcoin-js/tiny-secp256k1-asmjs'
       - ecpair
 
-  '@atomicfinance/bitcoin-wallet-provider@4.3.6(@bitcoin-js/tiny-secp256k1-asmjs@2.2.4)(ecpair@2.1.0)':
+  '@atomicfinance/bitcoin-wallet-provider@5.0.0(@bitcoin-js/tiny-secp256k1-asmjs@2.2.4)(ecpair@2.1.0)':
     dependencies:
-      '@atomicfinance/bitcoin-utils': 4.3.6(@bitcoin-js/tiny-secp256k1-asmjs@2.2.4)(ecpair@2.1.0)
-      '@atomicfinance/errors': 4.3.6
-      '@atomicfinance/provider': 4.3.6
-      '@atomicfinance/types': 4.3.6
-      '@atomicfinance/utils': 4.3.6(@bitcoin-js/tiny-secp256k1-asmjs@2.2.4)(ecpair@2.1.0)
+      '@atomicfinance/bitcoin-utils': 5.0.0(@bitcoin-js/tiny-secp256k1-asmjs@2.2.4)(ecpair@2.1.0)
+      '@atomicfinance/errors': 5.0.0
+      '@atomicfinance/provider': 5.0.0
+      '@atomicfinance/types': 5.0.0
+      '@atomicfinance/utils': 5.0.0(@bitcoin-js/tiny-secp256k1-asmjs@2.2.4)(ecpair@2.1.0)
       '@node-dlc/core': 1.2.1
       bip32: 2.0.6
       bitcoin-network: 0.1.0
@@ -6117,12 +6110,12 @@ snapshots:
       - '@bitcoin-js/tiny-secp256k1-asmjs'
       - ecpair
 
-  '@atomicfinance/client@4.3.6(@bitcoin-js/tiny-secp256k1-asmjs@2.2.4)(ecpair@2.1.0)':
+  '@atomicfinance/client@5.0.0(@bitcoin-js/tiny-secp256k1-asmjs@2.2.4)(ecpair@2.1.0)':
     dependencies:
-      '@atomicfinance/bitcoin-utils': 4.3.6(@bitcoin-js/tiny-secp256k1-asmjs@2.2.4)(ecpair@2.1.0)
-      '@atomicfinance/errors': 4.3.6
-      '@atomicfinance/provider': 4.3.6
-      '@atomicfinance/types': 4.3.6
+      '@atomicfinance/bitcoin-utils': 5.0.0(@bitcoin-js/tiny-secp256k1-asmjs@2.2.4)(ecpair@2.1.0)
+      '@atomicfinance/errors': 5.0.0
+      '@atomicfinance/provider': 5.0.0
+      '@atomicfinance/types': 5.0.0
       '@node-dlc/bitcoin': 1.2.1
       '@node-dlc/messaging': 1.2.1
       ajv: 6.15.0
@@ -6131,18 +6124,18 @@ snapshots:
       - '@bitcoin-js/tiny-secp256k1-asmjs'
       - ecpair
 
-  '@atomicfinance/crypto@4.3.6':
+  '@atomicfinance/crypto@5.0.0':
     dependencies:
       bech32: 1.1.4
       bs58: 4.0.1
       crypto-hashing: 1.0.0
 
-  '@atomicfinance/errors@4.3.6': {}
+  '@atomicfinance/errors@5.0.0': {}
 
-  '@atomicfinance/jsonrpc-provider@4.3.6':
+  '@atomicfinance/jsonrpc-provider@5.0.0':
     dependencies:
-      '@atomicfinance/errors': 4.3.6
-      '@atomicfinance/node-provider': 4.3.6
+      '@atomicfinance/errors': 5.0.0
+      '@atomicfinance/node-provider': 5.0.0
       '@babel/runtime': 7.29.7
       '@types/lodash': 4.17.25
       json-bigint: 1.0.0
@@ -6150,10 +6143,10 @@ snapshots:
     transitivePeerDependencies:
       - debug
 
-  '@atomicfinance/node-provider@4.3.6':
+  '@atomicfinance/node-provider@5.0.0':
     dependencies:
-      '@atomicfinance/errors': 4.3.6
-      '@atomicfinance/provider': 4.3.6
+      '@atomicfinance/errors': 5.0.0
+      '@atomicfinance/provider': 5.0.0
       '@babel/runtime': 7.29.7
       '@types/lodash': 4.17.25
       axios: 0.21.4
@@ -6161,23 +6154,23 @@ snapshots:
     transitivePeerDependencies:
       - debug
 
-  '@atomicfinance/provider@4.3.6':
+  '@atomicfinance/provider@5.0.0':
     dependencies:
-      '@atomicfinance/types': 4.3.6
+      '@atomicfinance/types': 5.0.0
       lodash: 4.18.1
 
-  '@atomicfinance/types@4.3.6':
+  '@atomicfinance/types@5.0.0':
     dependencies:
       '@node-dlc/bitcoin': 1.2.1
       '@node-dlc/messaging': 1.2.1
       '@node-dlc/noise': 1.2.1
       lodash: 4.18.1
 
-  '@atomicfinance/utils@4.3.6(@bitcoin-js/tiny-secp256k1-asmjs@2.2.4)(ecpair@2.1.0)':
+  '@atomicfinance/utils@5.0.0(@bitcoin-js/tiny-secp256k1-asmjs@2.2.4)(ecpair@2.1.0)':
     dependencies:
-      '@atomicfinance/crypto': 4.3.6
-      '@atomicfinance/errors': 4.3.6
-      '@atomicfinance/types': 4.3.6
+      '@atomicfinance/crypto': 5.0.0
+      '@atomicfinance/errors': 5.0.0
+      '@atomicfinance/types': 5.0.0
       '@babel/runtime': 7.29.7
       bignumber.js: 9.3.1
       bip174: 2.1.1
@@ -7066,16 +7059,20 @@ snapshots:
 
   '@bcoe/v8-coverage@0.2.3': {}
 
-  '@bennyblader/ddk-ts-darwin-arm64@0.3.42':
+  '@bennyblader/ddk-darwin-arm64@1.0.0-rc7':
     optional: true
 
-  '@bennyblader/ddk-ts-linux-x64-gnu@0.3.42':
+  '@bennyblader/ddk-linux-x64-gnu@1.0.0-rc7':
     optional: true
 
-  '@bennyblader/ddk-ts@0.3.42(patch_hash=a1c676b82694cb414c0b990e51e846186e83a93b98f7444d0d2f356bd34671ac)':
+  '@bennyblader/ddk@1.0.0-rc7':
+    dependencies:
+      '@ubjs/core': 0.31.0-5
+      '@ubjs/node': 0.31.0-5
+      '@ubjs/wasm': 0.31.0-5(@ubjs/core@0.31.0-5)
     optionalDependencies:
-      '@bennyblader/ddk-ts-darwin-arm64': 0.3.42
-      '@bennyblader/ddk-ts-linux-x64-gnu': 0.3.42
+      '@bennyblader/ddk-darwin-arm64': 1.0.0-rc7
+      '@bennyblader/ddk-linux-x64-gnu': 1.0.0-rc7
 
   '@bitcoin-js/tiny-secp256k1-asmjs@2.2.4':
     dependencies:
