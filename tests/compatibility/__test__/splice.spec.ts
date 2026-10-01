@@ -125,7 +125,6 @@ describe('splice: ddk offers the successor contract, BAL accepts', () => {
       ddkTransactions: ddk.dlcTransactionsFromMessages(offer2, accept2),
       fundTxId: fundTxId2,
       ddkParty,
-      ddkTempId: tempId2,
       ddkIsOfferer: true,
     }
     const attestation2 = scenario2.oracle.attestEnum(scenario2.eventId, 'up')
@@ -194,12 +193,11 @@ describe('splice: BAL offers the successor contract, ddk accepts', () => {
     ddk.validateOffer(offer2, MIN_TIMEOUT_INTERVAL, MAX_TIMEOUT_INTERVAL, NOW_UNIX)
 
     // ddk accepts with no inputs (single-funded successor).
-    const tempId2 = tempId(0xd2)
     const acceptResult2 = ddk.acceptOffer(
       offer2,
       {
         party: {
-          fundingPubkey: ddkParty.keys.fundingPubkey(tempId2),
+          fundingPubkey: ddkParty.keys.fundingPubkey(ddk.offerTemporaryContractId(offer2)),
           fundingInputs: [],
           payoutSpk: ddkParty.scriptPubkey(1),
           payoutSerialId: 4n,
@@ -240,7 +238,6 @@ describe('splice: BAL offers the successor contract, ddk accepts', () => {
       ddkTransactions: ddk.dlcTransactionsFromMessages(offer2, accept2),
       fundTxId: fundTxId2,
       ddkParty,
-      ddkTempId: tempId2,
       ddkIsOfferer: false,
     }
     const attestation2 = scenario2.oracle.attestEnum(scenario2.eventId, 'down')

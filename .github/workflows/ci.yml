@@ -207,15 +207,8 @@ jobs:
             "bitcoin-${{ env.BITCOIN_VERSION }}/bin/bitcoind" /usr/local/bin/bitcoind
           bitcoind --version | head -1
 
-      # TEMPORARY: only the offline half (message parity + vectors). The regtest
-      # lifecycle and splice suites create contracts with the released BAL
-      # (4.3.6 on its 0.3.42 engine), which uses the fee rule before ddk-dlc
-      # 2.0.0-rc.4, so single-funded and splice creation cannot agree with this
-      # ddk. Switch back to `pnpm test` once compat's BAL party is a BAL release
-      # on this engine (AtomicFinance/bitcoin-abstraction-layer#217). Until then,
-      # run the full suite locally with `just test compatibility`.
-      - name: BAL compatibility suite (messages and vectors only)
-        run: cd tests/compatibility && pnpm test:messages
+      - name: BAL compatibility suite
+        run: cd tests/compatibility && pnpm test
 
       # ---- ddk-rn (React Native) -------------------------------------------
       # All packages and examples share the root pnpm workspace.

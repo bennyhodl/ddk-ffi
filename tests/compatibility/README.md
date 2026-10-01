@@ -4,25 +4,21 @@ Proves that ddk's contract/message API (ddk and ddk-rn, generated from
 `ddk-ffi`) is wire- and lifecycle-compatible with the stack lygos is migrating
 away from: **bitcoin-abstraction-layer (BAL)** + **@node-dlc 1.2.1**. The BAL
 party in every test runs the **latest published npm release**
-(`@atomicfinance/* 4.3.6`) paired with the ddk-ts release production ships as
-its engine (`@bennyblader/ddk-ts@0.3.42`) — the exact combination lygos-app
-and orange-grove run — while the ddk party runs this repo's `@bennyblader/ddk`
-(the renamed ddk-ts). The two
-sides exchange nothing but wire bytes.
+(`@atomicfinance/* 5.0.0`) on a published ddk engine
+(`@bennyblader/ddk@1.0.0-rc7`; BAL 5 requires rc7 or later and checks it at
+construction), while the ddk party runs this repo's `@bennyblader/ddk`. The
+two sides exchange nothing but wire bytes.
 
 Two dependency details make that pairing work:
 
-- The 0.3.42 engine is installed under the **`bal-ddk-ts` alias** so it can
-  coexist with the `link:../../packages/node-browser` the ddk party tests.
-- It carries a **pnpm patch** (`patches/`, wired in the root `pnpm-workspace.yaml`)
-  removing its mislabeled `"type": "module"` — its dist is CJS. This is the
-  same patch orange-grove ships for the same reason.
+- BAL's engine is installed under the **`bal-ddk` alias** so it can coexist
+  with the workspace `@bennyblader/ddk` the ddk party tests.
 - `@node-dlc` is pinned to exactly `1.2.1`, the version every published BAL
   package pins, so this suite's message objects and BAL's internals share one
   class identity.
 
 To test a newer BAL release, bump the `@atomicfinance/*` versions in
-`package.json` (and `bal-ddk-ts` if BAL's expected ddk engine moves) and
+`package.json` (and `bal-ddk` if BAL's required ddk engine moves) and
 re-run; the "known divergences" tests below will tell you if a bump fixed
 them.
 
@@ -78,8 +74,8 @@ into its own wallet (`ddk-compat`) and never touches other wallets.
 ## Known divergences the suite pins (tests fail when they get fixed)
 
 1. **BAL's `acceptDlcOffer` writes a non-spec `temporaryContractId`**
-   (`@atomicfinance/bitcoin-ddk-provider@4.3.6`,
-   `dist/BitcoinDdkProvider.js:1968`: `sha256(offer.serialize())` instead of
+   (`@atomicfinance/bitcoin-ddk-provider@5.0.0`,
+   `dist/BitcoinDdkProvider.js:2174`: `sha256(offer.serialize())` instead of
    echoing the offer's). BAL never notices — it derives contract ids from the
    offer side — and the orange-grove backend's hand-built accepts copy the id
    correctly, so production is unaffected; but spec-conforming counterparties
@@ -109,14 +105,6 @@ into its own wallet (`ddk-compat`) and never touches other wallets.
   zero-input accepter.
 
 ## CI
-
-> **Temporarily, CI runs only `pnpm test:messages`.** The lifecycle and splice
-> suites create contracts with BAL 4.3.6 on its 0.3.42 engine, which uses the
-> fee rule before ddk-dlc 2.0.0-rc.4, so single-funded and splice creation
-> cannot agree with this ddk. The `check` job goes back to `pnpm test` once the
-> BAL party is a BAL release on this engine
-> (AtomicFinance/bitcoin-abstraction-layer#217). Until then, run
-> `just test compatibility` locally.
 
 The whole suite runs in the `check` job of `ci.yml` — the gate, so nothing else
 builds unless ddk and BAL still agree. It sits there rather than in a job of its

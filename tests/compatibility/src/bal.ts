@@ -6,26 +6,25 @@ import * as clientPkg from '@atomicfinance/client'
 import * as balTypesPkg from '@atomicfinance/types'
 import * as nodeDlcPkg from '@node-dlc/messaging'
 import * as nodeDlcBitcoinPkg from '@node-dlc/bitcoin'
-import * as balDdkTsPkg from 'bal-ddk-ts'
+import * as balDdkPkg from 'bal-ddk'
 import * as bitcoinNetworkPkg from 'bitcoin-network'
 
 import { RPC_URL, RPC_PASS, RPC_USER, RPC_WALLET } from './config.js'
 import type { BitcoindRpc } from './rpc.js'
 
-// The BAL party is the LATEST PUBLISHED release from npm, paired with the
-// ddk-ts release production ships as its engine:
-//   @atomicfinance/* 4.3.6  +  @bennyblader/ddk-ts 0.3.42
-// (the same pairing lygos-app / orange-grove run). The 0.3.42 engine is
-// installed under the `bal-ddk-ts` alias so it can coexist with the local
-// ddk-ts the ddk party tests, and carries a pnpm patch removing its mislabeled
-// `"type": "module"` (its dist is CJS — the exact patch orange-grove ships).
-// @node-dlc resolves to the single 1.2.1 instance BAL pins, so class identity
-// stays consistent between this test code and BAL internals.
+// The BAL party is the LATEST PUBLISHED release from npm, paired with a
+// published ddk release as its engine:
+//   @atomicfinance/* 5.0.0  +  @bennyblader/ddk 1.0.0-rc7
+// (BAL 5 requires ddk 1.0.0-rc7 or later and checks it at construction). The
+// engine is installed under the `bal-ddk` alias so it can coexist with the
+// local ddk the ddk party tests. @node-dlc resolves to the single 1.2.1
+// instance BAL pins, so class identity stays consistent between this test
+// code and BAL internals.
 const pick = (pkg: any, name: string) => pkg[name] ?? pkg.default?.[name] ?? pkg.default
 
 export const nodeDlc: any = nodeDlcPkg
 export const nodeDlcBitcoin: any = nodeDlcBitcoinPkg
-export const balDdkTs: any = balDdkTsPkg
+export const balDdk: any = balDdkPkg
 export const balTypes: any = balTypesPkg
 export const bitcoinNetworks: any = pick(bitcoinNetworkPkg, 'BitcoinNetworks')
 
@@ -43,9 +42,9 @@ export interface BalParty {
 }
 
 /**
- * A BAL party exactly as production wires it (lygos-app / orange-grove):
+ * A BAL party wired the way lygos-app / orange-grove wire it:
  * BitcoinRpcProvider + BitcoinJsWalletProvider + BitcoinDdkProvider backed by
- * the published @bennyblader/ddk-ts 0.3.42.
+ * the published @bennyblader/ddk 1.0.0-rc7.
  */
 export function createBalParty(mnemonic: string): BalParty {
   const rpcProvider = new BitcoinRpcProvider({
@@ -68,7 +67,7 @@ export function createBalParty(mnemonic: string): BalParty {
       addressType: balTypes.bitcoin.AddressType.BECH32,
     }),
   )
-  client.addProvider(new BitcoinDdkProvider(regtestNetwork, balDdkTs))
+  client.addProvider(new BitcoinDdkProvider(regtestNetwork, balDdk))
 
   return { client, dlc: client.dlc }
 }

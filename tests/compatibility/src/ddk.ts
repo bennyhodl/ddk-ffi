@@ -24,7 +24,7 @@ export class DdkParty {
   readonly descriptor: string
   readonly keys: ddk.ContractKeyProviderInterface
   /** What this party signs with: its contract keys and its descriptor wallet. */
-  readonly signers: ddk.Signers
+  readonly signers: ddk.SignersLike
   private readonly masterXprv: Uint8Array
   private nextAddressIndex = 0
 
